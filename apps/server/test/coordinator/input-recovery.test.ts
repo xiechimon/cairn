@@ -59,9 +59,10 @@ test('restart restores mirror debt after receipt commit even with a failed produ
   );
   expect(seen).toHaveLength(calls);
   expect(outcomes).toEqual(['unchanged']);
-  expect(w.s.db.select().from(chiefMessage).where(inArray(chiefMessage.id, ids)).all()).toEqual(
-    rows,
-  );
+  const byId = (list: typeof rows) => [...list].sort((a, b) => a.id.localeCompare(b.id));
+  expect(
+    byId(w.s.db.select().from(chiefMessage).where(inArray(chiefMessage.id, ids)).all()),
+  ).toEqual(byId(rows));
 }, 15000);
 
 test('a failed receipt at shutdown releases the lease and recovers placed input after its parent fails', async () => {

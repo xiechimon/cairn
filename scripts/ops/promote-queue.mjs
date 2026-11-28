@@ -57,7 +57,7 @@ export function closeLandedIssues({ commits, getIssue, postComment, closeIssue, 
   for (const [issue, naming] of closingTargets(commits)) {
     try {
       const info = getIssue(issue);
-      if (!info || info.state !== 'open') continue;
+      if (info?.state !== 'open') continue;
     } catch (error) {
       warn(`issue #${issue}: ${String(error.message ?? error).split('\n')[0]}`);
       continue;

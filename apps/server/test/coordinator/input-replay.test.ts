@@ -239,7 +239,11 @@ test.each([false, true])(
     expect(JSON.stringify(rows)).toContain('endedAt');
     expect(w.executions()).toBe(1);
     expect(w.requests()).toBe(2);
-    expect(rows.filter((row) => row.role === 'assistant')).toHaveLength(2);
+    const assistant = rows.filter((row) => row.role === 'assistant');
+    expect(assistant).toHaveLength(4);
+    expect(
+      assistant.filter((row) => (row.content as { kind?: string } | null)?.kind === 'modelCall'),
+    ).toHaveLength(2);
   },
 );
 

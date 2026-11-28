@@ -97,10 +97,10 @@
     },
     {
       "id": "run-log",
-      "url": "/app/runs/turn-b?scenario=run-trace",
-      "ready": "[data-testid=\"run-failure\"]",
+      "url": "/app?scenario=run-trace&trace=1&run=turn-b",
+      "ready": "[data-testid=\"run-trace-view\"]",
       "sources": [
-        "apps/web/src/runs/run-page.tsx"
+        "apps/web/src/runs/run-trace.tsx"
       ]
     },
     {

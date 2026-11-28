@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { runListQuerySchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
@@ -14,7 +15,18 @@ export function registerRunRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const download = c.req.query('download') === '1';
     const trace = readRunTrace(ctx.db, teamId, c.req.param('runId'), download);
-    if (!download) return c.json(trace, 200, NO_STORE);
+    if (!download) {
+      const etag = `"${createHash('sha256').update(JSON.stringify(trace)).digest('hex')}"`;
+      const headers = { ...NO_STORE, etag };
+      if (
+        c.req
+          .header('if-none-match')
+          ?.split(',')
+          .some((value) => value.trim() === etag)
+      )
+        return new Response(null, { status: 304, headers });
+      return c.json(trace, 200, headers);
+    }
     return new Response(`${JSON.stringify(trace, null, 2)}\n`, {
       headers: {
         ...NO_STORE,
@@ -31,9 +43,11 @@ export function registerRunRoutes(app: Hono, ctx: AppContext): void {
     return c.json(
       listRuns(ctx.db, teamId, {
         thread: query.thread,
+        todo: query.todo,
         limit: query.limit,
         before: query.before,
         problems: query.problems === '1',
+        includeCounts: query.includeCounts === '1',
       }),
       200,
       NO_STORE,

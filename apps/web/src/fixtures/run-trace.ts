@@ -128,12 +128,71 @@ const stoppedTrace: RunTrace = {
   ],
 };
 
+const wakeTrace: RunTrace = {
+  kind: 'coordinator',
+  id: 'turn-w',
+  title: '',
+  threadId: 'thread-run-trace',
+  todoId: null,
+  status: 'done',
+  startedAt: base - HOUR / 4,
+  finishedAt: base - HOUR / 4 + 9_000,
+  models: ['claude-sonnet-5'],
+  usage: { input: 9_800, output: 620, cacheRead: 4_000, cacheWrite: 0 },
+  failure: null,
+  items: [
+    { kind: 'wake', id: 'wake-turn-w', at: base - HOUR / 4, reason: 'failed' },
+    {
+      kind: 'model',
+      id: 'model-turn-w-1',
+      at: base - HOUR / 4 + 500,
+      model: 'claude-sonnet-5',
+      usage: { input: 4_900, output: 310, cacheRead: 2_000, cacheWrite: 0 },
+      startedAt: base - HOUR / 4 + 400,
+      endedAt: base - HOUR / 4 + 8_000,
+    },
+    tool(
+      'call_notify',
+      base - HOUR / 4 + 8_200,
+      'notify_user',
+      { message: '任务 #11 完成：CONTRIBUTING.md 已写好。' },
+      { notified: true },
+    ),
+    { kind: 'reply', id: 'msg-turn-w-2', at: base - HOUR / 4 + 8_800, text: '已通知。' },
+  ],
+};
+
+const liveTrace: RunTrace = {
+  ...wakeTrace,
+  id: 'turn-live',
+  status: 'running',
+  startedAt: base - HOUR / 3,
+  finishedAt: null,
+  items: [
+    {
+      kind: 'user',
+      id: 'user-turn-live',
+      at: base - HOUR / 3,
+      text: '把 README 里的安装步骤按新流程重写',
+    },
+    tool(
+      'call_live_read',
+      base - HOUR / 3 + 2_000,
+      'read',
+      { path: 'README.md' },
+      '# Cairn\n\n安装…',
+      false,
+      base - HOUR / 3 + 3_000,
+    ),
+  ],
+};
+
 const taskTrace: RunTrace = {
   kind: 'task',
   id: 'build-r',
   title: '#12 修复设置页 390 宽度下的横向滚动',
   threadId: null,
-  todoId: 'todo-r',
+  todoId: 'r3-contributing',
   status: 'done',
   startedAt: base - HOUR / 2,
   finishedAt: base - HOUR / 2 + 660_000,
@@ -193,6 +252,22 @@ const olderTurns: RunListRow[] = Array.from({ length: 22 }, (_, n) =>
 );
 
 const runs: RunListRow[] = [
+  turn({
+    id: 'turn-live',
+    at: liveTrace.startedAt,
+    status: 'running',
+    firstLine: '把 README 里的安装步骤按新流程重写',
+    toolCount: 1,
+    durationMs: null,
+  }),
+  turn({
+    id: 'turn-w',
+    at: wakeTrace.startedAt,
+    firstLine: '',
+    woke: true,
+    toolCount: 1,
+    durationMs: 9_000,
+  }),
   turn({
     id: 'turn-s',
     at: stoppedTrace.startedAt,
@@ -257,6 +332,8 @@ export const RUN_TRACE_SCENARIOS: Record<string, FixtureSet> = {
       'turn-a': doneTrace,
       'turn-b': failedTrace,
       'turn-s': stoppedTrace,
+      'turn-w': wakeTrace,
+      'turn-live': liveTrace,
       'build-r': taskTrace,
     },
   },

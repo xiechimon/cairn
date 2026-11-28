@@ -1903,9 +1903,9 @@
     },
     {
       "id": "run-log",
-      "name": "Run log",
-      "summary": "Every Coordinator turn and task run kept as a full trace in one run window: a left list of runs (this conversation or every conversation and task run in the team, an optional problems filter) and the selected run's trace on the right (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls and JSON export; reached from the Coordinator mark, the Run log link on a failed or stopped turn, or the task menu.",
-      "states": "Loading skeleton, not found, failed to load with retry, a done turn, a failed turn with a failing tool and a recovered tool error, a stopped turn, a task build, a long tool output shortened with the export holding the full text; the run list on this conversation or all, problems filter off (default) or on, grouped today, yesterday and by date, no runs at all, no problem runs, paging on scroll, failed page with retry; the one-time hint beside the mark; desktop two columns and 390px list then trace with a back link, light and dark.",
+      "name": "Run trajectory",
+      "summary": "A shared Trace tab beside both the Coordinator conversation and the task conversation. It shows runs scoped to the conversation, their ordered steps, and a selected step's inputs, outputs, timing and reported model usage. The Coordinator mark, task menu and failed or stopped turn links open the same tab.",
+      "states": "Empty, delayed loading, not found, retry, offline runner, running to settled, recovered or failing steps, stopped, quota-held, automatic wake, nested task calls, long capped previews with full JSON export, and keyboard navigation; desktop ledger and inspector, 390px single-pane navigation, light and dark.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1933,14 +1933,14 @@
       ],
       "verify": [],
       "research": [
-        "docs/research/dsh-sig-walk-2026-11.md"
+        "docs/research/run-trajectory-2026-11-28.md"
       ],
       "frontendDesign": [
-        "docs/design/references/coordinator-chat"
+        "docs/design/surfaces/conversation.md",
+        "docs/design/surfaces/tasks.md"
       ],
       "backendDesign": [
-        "docs/design/run-trace.md",
-        "docs/design/run-log-window.md"
+        "docs/design/run-trace.md"
       ],
       "evidence": [
         "apps/web/e2e/run-trace.spec.ts",

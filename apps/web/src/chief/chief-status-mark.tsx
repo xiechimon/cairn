@@ -3,11 +3,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
+import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { RunLogButton } from '../runs/run-log-button.js';
-import { turnRunIdOf } from '../runs/run-trace-link.js';
 import { useQuestionPending } from './chief-question.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import {
@@ -104,7 +103,7 @@ export function StatusMarkFloat({
   elapsed?: number | null;
   large?: boolean;
   className?: string;
-  runs?: { threadId: string; hintWanted: boolean };
+  runs?: { onTrace: () => void };
 }) {
   const { t } = useI18n();
   const { id, label, announce } = view;
@@ -166,16 +165,26 @@ export function StatusMarkFloat({
             </TooltipContent>
           </Tooltip>
         ) : (
-          <RunLogButton
-            threadId={runs.threadId}
-            state={name}
-            tooltip={tooltip}
-            hintWanted={runs.hintWanted}
-            hintBelow
-            className="grid size-15.5 place-items-center"
-          >
-            {glyph}
-          </RunLogButton>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  aria-label={t('Coordinator 运行记录')}
+                  aria-description={name}
+                  data-slot="status-mark-glyph"
+                  data-testid="chief-status-mark-button"
+                  className="pointer-events-auto grid size-15.5 place-items-center rounded-full border-0 p-0 hover:bg-transparent dark:hover:bg-transparent"
+                  onClick={runs.onTrace}
+                />
+              }
+            >
+              {glyph}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              {`${tooltip} · ${t('点击查看轨迹')}`}
+            </TooltipContent>
+          </Tooltip>
         )}
         {live}
       </div>
@@ -198,16 +207,26 @@ export function StatusMarkFloat({
           {glyph}
         </div>
       ) : (
-        <RunLogButton
-          threadId={runs.threadId}
-          state={name}
-          tooltip={tooltip}
-          hintWanted={runs.hintWanted}
-          hintBelow={false}
-          className="grid size-11 place-items-center"
-        >
-          {glyph}
-        </RunLogButton>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                aria-label={t('Coordinator 运行记录')}
+                aria-description={name}
+                data-slot="status-mark-glyph"
+                data-testid="chief-status-mark-button"
+                className="pointer-events-auto grid size-11 place-items-center rounded-full border-0 p-0 hover:bg-transparent dark:hover:bg-transparent"
+                onClick={runs.onTrace}
+              />
+            }
+          >
+            {glyph}
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>
+            {`${tooltip} · ${t('点击查看轨迹')}`}
+          </TooltipContent>
+        </Tooltip>
       )}
       <div
         aria-hidden="true"
@@ -237,11 +256,13 @@ export function ChiefStatusMark({
   large = false,
   hiddenWhenIdle = false,
   className = 'absolute inset-x-0 top-2.5 z-10',
+  onTrace,
 }: {
   chief: ChiefContent;
   large?: boolean;
   hiddenWhenIdle?: boolean;
   className?: string;
+  onTrace?: () => void;
 }) {
   const connected = useConnected();
   const questionPending = useQuestionPending();
@@ -269,16 +290,7 @@ export function ChiefStatusMark({
   const elapsed = useLiveSeconds(live?.kind === 'streaming' ? live.startedAt : null);
   const view = done && base.id === 'idle' ? DONE_VIEW : base;
   if (hiddenWhenIdle && view.id === 'idle') return null;
-  const runs =
-    chief.threadId === undefined
-      ? undefined
-      : {
-          threadId: chief.threadId,
-          hintWanted: stream.some(
-            (item) =>
-              (item.kind === 'error' || item.kind === 'stopped') && turnRunIdOf(item.id) !== null,
-          ),
-        };
+  const runs = onTrace === undefined ? undefined : { onTrace };
   return (
     <StatusMarkFloat
       view={view}

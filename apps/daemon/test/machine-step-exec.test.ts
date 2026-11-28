@@ -112,7 +112,10 @@ describe('step execution full chain (02 §5.7 lifecycle lines + journal endpoint
     const upload = api.uploads[0];
     expect(upload?.url).toBe('http://server/up/1');
     const ids = upload?.body.messages.map((m) => m.id);
-    expect(ids).toEqual(['user-s1', 'msg-s1-1', 'call-1']);
+    expect(ids).toEqual(['user-s1', 'msg-s1-1', 'call-1', expect.stringMatching(/^model-s1-\d+$/)]);
+    expect(upload?.body.messages.find((m) => m.id.startsWith('model-s1-'))?.content).toMatchObject({
+      kind: 'modelCall',
+    });
     expect(api.doneBodies[0]?.body).toMatchObject({
       status: 'success',
       sessionId: 'pi-sess-1',

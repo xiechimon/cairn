@@ -1,56 +1,5 @@
-import type { RunTraceItem } from '@cairn/shared';
-
-type ToolItem = Extract<RunTraceItem, { kind: 'tool' }>;
-
-export type RunRow =
-  | { type: 'item'; key: string; item: RunTraceItem; recovered: boolean }
-  | { type: 'tools'; key: string; tools: ToolItem[] };
-
-export const FOLD_MIN_TOOLS = 3;
-
-const isQuietTool = (item: RunTraceItem): item is ToolItem => item.kind === 'tool' && !item.isError;
-
-export function isProblem(item: RunTraceItem): boolean {
-  return item.kind === 'error' || (item.kind === 'tool' && item.isError);
-}
-
-export function runRows(items: readonly RunTraceItem[], problemsOnly: boolean): RunRow[] {
-  const recoveredAt = (index: number) => {
-    const item = items[index];
-    if (item?.kind !== 'tool' || !item.isError) return false;
-    return items
-      .slice(index + 1)
-      .some(
-        (later) => later.kind === 'tool' || later.kind === 'reply' || later.kind === 'thinking',
-      );
-  };
-  if (problemsOnly)
-    return items.flatMap((item, index) =>
-      isProblem(item)
-        ? [{ type: 'item' as const, key: item.id, item, recovered: recoveredAt(index) }]
-        : [],
-    );
-  const rows: RunRow[] = [];
-  let run: ToolItem[] = [];
-  const close = () => {
-    if (run.length >= FOLD_MIN_TOOLS)
-      rows.push({ type: 'tools', key: `tools-${run[0]?.id}`, tools: run });
-    else
-      for (const tool of run)
-        rows.push({ type: 'item', key: tool.id, item: tool, recovered: false });
-    run = [];
-  };
-  items.forEach((item, index) => {
-    if (isQuietTool(item)) {
-      run.push(item);
-      return;
-    }
-    close();
-    rows.push({ type: 'item', key: item.id, item, recovered: recoveredAt(index) });
-  });
-  close();
-  return rows;
-}
+import { RUN_PROBLEM_STATUSES, type RunListRow } from '@cairn/shared';
+import { dateTimeFormat } from '../lib/date-format.js';
 
 export function oneLine(value: unknown): string {
   return fullText(value).replace(/\s+/g, ' ').trim();
@@ -62,4 +11,67 @@ export function fullText(value: unknown): string {
   if (Array.isArray(value) && value.every((part) => typeof part?.text === 'string'))
     return value.map((part) => part.text as string).join('\n');
   return JSON.stringify(value, null, 2);
+}
+
+export type TraceScope =
+  | { kind: 'coordinator'; threadId: string | null }
+  | { kind: 'task'; todoId: string };
+export function toolTarget(name: string, args: unknown): string {
+  if (args === null || typeof args !== 'object' || Array.isArray(args)) return name;
+  const fields = args as Record<string, unknown>;
+  const hint = ['command', 'path', 'query', 'url', 'pattern', 'file_path', 'title', 'message']
+    .map((key) => fields[key])
+    .find((value): value is string => typeof value === 'string' && value.trim() !== '');
+  return hint === undefined ? name : `${name} ${oneLine(hint).slice(0, 60)}`;
+}
+
+export function durationText(ms: number): string {
+  if (ms < 1000) return `${Math.max(0, Math.round(ms))} ms`;
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
+
+export type LedgerFilter = 'all' | 'sent' | 'wake' | 'problems';
+
+export function formatRunHeader(at: number, locale: string): string {
+  return dateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: locale === 'zh' ? 'numeric' : 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(at);
+}
+
+export function selectLedgerRuns(
+  rows: readonly RunListRow[],
+  scope: TraceScope,
+  filter: LedgerFilter,
+  search: string,
+): RunListRow[] {
+  const needle = search.trim().toLocaleLowerCase();
+  return rows
+    .filter(
+      (row) =>
+        (scope.kind === 'coordinator'
+          ? scope.threadId !== null && row.kind === 'coordinator' && row.threadId === scope.threadId
+          : row.kind === 'task') &&
+        (filter === 'all' ||
+          (filter === 'problems'
+            ? RUN_PROBLEM_STATUSES.includes(row.status)
+            : filter === 'wake'
+              ? row.woke
+              : !row.woke)) &&
+        (!needle || row.firstLine.toLocaleLowerCase().includes(needle)),
+    )
+    .sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+}
+export function scopedRunId(
+  rows: readonly RunListRow[],
+  scope: TraceScope,
+  id: string | null,
+): string | null {
+  return id !== null && selectLedgerRuns(rows, scope, 'all', '').some((row) => row.id === id)
+    ? id
+    : null;
 }

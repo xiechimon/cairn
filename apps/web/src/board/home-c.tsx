@@ -34,6 +34,9 @@ import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/record
 import { useI18n } from '../i18n/provider.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
+import { RunTraceView } from '../runs/run-trace.js';
+import { useTraceNav } from '../runs/trace-nav.js';
+import { TraceTabs } from '../runs/trace-tabs.js';
 import {
   ARCHIVED_PROJECT_WRITE_REASON,
   ArchivedProjectBar,
@@ -219,6 +222,7 @@ export function HomeC({
   const designComposer = useDesignComposer(useActiveArtifact());
   const paneShown = threadId === null || docked;
   const narrow = useNarrow();
+  const trace = useTraceNav();
   const shortViewport = useMediaQuery('(max-height: 700px)');
   const { createTodo } = useApiMutations(teamId);
   const projectsQuery = useProjects(teamId, live);
@@ -430,7 +434,21 @@ export function HomeC({
     }
   }, [jumpMessageId, jumpKind, loadEarlier, clearJumpParam, t]);
 
+  const tracing = trace.tracing && chiefThreadId !== null;
+  const openTrace = () => trace.open();
+  const openConversation = (target: string | null) => {
+    const next = new URLSearchParams();
+    if (target !== null) {
+      next.set('project', target);
+      next.set('chat', '1');
+    }
+    next.set('trace', '1');
+    navigate({ pathname: '/app', search: `?${next.toString()}` });
+  };
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
+  const tabs = (
+    <TraceTabs tracing={tracing} onChange={(next) => (next ? trace.open() : trace.close())} />
+  );
   const paneButtons = narrow ? (
     heading
   ) : (
@@ -439,6 +457,7 @@ export function HomeC({
       className="relative z-10 flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5 in-data-[chat-top=under-header]:pointer-events-none in-data-[chat-top=under-header]:-mb-12 in-data-[chat-top=under-header]:*:pointer-events-auto"
     >
       {heading}
+      {loaded && <div className="mr-auto">{tabs}</div>}
       <IconTooltip
         label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
         side="bottom"
@@ -492,7 +511,16 @@ export function HomeC({
 
   const phoneChrome = narrow && (
     <NarrowChrome
-      mark={loaded ? <ChiefStatusMark chief={{ ...chiefData, stream }} large className="" /> : null}
+      mark={
+        loaded ? (
+          <ChiefStatusMark
+            chief={{ ...chiefData, stream }}
+            large
+            className=""
+            onTrace={openTrace}
+          />
+        ) : null
+      }
       pane={pane}
       badge={badge}
       onTasks={() => togglePane('tasks')}
@@ -638,13 +666,17 @@ export function HomeC({
         >
           {designSplit?.chatBar}
           {paneButtons}
-          {!narrow && (
+          {!narrow && !tracing && (
             <ChiefStatusMark
               chief={{ ...chiefData, stream }}
               hiddenWhenIdle={(homeSpiral && !shortViewport) || setupEmpty}
+              onTrace={openTrace}
             />
           )}
-          {homeSpiral && <HomeSpiral projects={shownProjects} waiting={waitingIds} />}
+          {narrow && !setupEmpty && (
+            <div className="mt-18 flex flex-none items-center px-4 lg:mt-2">{tabs}</div>
+          )}
+          {homeSpiral && !tracing && <HomeSpiral projects={shownProjects} waiting={waitingIds} />}
           {banner != null && (
             <div
               data-home-banner=""
@@ -653,46 +685,56 @@ export function HomeC({
               <div className="mx-auto w-full max-w-chat">{banner}</div>
             </div>
           )}
-          <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
-            <ChiefConversation
-              mentionGroups={mentionGroups}
-              focusMessageId={jumpKind === 'focus' ? jumpFocusId : null}
-              onFocusMessage={handleFocusMessage}
-              chief={{
-                ...chiefData,
-                stream: conversation,
-                ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
-              }}
-              onSend={
-                archived !== null
-                  ? undefined
-                  : surface.onSend != null
-                    ? (text: string) => surface.onSend?.(text, projectId, designComposer?.ids)
-                    : live
-                      ? undefined
-                      : () => {}
-              }
-              onRewind={archived === null ? surface.onRewind : undefined}
-              onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
-              onWithdraw={archived === null ? surface.onWithdraw : undefined}
-              unsent={archived === null ? surface.unsent : undefined}
-              onStop={archived === null ? surface.onStop : undefined}
-              composerReplacement={archivedBar}
-              pendingComments={archived === null ? designComposer : null}
-              earlier={surface.earlier}
-              onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
-              showBindGate={!live}
-              todoGlances={todoGlances}
-              draftScope={chiefDraftKeys(draftProjectId ?? projectId).scope}
-              draftStorageKey={chiefDraftKeys(draftProjectId ?? projectId).localKey}
-              prefill={prefill}
-              placeholder={composerPlaceholder}
-              notice={setupStep !== null && <SetupPrompt step={setupStep} empty={setupEmpty} />}
-              composerRef={(node) => {
-                composerRef.current = node;
-              }}
+          {tracing ? (
+            <RunTraceView
+              scope={{ kind: 'coordinator', threadId: chiefThreadId }}
+              runId={trace.runId}
+              stepId={trace.stepId}
+              onSelect={trace.select}
+              onOpenConversation={openConversation}
             />
-          </ConversationBoundary>
+          ) : (
+            <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
+              <ChiefConversation
+                mentionGroups={mentionGroups}
+                focusMessageId={jumpKind === 'focus' ? jumpFocusId : null}
+                onFocusMessage={handleFocusMessage}
+                chief={{
+                  ...chiefData,
+                  stream: conversation,
+                  ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
+                }}
+                onSend={
+                  archived !== null
+                    ? undefined
+                    : surface.onSend != null
+                      ? (text: string) => surface.onSend?.(text, projectId, designComposer?.ids)
+                      : live
+                        ? undefined
+                        : () => {}
+                }
+                onRewind={archived === null ? surface.onRewind : undefined}
+                onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
+                onWithdraw={archived === null ? surface.onWithdraw : undefined}
+                unsent={archived === null ? surface.unsent : undefined}
+                onStop={archived === null ? surface.onStop : undefined}
+                composerReplacement={archivedBar}
+                pendingComments={archived === null ? designComposer : null}
+                earlier={surface.earlier}
+                onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
+                showBindGate={!live}
+                todoGlances={todoGlances}
+                draftScope={chiefDraftKeys(draftProjectId ?? projectId).scope}
+                draftStorageKey={chiefDraftKeys(draftProjectId ?? projectId).localKey}
+                prefill={prefill}
+                placeholder={composerPlaceholder}
+                notice={setupStep !== null && <SetupPrompt step={setupStep} empty={setupEmpty} />}
+                composerRef={(node) => {
+                  composerRef.current = node;
+                }}
+              />
+            </ConversationBoundary>
+          )}
         </section>
         {designSplit?.pane ?? thread}
         {workPanel}

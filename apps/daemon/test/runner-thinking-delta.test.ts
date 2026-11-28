@@ -252,7 +252,9 @@ describe('runner transcript rows for full messages (#4064)', () => {
     ]);
     expect(client.rows.map((row) => row.content)).toEqual([
       [{ type: 'text', text: 'streamed' }],
+      { kind: 'modelCall', model: null, usage: null, startedAt: null, endedAt: null },
       [{ type: 'text', text: 'full only' }],
+      { kind: 'modelCall', model: null, usage: null, startedAt: null, endedAt: null },
     ]);
   });
 });

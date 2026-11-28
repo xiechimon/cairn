@@ -1,4 +1,5 @@
 import {
+  coordinatorModelCallSourceId,
   coordinatorTextSourceId,
   coordinatorThinkingSourceId,
   coordinatorToolSourceId,
@@ -34,6 +35,31 @@ export interface EntryRow {
   lastOfEntry: boolean;
 }
 
+function modelCallContent(message: AssistantMessage): {
+  kind: 'modelCall';
+  model: string | null;
+  usage: { input: number; output: number; cacheRead: number; cacheWrite: number } | null;
+  startedAt: number | null;
+  endedAt: number | null;
+} {
+  const usage = message.usage;
+  return {
+    kind: 'modelCall',
+    model: message.responseModel ?? message.model ?? null,
+    usage:
+      usage === undefined
+        ? null
+        : {
+            input: usage.input ?? 0,
+            output: usage.output ?? 0,
+            cacheRead: usage.cacheRead ?? 0,
+            cacheWrite: usage.cacheWrite ?? 0,
+          },
+    startedAt: message.timestamp,
+    endedAt: message.durationMs === undefined ? null : message.timestamp + message.durationMs,
+  };
+}
+
 export function entryRowSources(
   stepId: string,
   entries: readonly EntryRecord[],
@@ -56,6 +82,17 @@ export function entryRowSources(
       (message.stopReason === 'aborted' && entry.id !== stoppedEntry)
     ) {
       continue;
+    }
+    if (message.stopReason !== 'aborted') {
+      rows.push({
+        entryId: String(entry.id),
+        row: {
+          id: coordinatorModelCallSourceId(stepId, String(entry.id), storeId),
+          role: 'assistant',
+          content: modelCallContent(message),
+          createdAt: message.timestamp,
+        },
+      });
     }
     const thinking = thinkingBlocks(message);
     if (thinking !== '') {

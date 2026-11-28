@@ -666,7 +666,7 @@ test('a rebuild that changes the tree still cancels the stale run and tests the 
 
 test('entries behind a held one still start or keep their speculative runs', () => {
   queueHarness('queue-hold-tail-', (q) => {
-    const [a, b, c] = ['a', 'b', 'c'].map((name) =>
+    const [_a, b, c] = ['a', 'b', 'c'].map((name) =>
       q.commit(q.base, `${name}.txt`, `${name}\n`, `feat: ${name}`),
     );
     const aTry = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');

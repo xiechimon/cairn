@@ -5,37 +5,18 @@ import {
   type RunListRow,
   type RunTrace,
 } from '@cairn/shared';
-import { type InfiniteData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { fetchWithSession } from '../api/auth.js';
 import { ApiError, api } from '../api/client.js';
 import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
-import { RUN_PATH_PREFIX } from '../resources/hrefs.js';
-
-const RUN_SEARCH_KEYS = ['thread', 'scope', 'problems', 'scenario'] as const;
-type RunSearchKey = (typeof RUN_SEARCH_KEYS)[number];
-
-export type RunLinkTo = (
-  runId: string | null,
-  change?: Partial<Record<RunSearchKey, string | null>>,
-) => { pathname: string; search: string };
-
-export function useRunLinkTo(): RunLinkTo {
-  const [params] = useSearchParams();
-  return (runId, change = {}) => {
-    const next = new URLSearchParams();
-    for (const key of RUN_SEARCH_KEYS) {
-      const value = key in change ? change[key] : params.get(key);
-      if (value != null) next.set(key, value);
-    }
-    const search = next.toString();
-    return {
-      pathname: runId === null ? RUN_PATH_PREFIX : `${RUN_PATH_PREFIX}${encodeURIComponent(runId)}`,
-      search: search === '' ? '' : `?${search}`,
-    };
-  };
-}
+import type { TraceScope } from './run-items.js';
 
 function fixtureRunPage(
   rows: readonly RunListRow[],
@@ -54,7 +35,26 @@ function fixtureRunPage(
   return { runs, nextCursor: more ? (runs.at(-1)?.id ?? null) : null };
 }
 
-export function useRunList(threadId: string | null, problems: boolean, enabled: boolean) {
+const ACTIVE_REFRESH_MAX_MS = 10 * 60_000;
+
+function refreshing(activeSince: number | null): boolean {
+  return activeSince !== null && Date.now() - activeSince < ACTIVE_REFRESH_MAX_MS;
+}
+
+export function useRunList(
+  threadOrScope: string | null | TraceScope,
+  problems: boolean,
+  enabled: boolean,
+  includeCounts = false,
+) {
+  const scope = typeof threadOrScope === 'object' && threadOrScope !== null ? threadOrScope : null;
+  const threadId =
+    scope?.kind === 'coordinator'
+      ? scope.threadId
+      : scope
+        ? null
+        : (threadOrScope as string | null);
+  const todoId = scope?.kind === 'task' ? scope.todoId : null;
   const { live, teamId } = useLiveData();
   const [params] = useSearchParams();
   const fixture = resolveScenario(params);
@@ -63,40 +63,95 @@ export function useRunList(threadId: string | null, problems: boolean, enabled: 
       'run-list',
       live ? teamId : `fixture:${params.get('scenario') ?? ''}`,
       threadId,
+      todoId,
       problems,
+      includeCounts,
     ],
     initialPageParam: null,
     getNextPageParam: (page) => page.nextCursor,
     queryFn: ({ pageParam, signal }) => {
       if (!live)
-        return Promise.resolve(fixtureRunPage(fixture.runs ?? [], threadId, problems, pageParam));
+        return Promise.resolve(
+          fixtureRunPage(
+            todoId === null
+              ? (fixture.runs ?? [])
+              : (fixture.runs ?? []).filter(
+                  (row) => fixture.runTraces?.[row.id]?.todoId === todoId,
+                ),
+            threadId,
+            problems,
+            pageParam,
+          ),
+        );
       const query = new URLSearchParams({ problems: problems ? '1' : '0' });
       if (threadId !== null) query.set('thread', threadId);
+      if (todoId !== null) query.set('todo', todoId);
+      if (includeCounts && pageParam === null) query.set('includeCounts', '1');
       if (pageParam !== null) query.set('before', pageParam);
       return api.get<RunListPage>(`/api/teams/${teamId}/runs?${query}`, signal);
     },
-    enabled: enabled && (!live || teamId !== undefined),
+    enabled:
+      enabled &&
+      !(scope?.kind === 'coordinator' && scope.threadId === null) &&
+      (!live || teamId !== undefined),
     staleTime: 0,
+    refetchInterval: (query) => {
+      const running = (query.state.data?.pages ?? []).flatMap((page) =>
+        page.runs.filter((row) => row.status === 'running'),
+      );
+      const since = running.length === 0 ? null : Math.min(...running.map((row) => row.at));
+      return refreshing(since) ? 8000 : false;
+    },
+    refetchIntervalInBackground: false,
   });
 }
+
+const detailEtags = new Map<string, string>();
 
 export function useRunTrace(runId: string | null) {
   const { live, teamId } = useLiveData();
   const [params] = useSearchParams();
   const fixture = resolveScenario(params);
+  const queryClient = useQueryClient();
+  const scopeKey = live ? teamId : `fixture:${params.get('scenario') ?? ''}`;
+  const queryKey = ['run-trace', scopeKey, runId];
   return useQuery<RunTrace>({
-    queryKey: ['run-trace', live ? teamId : `fixture:${params.get('scenario') ?? ''}`, runId],
-    queryFn: ({ signal }) => {
-      if (runId === null) return Promise.reject(new ApiError(404, 'not found'));
-      if (live)
-        return api.get<RunTrace>(`/api/teams/${teamId}/runs/${encodeURIComponent(runId)}`, signal);
-      const trace = fixture.runTraces?.[runId];
-      return trace === undefined
-        ? Promise.reject(new ApiError(404, 'not found'))
-        : Promise.resolve(trace);
+    queryKey,
+    queryFn: async ({ signal }) => {
+      if (runId === null) throw new ApiError(404, 'not found');
+      if (!live) {
+        const trace = fixture.runTraces?.[runId];
+        if (trace === undefined) throw new ApiError(404, 'not found');
+        return trace;
+      }
+      const path = `/api/teams/${teamId}/runs/${encodeURIComponent(runId)}`;
+      const etagKey = `${String(scopeKey)}:${runId}`;
+      const read = (conditional: boolean) => {
+        const etag = detailEtags.get(etagKey);
+        return fetchWithSession(path, {
+          signal,
+          ...(conditional && etag !== undefined ? { headers: { 'if-none-match': etag } } : {}),
+        });
+      };
+      let response = await read(true);
+      if (response.status === 304) {
+        const cached = queryClient.getQueryData<RunTrace>(queryKey);
+        if (cached !== undefined) return cached;
+        response = await read(false);
+      }
+      if (!response.ok) throw new ApiError(response.status, response.statusText);
+      const etag = response.headers.get('etag');
+      if (etag !== null) detailEtags.set(etagKey, etag);
+      return (await response.json()) as RunTrace;
     },
     enabled: runId !== null && (!live || teamId !== undefined),
     retry: false,
+    refetchInterval: (query) => {
+      const trace = query.state.data;
+      if (trace?.status !== 'running' || !refreshing(trace.startedAt)) return false;
+      return trace.items.length >= 100 ? 8000 : 2000;
+    },
+    refetchIntervalInBackground: false,
   });
 }
 

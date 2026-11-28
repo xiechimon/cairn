@@ -2,6 +2,7 @@ import {
   AUTOMATIC_RETRY_ROW_KIND,
   BUILD_FAILURE_ROW_KIND,
   chiefTurnErrorContentSchema,
+  modelCallRowSchema,
   RUN_TRACE_VALUE_CAP,
   type RunListPage,
   type RunListRow,
@@ -78,18 +79,120 @@ function capped(raw: unknown, cap: boolean): { value: unknown; cut: boolean } {
   return { value: text.slice(0, RUN_TRACE_VALUE_CAP), cut: true };
 }
 
-function toolItem(row: Row, cap: boolean): RunTraceItem | null {
-  const content = row.content;
+const PREVIEW_BUDGET_CHARS = 128 * 1024;
+
+function withPreviewBudget(items: RunTraceItem[]): RunTraceItem[] {
+  let used = 0;
+  return items.map((item) => {
+    if (item.kind !== 'tool') return item;
+    const argumentsSize = JSON.stringify(item.arguments ?? null).length;
+    const size = argumentsSize + JSON.stringify(item.result ?? null).length;
+    if (used + size <= PREVIEW_BUDGET_CHARS) {
+      used += size;
+      return item;
+    }
+    if (used + argumentsSize <= PREVIEW_BUDGET_CHARS) {
+      used += argumentsSize;
+      return { ...item, result: null, truncated: true };
+    }
+    used = PREVIEW_BUDGET_CHARS;
+    return { ...item, arguments: null, result: null, truncated: true };
+  });
+}
+
+function toolCallOf(content: unknown): Record<string, unknown> | null {
   if (content === null || typeof content !== 'object' || Array.isArray(content)) return null;
-  const { kind, call } = content as { kind?: unknown; call?: Record<string, unknown> };
-  if (kind !== 'toolcall' || call === undefined || call === null) return null;
+  const { kind, call } = content as { kind?: unknown; call?: unknown };
+  return kind === 'toolcall' && call !== null && typeof call === 'object' && !Array.isArray(call)
+    ? (call as Record<string, unknown>)
+    : null;
+}
+
+function toolName(value: unknown): string {
+  return typeof value === 'string'
+    ? value
+        .replace(/^使用\s+/, '')
+        .replace(/^mcp__(?:acp_.+|cairn)__/, '')
+        .replace(/^cairn\s*\/\s*/, '')
+    : 'tool';
+}
+
+const RELAY_WRAPPER_RE = /^使用\s+mcp__acp_\w+__([A-Za-z0-9_]+)$/;
+const RELAY_DIRECT_RE = /^cairn\s*\/\s*([A-Za-z0-9_]+)$/;
+
+function payloadOf(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
+function wrapperArguments(call: Record<string, unknown>): unknown {
+  const raw = typeof call.result === 'string' ? call.result : '';
+  const section =
+    raw === ''
+      ? undefined
+      : /^入参\s*\n([\s\S]*?)(?:\n(?:出参|输出|结果)(?:\s|$)|$)/.exec(raw)?.[1];
+  if (section === undefined) return call.arguments ?? null;
+  try {
+    return JSON.parse(section) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function relayCalls(rows: readonly Row[]): Set<string> {
+  const direct = rows.flatMap((row) => {
+    const call = toolCallOf(row.content);
+    const match = RELAY_DIRECT_RE.exec(String(call?.name ?? ''));
+    return call !== null && match !== null ? [{ id: row.id, tool: match[1] ?? '', call }] : [];
+  });
+  const wrappers = rows.flatMap((row) => {
+    const call = toolCallOf(row.content);
+    const match = RELAY_WRAPPER_RE.exec(String(call?.name ?? ''));
+    if (call === null || match === null) return [];
+    if (typeof call.startedAt !== 'number' || typeof call.endedAt !== 'number') return [];
+    return [
+      {
+        id: row.id,
+        tool: match[1] ?? '',
+        args: wrapperArguments(call),
+        startedAt: call.startedAt,
+        endedAt: call.endedAt,
+      },
+    ];
+  });
+  const paired = wrappers.flatMap((wrapper) => {
+    const matches = direct.filter(
+      (candidate) =>
+        candidate.tool === wrapper.tool &&
+        typeof candidate.call.startedAt === 'number' &&
+        typeof candidate.call.endedAt === 'number' &&
+        candidate.call.startedAt >= wrapper.startedAt &&
+        candidate.call.endedAt <= wrapper.endedAt &&
+        payloadOf(candidate.call.arguments) === payloadOf(wrapper.args),
+    );
+    return matches.length === 1 ? [{ wrapper, direct: matches[0]?.id }] : [];
+  });
+  return new Set(
+    paired
+      .filter(
+        (item) =>
+          paired.filter((other) => other.direct === item.direct).length === 1 &&
+          paired.filter((other) => other.wrapper.id === item.wrapper.id).length === 1,
+      )
+      .map((item) => item.wrapper.id),
+  );
+}
+
+function toolItem(row: Row, cap: boolean): RunTraceItem | null {
+  const call = toolCallOf(row.content);
+  if (call === null || /^(?:工具执行完成|搜索工具信息)$/.test(toolName(call.name))) return null;
   const args = capped(call.arguments, cap);
   const result = capped(call.result, cap);
   return {
     kind: 'tool',
     id: row.id,
     at: typeof call.startedAt === 'number' ? call.startedAt : row.createdAt,
-    name: typeof call.name === 'string' ? call.name : 'tool',
+    name: toolName(call.name),
     arguments: args.value,
     result: result.value,
     isError: call.isError === true,
@@ -101,6 +204,11 @@ function toolItem(row: Row, cap: boolean): RunTraceItem | null {
 function assistantItems(row: Row, cap: boolean): RunTraceItem[] {
   const tool = toolItem(row, cap);
   if (tool !== null) return [tool];
+  const model = modelCallRowSchema.safeParse(row.content);
+  if (model.success) {
+    const { kind: _kind, ...fields } = model.data;
+    return [{ kind: 'model', id: row.id, at: row.createdAt, ...fields }];
+  }
   if (!Array.isArray(row.content)) {
     const text = textOf(row.content);
     return text === '' ? [] : [{ kind: 'reply', id: row.id, at: row.createdAt, text }];
@@ -171,13 +279,13 @@ function turnWindow(db: Db, row: StepRow) {
 
 function turnTrace(db: Db, thread: TeamThread, stepId: string, capResults: boolean): RunTrace {
   const found = db
-    .select({ row: step, quotaBlock: stepQuota.quotaBlock })
+    .select({ row: step, quotaBlock: stepQuota.quotaBlock, ranModel: stepQuota.ranModel })
     .from(step)
     .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .where(eq(step.id, stepId))
     .get();
   if (found === undefined) throw new HttpError(404, `run ${stepId}`);
-  const row = { ...found.row, quotaBlock: found.quotaBlock };
+  const row = { ...found.row, quotaBlock: found.quotaBlock, ranModel: found.ranModel };
   const { start, end } = turnWindow(db, row);
   const owners = new Set(row.ownerMessageIds ?? []);
   const rows = db
@@ -205,15 +313,24 @@ function turnTrace(db: Db, thread: TeamThread, stepId: string, capResults: boole
     .orderBy(asc(chiefMessage.createdAt), asc(sql`rowid`))
     .all();
   const items: RunTraceItem[] = [];
+  const wakeReason = parseChiefTrigger(row.prompt);
+  const relays = relayCalls(rows.filter((m) => m.createdAt > start && m.createdAt <= end));
   for (const m of rows) {
+    if (relays.has(m.id)) continue;
     const bound = boundToStep(m.id, stepId) || owners.has(m.id);
     if (owners.has(m.id) || m.id === stepId) {
       const text = textOf(m.content);
-      if (text !== '') items.push({ kind: 'user', id: m.id, at: m.createdAt, text });
+      if (wakeReason !== 'user' && !owners.has(m.id))
+        items.push({ kind: 'wake', id: m.id, at: m.createdAt, reason: wakeReason });
+      else if (text !== '') items.push({ kind: 'user', id: m.id, at: m.createdAt, text });
       continue;
     }
     if (m.id === transcriptPromptRowId(stepId)) {
-      items.push({ kind: 'prompt', id: m.id, at: m.createdAt, text: textOf(m.content) });
+      const text = textOf(m.content);
+      if (wakeReason !== 'user') {
+        if (!items.some((item) => item.kind === 'wake'))
+          items.push({ kind: 'wake', id: m.id, at: m.createdAt, reason: wakeReason });
+      } else items.push({ kind: 'prompt', id: m.id, at: m.createdAt, text });
       continue;
     }
     if (m.id === `${CHIEF_ERROR_PREFIX}${stepId}`) {
@@ -243,10 +360,16 @@ function turnTrace(db: Db, thread: TeamThread, stepId: string, capResults: boole
     status: turnStatus(db, row),
     startedAt: row.claimedAt ?? row.createdAt,
     finishedAt: row.claimedAt === null ? null : row.finishedAt,
-    models: [...new Set(usageRows.map((u) => u.model))],
+    models: [
+      ...new Set([
+        ...usageRows.map((u) => u.model),
+        ...items.flatMap((i) => (i.kind === 'model' && i.model ? [i.model] : [])),
+        ...(row.ranModel?.modelId ? [row.ranModel.modelId] : []),
+      ]),
+    ],
     usage: sumUsage(usageRows),
     failure: failureOf(items),
-    items,
+    items: capResults ? withPreviewBudget(items) : items,
   };
 }
 
@@ -281,13 +404,13 @@ function systemItem(row: Row): RunTraceItem | null {
 
 function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
   const steps = db
-    .select({ row: step, quotaBlock: stepQuota.quotaBlock })
+    .select({ row: step, quotaBlock: stepQuota.quotaBlock, ranModel: stepQuota.ranModel })
     .from(step)
     .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .where(eq(step.buildId, owner.id))
     .orderBy(asc(step.createdAt), asc(step.id))
     .all()
-    .map(({ row, quotaBlock }) => ({ ...row, quotaBlock }));
+    .map(({ row, quotaBlock, ranModel }) => ({ ...row, quotaBlock, ranModel }));
   const rows = db
     .select({
       id: message.id,
@@ -300,6 +423,7 @@ function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
     .orderBy(asc(message.createdAt), asc(sql`rowid`))
     .all();
   const stepIds = new Set(steps.map((s) => s.id));
+  const relays = relayCalls(rows);
   const items: RunTraceItem[] = steps.map((s) => ({
     kind: 'step',
     id: `step-${s.id}`,
@@ -307,7 +431,15 @@ function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
     stepKind: s.kind,
     status: s.status,
   }));
+  const toolIds = new Map<string, string>();
   for (const m of rows) {
+    if (relays.has(m.id)) continue;
+    const content = m.content as { kind?: string; call?: { id?: string } } | null;
+    if (content?.kind === 'toolcall' && typeof content.call?.id === 'string')
+      toolIds.set(content.call.id, m.id);
+  }
+  for (const m of rows) {
+    if (relays.has(m.id)) continue;
     if (m.role === 'user') {
       const promptOf = m.id.startsWith('user-') && stepIds.has(m.id.slice('user-'.length));
       items.push({
@@ -323,7 +455,11 @@ function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
       if (item !== null) items.push(item);
       continue;
     }
-    items.push(...assistantItems(m, capResults));
+    const projected = assistantItems(m, capResults);
+    const content = m.content as { call?: { parent?: string } } | null;
+    const parentId = content?.call?.parent ? toolIds.get(content.call.parent) : undefined;
+    if (parentId && projected[0]?.kind === 'tool') projected[0].parentId = parentId;
+    items.push(...projected);
   }
   if (owner.errorMessage !== null && owner.errorMessage.trim() !== '')
     items.push({
@@ -355,15 +491,23 @@ function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
     status: buildStatus(steps, owner),
     startedAt: steps[0]?.claimedAt ?? owner.createdAt,
     finishedAt: finished,
-    models: [...new Set(usage.map((u) => u.model))],
+    models: [
+      ...new Set([
+        ...usage.map((u) => u.model),
+        ...items.flatMap((i) => (i.kind === 'model' && i.model ? [i.model] : [])),
+        ...steps.flatMap((s) => (s.ranModel?.modelId ? [s.ranModel.modelId] : [])),
+      ]),
+    ],
     usage: sumUsage(usage),
     failure: failureOf(items),
-    items,
+    items: capResults ? withPreviewBudget(items) : items,
   };
 }
 
 export function readRunTrace(db: Db, teamId: string, id: string, full: boolean): RunTrace {
   const target = resolveRunTarget(db, teamId, id);
+  if (target.kind === 'turn' && /^(chief-digest-|chief-memory-)/.test(target.thread.id))
+    throw new HttpError(404, `run ${id}`);
   const trace =
     target.kind === 'turn'
       ? turnTrace(db, target.thread, target.stepId, !full)
@@ -401,9 +545,11 @@ function turnStatus(db: Db, row: StepWithQuotaBlock): RunStatus {
 
 export interface RunListQuery {
   thread?: string | undefined;
+  todo?: string | undefined;
   limit: number;
   before?: string | undefined;
   problems: boolean;
+  includeCounts?: boolean | undefined;
 }
 
 type Cursor = { at: number; id: string };
@@ -462,6 +608,7 @@ function turnRows(
     .all();
   return rows.map(({ row, quotaBlock, source }) => {
     const threadId = row.buildId;
+    const woke = parseChiefTrigger(row.prompt) !== 'user' && !row.ownerMessageIds?.length;
     const { start, end } = turnWindow(db, row);
     const ownerId = row.ownerMessageIds?.[0] ?? row.id;
     const owner = db
@@ -488,10 +635,11 @@ function turnRows(
       threadId,
       at: row.createdAt,
       status: turnStatus(db, { ...row, quotaBlock }),
-      firstLine: firstLineOf(
-        redactSecrets(owner === undefined ? '' : textOf(owner.content)).value as string,
-      ),
-      woke: parseChiefTrigger(row.prompt) !== 'user',
+      firstLine: (() => {
+        const text = owner === undefined ? '' : textOf(owner.content);
+        return woke ? '' : firstLineOf(redactSecrets(text).value as string);
+      })(),
+      woke,
       source,
       toolCount,
       durationMs:
@@ -518,7 +666,10 @@ function taskRows(
   query: RunListQuery,
   cursor: Cursor | null,
 ): RunListRow[] {
-  const conditions: SQL[] = [eq(todo.teamId, teamId)];
+  const conditions: SQL[] = [
+    eq(todo.teamId, teamId),
+    ...(query.todo === undefined ? [] : [eq(todo.id, query.todo)]),
+  ];
   if (query.problems)
     conditions.push(
       sql`(${BUILD_QUOTA} or ${BUILD_STOPPED} or (${BUILD_FAILED} and not ${BUILD_RUNNING}))`,
@@ -579,6 +730,27 @@ function taskRows(
   });
 }
 
+function problemCounts(db: Db, teamId: string): { threadId: string; count: number }[] {
+  return db
+    .select({ threadId: chiefThread.id, count: sql<number>`count(*)` })
+    .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+    .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
+    .where(
+      and(
+        eq(step.kind, 'chief'),
+        eq(chiefThread.teamId, teamId),
+        VISIBLE_THREAD,
+        or(
+          inArray(step.status, ['failed', 'stopped', 'waiting_quota']),
+          isNotNull(stepQuota.quotaBlock),
+        ),
+      ),
+    )
+    .groupBy(chiefThread.id)
+    .all();
+}
+
 const newestFirst = (a: RunListRow, b: RunListRow) =>
   b.at - a.at || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
 
@@ -587,7 +759,7 @@ export function listRuns(db: Db, teamId: string, query: RunListQuery): RunListPa
     throw new HttpError(404, `thread ${query.thread}`);
   const cursor = query.before === undefined ? null : parseCursor(query.before);
   const rows = [
-    ...turnRows(db, teamId, query, cursor),
+    ...(query.todo === undefined ? turnRows(db, teamId, query, cursor) : []),
     ...(query.thread === undefined ? taskRows(db, teamId, query, cursor) : []),
   ].sort(newestFirst);
   const page = rows.slice(0, query.limit);
@@ -595,5 +767,6 @@ export function listRuns(db: Db, teamId: string, query: RunListQuery): RunListPa
   return {
     runs: page,
     nextCursor: rows.length > query.limit && last !== undefined ? `${last.at}:${last.id}` : null,
+    ...(query.includeCounts && cursor === null ? { problemCounts: problemCounts(db, teamId) } : {}),
   };
 }

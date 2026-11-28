@@ -120,7 +120,7 @@ export function MoreMenu({
           {
             key: 'view-run',
             shortcut: 'T',
-            label: t('运行记录'),
+            label: t('轨迹'),
             Icon: History,
             action: 'view-run',
             disabled: false,

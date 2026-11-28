@@ -358,7 +358,20 @@ export class ConversationStreamHub {
 }
 
 function endsLiveTextBuffer(message: TranscriptRow): boolean {
-  return !isToolCallRow(message.content) && !isThinkingOnlyRow(message.content);
+  return (
+    !isToolCallRow(message.content) &&
+    !isModelCallRow(message.content) &&
+    !isThinkingOnlyRow(message.content)
+  );
+}
+
+function isModelCallRow(content: unknown): boolean {
+  return (
+    content !== null &&
+    typeof content === 'object' &&
+    !Array.isArray(content) &&
+    (content as { kind?: unknown }).kind === 'modelCall'
+  );
 }
 
 function isToolCallRow(content: unknown): boolean {

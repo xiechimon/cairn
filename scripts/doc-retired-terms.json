@@ -1,6 +1,12 @@
 {
   "terms": [
     {
+      "id": "standalone-run-log-dialog",
+      "pattern": "\\b(?:RunLogButton|run-trace-hint|run-log-button\\.tsx|runs/run-page\\.tsx)\\b",
+      "canary": "apps/web/src/runs/run-page.tsx",
+      "reason": "the Coordinator and task share a Trace tab instead of a standalone run dialog"
+    },
+    {
       "id": "plan-pass-only",
       "pattern": "(?:with `Verdict: PASS` and matching `Plan-SHA256`|`Verdict: PASS`, matching `Plan-SHA256`)",
       "canary": "with `Verdict: PASS` and matching `Plan-SHA256`",

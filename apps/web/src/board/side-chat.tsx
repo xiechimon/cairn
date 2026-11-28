@@ -48,7 +48,9 @@ import { baseName, dirName } from '../lib/path-name.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { DoubaoQrLoginCard } from '../resources/doubao-qr-login.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
-import { settingsHref } from '../settings/settings-href.js';
+import { RunTraceView } from '../runs/run-trace.js';
+import { useTraceNav } from '../runs/trace-nav.js';
+import { TraceTabs } from '../runs/trace-tabs.js';
 import { inlineArtifactKey, registerInlineArtifact } from './artifact/inline-artifact.js';
 import { type EngineRunView, engineTranscript, engineUsageSummary } from './engine-run.js';
 import { EngineQuestion, EngineRawView } from './engine-run-view.js';
@@ -943,6 +945,8 @@ function ReadyThread({
     );
   };
   const effectiveView: ThreadView = view === 'raw' && engine !== undefined ? 'raw' : 'chat';
+  const trace = useTraceNav('task');
+  const tracing = trace.tracing && effectiveView === 'chat';
   return (
     <>
       <Head
@@ -964,55 +968,69 @@ function ReadyThread({
           updates={updates}
         />
       </Head>
-      <ThreadBody
-        chat={chat}
-        todo={todo}
-        actions={actions}
-        view={effectiveView}
-        changesOpen={changesOpen}
-        onChangesOpen={onChangesOpen}
-        origin={origin}
-        onJumpToOrigin={jumpToOrigin}
-        onClose={onClose}
-        engine={engine}
-        pr={
-          prs.status === 'error' || (prs.status === 'success' && prRows.length > 0) ? (
-            <ThreadPrPanel
-              status={prs.status}
-              rows={prRows}
-              onViewChanges={
-                chat.changes.status !== 'none'
-                  ? () => {
-                      onView('chat');
-                      onChangesOpen(true);
-                      requestAnimationFrame(() =>
-                        document
-                          .querySelector('.side-panel [data-testid="side-chat-changes"]')
-                          ?.scrollIntoView({ block: 'nearest' }),
-                      );
-                    }
-                  : undefined
-              }
-              onRetry={() => void prs.refetch()}
-            />
-          ) : null
-        }
-        usage={
-          engine !== undefined ||
-          (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
-          contextPercentOf(usage.context) !== null
-            ? {
-                summary:
-                  engine === undefined
-                    ? usage.summary
-                    : engineUsageSummary(usage.summary, engine.run),
-                state: usage.state,
-                onRetry: usage.retry,
-                context: usage.context,
-              }
-            : null
-        }
-      />
+      {effectiveView === 'chat' && (
+        <div className="flex flex-none items-center px-4 pb-2">
+          <TraceTabs tracing={tracing} onChange={(next) => (next ? trace.open() : trace.close())} />
+        </div>
+      )}
+      {tracing ? (
+        <RunTraceView
+          scope={{ kind: 'task', todoId: todo.id }}
+          runId={trace.runId}
+          stepId={trace.stepId}
+          onSelect={trace.select}
+        />
+      ) : (
+        <ThreadBody
+          chat={chat}
+          todo={todo}
+          actions={actions}
+          view={effectiveView}
+          changesOpen={changesOpen}
+          onChangesOpen={onChangesOpen}
+          origin={origin}
+          onJumpToOrigin={jumpToOrigin}
+          onClose={onClose}
+          engine={engine}
+          pr={
+            prs.status === 'error' || (prs.status === 'success' && prRows.length > 0) ? (
+              <ThreadPrPanel
+                status={prs.status}
+                rows={prRows}
+                onViewChanges={
+                  chat.changes.status !== 'none'
+                    ? () => {
+                        onView('chat');
+                        onChangesOpen(true);
+                        requestAnimationFrame(() =>
+                          document
+                            .querySelector('.side-panel [data-testid="side-chat-changes"]')
+                            ?.scrollIntoView({ block: 'nearest' }),
+                        );
+                      }
+                    : undefined
+                }
+                onRetry={() => void prs.refetch()}
+              />
+            ) : null
+          }
+          usage={
+            engine !== undefined ||
+            (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
+            contextPercentOf(usage.context) !== null
+              ? {
+                  summary:
+                    engine === undefined
+                      ? usage.summary
+                      : engineUsageSummary(usage.summary, engine.run),
+                  state: usage.state,
+                  onRetry: usage.retry,
+                  context: usage.context,
+                }
+              : null
+          }
+        />
+      )}
     </>
   );
 }

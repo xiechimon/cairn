@@ -282,7 +282,49 @@ export async function consumeStepPassEvent(
         break;
       }
       if (ev.message.stopReason === 'error') stream.discardAttempt();
-      else await segments.endAssistantMessage(ev.message.content);
+      else {
+        await segments.endAssistantMessage(ev.message.content);
+        if (ev.message.stopReason === 'aborted') break;
+        const startedAt = typeof ev.message.timestamp === 'number' ? ev.message.timestamp : null;
+        const endedAt =
+          startedAt !== null && typeof ev.message.durationMs === 'number'
+            ? startedAt + ev.message.durationMs
+            : null;
+        const model =
+          typeof ev.message.responseModel === 'string'
+            ? ev.message.responseModel
+            : typeof ev.message.model === 'string'
+              ? ev.message.model
+              : null;
+        const row = {
+          id: `model-${stepId}-${startedAt ?? stream.rowCreatedAt()}`,
+          role: 'assistant' as const,
+          content: {
+            kind: 'modelCall',
+            model,
+            usage:
+              messageUsage === undefined
+                ? null
+                : {
+                    input: messageUsage.input ?? 0,
+                    output: messageUsage.output ?? 0,
+                    cacheRead: messageUsage.cacheRead ?? 0,
+                    cacheWrite: messageUsage.cacheWrite ?? 0,
+                  },
+            startedAt,
+            endedAt,
+          },
+          createdAt: stream.rowCreatedAt(),
+        };
+        transcript.upsert(row);
+        try {
+          await client.transcriptRow?.(stepId, row);
+        } catch (err: unknown) {
+          logger.step(
+            `model call row relay failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
       break;
     }
     case 'error': {

@@ -1985,7 +1985,13 @@ function settleDeliveryBlock(db: Db, record: TodoRecord): string | null {
     db
       .select({ content: message.content })
       .from(message)
-      .where(and(eq(message.conversationId, buildId), eq(message.role, 'assistant')))
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          eq(message.role, 'assistant'),
+          sql`(case when json_valid(${message.content}) then json_extract(${message.content}, '$.kind') end) is not 'modelCall'`,
+        ),
+      )
       .orderBy(desc(message.createdAt), sql`rowid desc`)
       .limit(10)
       .all()
@@ -2812,7 +2818,13 @@ export function notifyChiefTurn(
   const last = deps.db
     .select()
     .from(chiefMessage)
-    .where(and(eq(chiefMessage.threadId, threadId), eq(chiefMessage.role, 'assistant')))
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        eq(chiefMessage.role, 'assistant'),
+        sql`(case when json_valid(${chiefMessage.content}) then json_extract(${chiefMessage.content}, '$.kind') end) is not 'modelCall'`,
+      ),
+    )
     .orderBy(desc(chiefMessage.createdAt))
     .limit(1)
     .get();

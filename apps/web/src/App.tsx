@@ -33,6 +33,7 @@ import {
 import { MachineDetailRedirect } from './resources/machine-detail-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
+import { RunRedirect } from './runs/run-redirect.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 import { TrayPage } from './tray/tray-page.js';
@@ -64,13 +65,9 @@ const MachineAuthorizePage = retryableLazy(() =>
   })),
 );
 
-const RunPage = retryableLazy(() =>
-  import('./runs/run-page.js').then((m) => ({ default: m.RunPage })),
-);
-
 const DIALOG_ROUTES = withBoundary([
   { path: USAGE_PATH, element: <UsagePage /> },
-  { path: RUN_PATH, element: <RunPage /> },
+  { path: RUN_PATH, element: <RunRedirect /> },
   { path: '/app/project/new', element: <ProjectNewPage /> },
   { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
 ]);

@@ -28,8 +28,12 @@ test('tool rows and their payload identities are isolated across store replaceme
   };
   const before = entryRowSources('producer', [toolEntry], 'store_one');
   const after = entryRowSources('producer', [toolEntry], 'store_two');
-  expect(after[0]?.row.id).not.toBe(before[0]?.row.id);
-  expect(JSON.stringify(after[0]?.row.content)).not.toBe(JSON.stringify(before[0]?.row.content));
+  const toolRow = (rows: typeof before) =>
+    rows.find(({ row }) => (row.content as { kind?: string } | null)?.kind === 'toolcall');
+  expect(toolRow(after)?.row.id).not.toBe(toolRow(before)?.row.id);
+  expect(JSON.stringify(toolRow(after)?.row.content)).not.toBe(
+    JSON.stringify(toolRow(before)?.row.content),
+  );
 });
 
 test('an in-server turn stores its thinking before the reply, like a computer-run turn', () => {
@@ -48,14 +52,16 @@ test('an in-server turn stores its thinking before the reply, like a computer-ru
   };
   const rows = entryRowSources('producer', [thinkingEntry], 'store_one');
   expect(rows.map(({ row }) => row.id)).toEqual([
+    'native-store_one:producer-m5',
     'native-store_one:producer-t5',
     'native-store_one:producer-e5',
     expect.stringMatching(/^native-store_one:/),
   ]);
-  expect(rows[0]?.row.content).toEqual([
+  expect(rows[1]?.row.content).toEqual([
     { type: 'thinking', thinking: 'Check the projects first.' },
   ]);
   expect(rows.map((r) => [r.entryId, r.lastOfEntry])).toEqual([
+    ['5', false],
     ['5', false],
     ['5', false],
     ['5', true],
@@ -74,8 +80,9 @@ test('blank thinking stores nothing; an aborted entry keeps thinking only when i
   };
   const ids = (stopped?: EntryId) =>
     entryRowSources('producer', [blank, aborted], 'store_one', stopped).map(({ row }) => row.id);
-  expect(ids()).toEqual(['native-store_one:producer-e5']);
+  expect(ids()).toEqual(['native-store_one:producer-m5', 'native-store_one:producer-e5']);
   expect(ids(6 as EntryId)).toEqual([
+    'native-store_one:producer-m5',
     'native-store_one:producer-e5',
     'native-store_one:producer-t6',
   ]);

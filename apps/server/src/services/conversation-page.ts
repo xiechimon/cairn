@@ -6,12 +6,26 @@ import { HttpError } from '../lib/errors.js';
 
 const CONVERSATION_MAX_CHARS = 60000;
 
+export function traceMetadataOf(content: unknown): 'modelCall' | null {
+  let parsed: unknown = content;
+  if (typeof content === 'string') {
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  return (parsed as { kind?: unknown }).kind === 'modelCall' ? 'modelCall' : null;
+}
+
 export function messageText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) return content.map(messageText).join('\n');
   if (content === null || typeof content !== 'object') return '';
   const block = content as Record<string, unknown>;
   if (block.type === 'text' && typeof block.text === 'string') return block.text;
+  if (block.kind === 'modelCall') return '';
   if (block.kind === 'toolcall' && block.call !== null && typeof block.call === 'object') {
     const call = block.call as Record<string, unknown>;
     return `[toolcall: ${typeof call.name === 'string' ? call.name : 'unknown'}${call.isError === true ? ' (error)' : ''}; payload omitted]`;
@@ -64,6 +78,10 @@ export function readConversationPage(db: Db, conversationId: string, before?: st
       .limit(1)
       .get();
     if (!row) break;
+    if (traceMetadataOf(row.content) !== null) {
+      cursor = row;
+      continue;
+    }
     const item = {
       id: row.id,
       role: row.role,

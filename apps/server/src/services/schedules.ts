@@ -14,7 +14,7 @@ import {
   SCHEDULE_MINUTE_STEPS,
 } from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
-import { and, desc, eq, inArray, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, like, lte, max, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { databaseIdentity } from '../db/identity.js';
@@ -907,7 +907,13 @@ function extractScheduleSummary(db: Db, stepRow: typeof step.$inferSelect): stri
     const rows = db
       .select({ content: chiefMessage.content })
       .from(chiefMessage)
-      .where(and(eq(chiefMessage.threadId, stepRow.buildId), eq(chiefMessage.role, 'assistant')))
+      .where(
+        and(
+          eq(chiefMessage.threadId, stepRow.buildId),
+          eq(chiefMessage.role, 'assistant'),
+          sql`(case when json_valid(${chiefMessage.content}) then json_extract(${chiefMessage.content}, '$.kind') end) is not 'modelCall'`,
+        ),
+      )
       .orderBy(desc(chiefMessage.createdAt), desc(chiefMessage.id))
       .limit(10)
       .all();
@@ -920,7 +926,13 @@ function extractScheduleSummary(db: Db, stepRow: typeof step.$inferSelect): stri
   const msgRows = db
     .select({ content: message.content })
     .from(message)
-    .where(and(eq(message.conversationId, stepRow.buildId), eq(message.role, 'assistant')))
+    .where(
+      and(
+        eq(message.conversationId, stepRow.buildId),
+        eq(message.role, 'assistant'),
+        sql`(case when json_valid(${message.content}) then json_extract(${message.content}, '$.kind') end) is not 'modelCall'`,
+      ),
+    )
     .orderBy(desc(message.createdAt), desc(message.id))
     .limit(10)
     .all();

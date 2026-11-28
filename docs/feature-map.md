@@ -59,7 +59,7 @@
 | [Phone computers](#phones) | 2 | partial | yes | yes | yes |  |
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
-| [Run log](#run-log) | 2 | shipped | yes | yes | yes |  |
+| [Run trajectory](#run-log) | 2 | shipped | yes | yes | yes |  |
 | [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes | B5 |
 | [Token usage](#token-usage) | 2 | shipped | gap | yes | yes | B7 |
 | [Account and team](#account-and-team) | 3 | shipped | yes | yes | gap | B10 |
@@ -439,11 +439,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### run-log
 
-**Run log** (shipped). Every Coordinator turn and task run kept as a full trace in one run window: a left list of runs (this conversation or every conversation and task run in the team, an optional problems filter) and the selected run's trace on the right (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls and JSON export; reached from the Coordinator mark, the Run log link on a failed or stopped turn, or the task menu.
+**Run trajectory** (shipped). A shared Trace tab beside both the Coordinator conversation and the task conversation. It shows runs scoped to the conversation, their ordered steps, and a selected step's inputs, outputs, timing and reported model usage. The Coordinator mark, task menu and failed or stopped turn links open the same tab.
 
-- Research: [docs/research/dsh-sig-walk-2026-11.md](research/dsh-sig-walk-2026-11.md)
-- Frontend design: [docs/design/references/coordinator-chat](design/references/coordinator-chat)
-- Backend design: [docs/design/run-trace.md](design/run-trace.md), [docs/design/run-log-window.md](design/run-log-window.md)
+- Research: [docs/research/run-trajectory-2026-11-28.md](research/run-trajectory-2026-11-28.md)
+- Frontend design: [docs/design/surfaces/conversation.md](design/surfaces/conversation.md), [docs/design/surfaces/tasks.md](design/surfaces/tasks.md)
+- Backend design: [docs/design/run-trace.md](design/run-trace.md)
 
 ### tailnet-login
 

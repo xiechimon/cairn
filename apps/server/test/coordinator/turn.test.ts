@@ -128,6 +128,14 @@ describe('runCoordinatorTurn', () => {
       {
         stepId: 'step-1',
         row: expect.objectContaining({
+          id: expect.stringMatching(/^step-1-m\d+$/),
+          role: 'assistant',
+          content: expect.objectContaining({ kind: 'modelCall' }),
+        }),
+      },
+      {
+        stepId: 'step-1',
+        row: expect.objectContaining({
           id: expect.stringMatching(/^step-1-e\d+$/),
           role: 'assistant',
           content: [{ type: 'text', text: 'answer' }],

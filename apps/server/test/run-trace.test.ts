@@ -2,6 +2,7 @@ import {
   RUN_TRACE_VALUE_CAP,
   type RunListPage,
   type RunTrace,
+  type RunTraceItem,
   transcriptPromptRowId,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -232,6 +233,49 @@ describe('run trace', () => {
     });
   });
 
+  test('the detail preview stops at 128 KiB while the export keeps every step whole', async () => {
+    seedTurns();
+    const chunk = 'z'.repeat(RUN_TRACE_VALUE_CAP);
+    H.s.db
+      .insert(chiefMessage)
+      .values(
+        Array.from({ length: 40 }, (_, n) =>
+          chiefRow(`call_budget_${n}`, T0 + 300 + n, 'assistant', {
+            kind: 'toolcall',
+            call: {
+              id: `call_budget_${n}`,
+              name: 'read',
+              arguments: {},
+              result: chunk,
+              isError: false,
+            },
+          }),
+        ),
+      )
+      .run();
+    const page = await getJson<RunTrace>(`/api/teams/${H.teamId}/runs/turn-a`);
+    const tools = page.items.filter(
+      (item): item is Extract<RunTraceItem, { kind: 'tool' }> => item.kind === 'tool',
+    );
+    expect(tools.filter((item) => item.truncated).length).toBeGreaterThan(0);
+    expect(
+      tools.reduce(
+        (total, item) =>
+          total +
+          JSON.stringify(item.arguments ?? null).length +
+          JSON.stringify(item.result ?? null).length,
+        0,
+      ),
+    ).toBeLessThanOrEqual(128 * 1024);
+    const res = await H.s.app.request(`/api/teams/${H.teamId}/runs/turn-a?download=1`);
+    const file = JSON.parse(await res.text()) as RunTrace;
+    expect(
+      file.items
+        .filter((item): item is Extract<RunTraceItem, { kind: 'tool' }> => item.kind === 'tool')
+        .every((item) => !item.truncated),
+    ).toBe(true);
+  });
+
   test('a secret that straddles the cap is redacted before the cut, so no prefix of it reaches the page', async () => {
     seedTurns();
     const straddle = `${'x'.repeat(RUN_TRACE_VALUE_CAP - 12)}${fakeKey}`;
@@ -353,11 +397,40 @@ describe('run trace', () => {
             kind: 'toolcall',
             call: {
               id: 'tc-1',
-              name: 'Bash',
+              name: 'cairn / Bash',
               arguments: { cmd: 'ls' },
               result: 'a b',
               isError: false,
+              startedAt: T0 + 4,
+              endedAt: T0 + 5,
             },
+          },
+          createdAt: T0 + 4,
+        },
+        {
+          id: 'tc-wrap',
+          conversationId: 'build-1',
+          role: 'assistant',
+          content: {
+            kind: 'toolcall',
+            call: {
+              id: 'tc-wrap',
+              name: '使用 mcp__acp_test__Bash',
+              arguments: {},
+              result: '入参\n{"cmd":"ls"}\n出参\n{"ok":true}',
+              startedAt: T0 + 3,
+              endedAt: T0 + 6,
+            },
+          },
+          createdAt: T0 + 3,
+        },
+        {
+          id: 'tc-child',
+          conversationId: 'build-1',
+          role: 'assistant',
+          content: {
+            kind: 'toolcall',
+            call: { id: 'child', parent: 'tc-1', name: 'read', arguments: {} },
           },
           createdAt: T0 + 4,
         },
@@ -387,10 +460,20 @@ describe('run trace', () => {
         'prompt',
         'thinking',
         'tool',
+        'tool',
         'reply',
         'error',
       ]);
+      expect(trace.items.find((i) => i.id === 'tc-child')).toMatchObject({ parentId: 'tc-1' });
+      expect(trace.items.find((i) => i.id === 'tc-wrap')).toBeUndefined();
+      expect(trace.items.find((i) => i.id === 'tc-1')).toMatchObject({ name: 'Bash' });
     }
+    const scoped = await getJson<RunListPage>(`/api/teams/${H.teamId}/runs?todo=todo-1`);
+    expect(scoped.runs.map((r) => r.id)).toEqual(['build-1']);
+    expect((await getJson<RunListPage>(`/api/teams/${H.teamId}/runs?todo=missing`)).runs).toEqual(
+      [],
+    );
+    await getJson(`/api/teams/${H.teamId}/runs?todo=todo-1&thread=${H.threadId}`, 400);
     await getJson(`/api/teams/${H.teamId}/runs/todo-1`, 404);
   });
 
@@ -644,8 +727,14 @@ describe('run trace', () => {
     expect(problems.runs.map((r) => r.id)).toEqual(['a-1', 'm-1', 'b-fail']);
     const mine = await getJson<RunListPage>(`${base}?thread=${H.threadId}`);
     expect(mine.runs.map((r) => r.id)).toEqual(['m-run', 'm-1']);
-    for (const internal of ['chief-digest-x', 'chief-memory-x'])
+    for (const [internal, turn] of [
+      ['chief-digest-x', 'd-1'],
+      ['chief-memory-x', 'mem-1'],
+    ]) {
       expect((await getJson<RunListPage>(`${base}?thread=${internal}`)).runs).toEqual([]);
+      await getJson(`${base}/${turn}`, 404);
+      await getJson(`${base}/${turn}?download=1`, 404);
+    }
     expect((await getJson<{ status: string }>(`/api/teams/${H.teamId}/runs/b-fail`)).status).toBe(
       'failed',
     );
@@ -658,6 +747,161 @@ describe('run trace', () => {
     const rest = await getJson<RunListPage>(`${base}?limit=3&before=${head.nextCursor}`);
     expect(rest.runs.map((r) => r.id)).toEqual(['c-2', 'b-done', 'c-1']);
     await getJson(`${base}?before=a-1`, 400);
+  });
+
+  test('counts all visible Coordinator problems only when requested on the first page', async () => {
+    H.s.db
+      .insert(step)
+      .values(
+        Array.from({ length: 30 }, (_, i) =>
+          chiefStep(`count-${i}`, T0 + i * 100, { status: i < 4 ? 'failed' : 'done' }),
+        ),
+      )
+      .run();
+    const base = `/api/teams/${H.teamId}/runs`;
+    const first = await getJson<RunListPage & { problemCounts?: unknown }>(
+      `${base}?limit=2&includeCounts=1`,
+    );
+    expect(first.problemCounts).toEqual([{ threadId: H.threadId, count: 4 }]);
+    const next = await getJson<RunListPage & { problemCounts?: unknown }>(
+      `${base}?includeCounts=1&before=${first.nextCursor}`,
+    );
+    expect(next.problemCounts).toBeUndefined();
+    expect(
+      (await getJson<RunListPage & { problemCounts?: unknown }>(base)).problemCounts,
+    ).toBeUndefined();
+  });
+
+  test('wake provenance never appears in detail, list or export', async () => {
+    const wake = '[wake:failed] provenance=secret:abc\ninternal prompt';
+    H.s.db
+      .insert(step)
+      .values(chiefStep('wake-turn', T0, { prompt: wake, ownerMessageIds: null }))
+      .run();
+    H.s.db
+      .insert(chiefMessage)
+      .values(chiefRow('wake-turn', T0, 'user', wake))
+      .run();
+    const base = `/api/teams/${H.teamId}/runs`;
+    expect((await getJson<RunListPage>(base)).runs[0]?.firstLine).not.toBe('failed');
+    const detail = await getJson<{ items: unknown[] }>(`${base}/wake-turn`);
+    expect(detail.items).toContainEqual(
+      expect.objectContaining({ kind: 'wake', reason: 'failed' }),
+    );
+    for (const path of [`${base}/wake-turn`, `${base}/wake-turn?download=1`, base]) {
+      expect(await (await H.s.app.request(path)).text()).not.toContain('provenance=secret:abc');
+    }
+  });
+
+  test('owner wake-like text stays user text and recorded model calls stay separate from totals', async () => {
+    H.s.db
+      .insert(step)
+      .values(chiefStep('model-turn', T0, { prompt: 'normal' }))
+      .run();
+    H.s.db
+      .insert(stepQuota)
+      .values({ stepId: 'model-turn', ranModel: { provider: 'stub', modelId: 'fallback' } })
+      .run();
+    H.s.db
+      .insert(chiefMessage)
+      .values([
+        chiefRow('owner-model-turn', T0, 'user', '[wake:failed] hello'),
+        chiefRow('msg-model-turn-1', T0 + 100, 'assistant', {
+          kind: 'modelCall',
+          model: 'real',
+          usage: { input: 3, output: 0, cacheRead: 0, cacheWrite: 0 },
+          startedAt: T0 + 50,
+          endedAt: T0 + 90,
+        }),
+      ])
+      .run();
+    const base = `/api/teams/${H.teamId}/runs`;
+    const trace = await getJson<RunTrace>(`${base}/model-turn`);
+    expect(trace.items).toContainEqual(
+      expect.objectContaining({ kind: 'user', text: '[wake:failed] hello' }),
+    );
+    expect(trace.items).toContainEqual(
+      expect.objectContaining({
+        kind: 'model',
+        model: 'real',
+        usage: { input: 3, output: 0, cacheRead: 0, cacheWrite: 0 },
+        startedAt: T0 + 50,
+        endedAt: T0 + 90,
+      }),
+    );
+    expect(trace.usage.input).toBe(0);
+    expect((await getJson<RunListPage>(base)).runs[0]).toMatchObject({
+      firstLine: '[wake:failed] hello',
+      woke: false,
+    });
+  });
+
+  test('projects one notification per invocation and keeps distinct repeated calls', async () => {
+    H.s.db.insert(step).values(chiefStep('relay-turn', T0)).run();
+    const args = { message: 'The task is ready.' };
+    H.s.db
+      .insert(chiefMessage)
+      .values([
+        ...[
+          {
+            id: 'wrapper',
+            at: 100,
+            end: 500,
+            name: '使用 mcp__acp_provider__notify_user',
+            arguments: {},
+            result: `入参\n${JSON.stringify(args)}\n出参\n{"notified":true}`,
+          },
+          {
+            id: 'actual',
+            at: 150,
+            end: 200,
+            name: 'cairn / notify_user',
+            arguments: args,
+            result: { notified: true },
+          },
+          {
+            id: 'repeat',
+            at: 700,
+            end: 750,
+            name: 'cairn / notify_user',
+            arguments: args,
+            result: { notified: true },
+          },
+          { id: 'status', at: 800, end: 850, name: '工具执行完成', arguments: {}, result: '' },
+        ].map(({ id, at, end, ...call }) =>
+          chiefRow(id, T0 + at, 'assistant', {
+            kind: 'toolcall',
+            call: { ...call, id, startedAt: T0 + at, endedAt: T0 + end },
+          }),
+        ),
+      ])
+      .run();
+    const trace = await getJson<RunTrace>(`/api/teams/${H.teamId}/runs/relay-turn`);
+    expect(
+      trace.items.filter((item) => item.kind === 'tool').map(({ id, name }) => [id, name]),
+    ).toEqual([
+      ['actual', 'notify_user'],
+      ['repeat', 'notify_user'],
+    ]);
+  });
+
+  test('conditional detail reads require a matching authenticated run and preserve full export', async () => {
+    seedTurns();
+    const path = `/api/teams/${H.teamId}/runs/turn-a`;
+    const first = await H.s.app.request(path);
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    expect((await H.s.app.request(path, { headers: { 'If-None-Match': etag! } })).status).toBe(304);
+    expect(
+      (await H.s.app.request(`${path}?download=1`, { headers: { 'If-None-Match': etag! } })).status,
+    ).toBe(200);
+    expect(
+      (
+        await H.s.app.request(`/api/teams/${H.teamId}/runs/missing`, {
+          headers: { 'If-None-Match': etag! },
+        })
+      ).status,
+    ).toBe(404);
   });
 
   test('a team with no runs gets an empty first page', async () => {
