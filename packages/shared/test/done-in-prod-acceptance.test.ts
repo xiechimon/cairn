@@ -369,6 +369,82 @@ describe('done-in-prod acceptance contract', () => {
     expect(docOnly).toMatchObject({ ok: true });
   });
 
+  test('keeps a doc read-back valid when the agent only writes and removes its own proof file afterwards', () => {
+    const result = evaluateStepAcceptance({
+      output: 'code',
+      repoKind: 'github',
+      hasChanges: true,
+      editedPaths: ['README.md'],
+      messages: [
+        toolMsg('edit', { path: 'README.md' }, { createdAt: 100 }),
+        toolMsg(
+          'bash',
+          { command: 'cat README.md' },
+          { result: 'Hello from Cairn.', createdAt: 200 },
+        ),
+        toolMsg(
+          'bash',
+          { command: 'mkdir -p .proof && cat README.md > .proof/readback.txt' },
+          { result: 'ok', createdAt: 210 },
+        ),
+        toolMsg(
+          'attach_file',
+          { path: '.proof/readback.txt', caption: 'README read-back' },
+          { createdAt: 220 },
+        ),
+        toolMsg(
+          'bash',
+          { command: 'rm -rf .proof && git status --short' },
+          { result: '', createdAt: 230 },
+        ),
+      ],
+      attachments: [
+        proof({
+          fileName: 'readback.txt',
+          mimeType: 'text/plain',
+          sizeBytes: 120,
+          createdAt: 220,
+        }),
+      ],
+      stepIds: ['step-1'],
+    });
+    expect(result).toMatchObject({ ok: true });
+
+    const trackedDelete = evaluateStepAcceptance({
+      output: 'code',
+      repoKind: 'hosted',
+      hasChanges: true,
+      editedPaths: ['README.md'],
+      messages: [
+        toolMsg('edit', { path: 'README.md' }, { createdAt: 100 }),
+        toolMsg('bash', { command: 'cat README.md' }, { result: 'ok', createdAt: 200 }),
+        toolMsg('bash', { command: 'rm README.md' }, { result: '', createdAt: 210 }),
+      ],
+      attachments: [],
+      stepIds: ['step-1'],
+    });
+    expect(trackedDelete).toMatchObject({ ok: false, reason: 'unverified-doc' });
+
+    const trackedDirDelete = evaluateStepAcceptance({
+      output: 'code',
+      repoKind: 'hosted',
+      hasChanges: true,
+      editedPaths: ['src/foo.ts'],
+      messages: [
+        toolMsg('edit', { path: 'src/foo.ts' }, { createdAt: 100 }),
+        toolMsg(
+          'bash',
+          { command: 'vitest run test/foo.test.ts' },
+          { result: 'passed', createdAt: 200 },
+        ),
+        toolMsg('bash', { command: 'rm -rf src' }, { result: '', createdAt: 210 }),
+      ],
+      attachments: [],
+      stepIds: ['step-1'],
+    });
+    expect(trackedDirDelete).toMatchObject({ ok: false });
+  });
+
   test('parses single-line missing evidence and folds prod verification into single-harness prompts', () => {
     expect(
       parseMissingEvidenceLine(
