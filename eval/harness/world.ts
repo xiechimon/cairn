@@ -150,10 +150,8 @@ export async function runRuntimeTurn(task: RuntimeTask): Promise<TurnRecord> {
       toolCalls: toolCalls.map((call) => ({ name: call.name, argsValid: true })),
       text: assistantText,
       boundModels: usage.map((u) => u.model),
-      promptSystem: seenByCall,
-      promptSha256: createHash('sha256')
-        .update(seenByCall[0] ?? '')
-        .digest('hex'),
+      promptSystem: scripted.prompts,
+      promptSha256: createHash('sha256').update(scripted.prompts.join('\n')).digest('hex'),
     };
   } catch (error) {
     return {
