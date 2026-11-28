@@ -1581,3 +1581,165 @@ describe('Wave 4B UX fixes', () => {
     expect(otherStep.prompt).toContain('different chat turn');
   });
 });
+
+describe('honest IM turn failures', () => {
+  const failureText = (reason: string) => `本轮处理失败：${reason}。请再发一次。`;
+
+  const recordTurnError = (stepId: string, threadId: string, message: string) => {
+    upsertChiefRow(
+      { db: s.db },
+      {
+        id: `chief-err-${stepId}`,
+        threadId,
+        role: 'system',
+        content: JSON.stringify({ kind: 'chief_turn_error', message }),
+        createdAt: nowMs() + 1,
+      },
+    );
+  };
+
+  const failTurn = (stepId: string, error?: string) => {
+    const stepRow = stepById(stepId);
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    if (error !== undefined) recordTurnError(stepRow.id, stepRow.buildId, error);
+    s.db.update(step).set({ status: 'failed' }).where(eq(step.id, stepRow.id)).run();
+    service.runtime.turnFinished(stepById(stepRow.id));
+  };
+
+  const pendingChiefStep = () => {
+    const row = s.db
+      .select()
+      .from(step)
+      .where(and(eq(step.kind, 'chief'), eq(step.status, 'pending')))
+      .all()
+      .at(-1);
+    if (row === undefined) throw new Error('expected a pending chief step');
+    return row;
+  };
+
+  const sentTexts = () => sessions[0]?.sent.map((msg) => msg.text) ?? [];
+
+  test('names the ACP startup timeout instead of the generic failure', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'summarize this'));
+    const stepRow = latestChiefStep();
+    failTurn(stepRow.id, 'ACP initialization timed out');
+
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('模型运行环境启动超时')));
+    expect(sentTexts()).not.toContain('本轮处理失败，请稍后重试。');
+  });
+
+  test('names MCP readiness and ACP disconnects', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'first ask'));
+    failTurn(
+      latestChiefStep().id,
+      'ACP initialize failed (protocolVersion client=1, agent=1): Internal error: MCP servers did not become ready in time.',
+    );
+    await vi.waitFor(() =>
+      expect(sentTexts()).toContain(failureText('模型运行环境需要的工具服务没能按时启动')),
+    );
+
+    sessions[0]?.handlers.onMessage(inbound('55', 'second ask'));
+    failTurn(
+      pendingChiefStep().id,
+      'doubao ACP exited (3): auth_unavailable: 运行时与共享服务断开连接',
+    );
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('模型服务连接断开了')));
+  });
+
+  test('falls back to the first error line, never a stack', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'try again'));
+    failTurn(latestChiefStep().id, 'upstream exploded\n    at foo.js:1:2');
+
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('upstream exploded')));
+    expect(sentTexts().every((text) => !text.includes('at foo.js'))).toBe(true);
+  });
+
+  test('says no reason was recorded when the turn has no error row', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'no reason turn'));
+    failTurn(latestChiefStep().id);
+
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('服务没有记录原因')));
+  });
+
+  test('keeps an image-only attachment and names a failed image turn', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage({
+      ...inbound('55', ''),
+      images: [
+        {
+          name: 'wechat-image-1.jpg',
+          mimeType: 'image/jpeg',
+          dataBase64: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]).toString('base64'),
+        },
+      ],
+    });
+
+    const rows = s.db.select().from(attachment).all();
+    expect(rows).toHaveLength(1);
+    const stepRow = latestChiefStep();
+    expect(stepRow.prompt).toContain(`attachment=${rows[0]?.id}`);
+    expect(stepRow.prompt).not.toContain('没有取到');
+
+    failTurn(stepRow.id, 'ACP initialization timed out');
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('模型运行环境启动超时')));
+  });
+
+  test('names an unreachable skills service', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'skills turn'));
+    failTurn(latestChiefStep().id, 'team skills distribution failed: fetch failed');
+
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('技能服务连不上')));
+  });
+
+  test('removes URLs and absolute paths from an unknown error', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'unknown failure'));
+    failTurn(
+      latestChiefStep().id,
+      'boom https://provider.example/x at /Users/ian/secret/file.ts:12\nsecond line',
+    );
+
+    await vi.waitFor(() => expect(sentTexts()).toContain(failureText('boom at')));
+    expect(sentTexts().every((text) => !text.includes('http'))).toBe(true);
+    expect(sentTexts().every((text) => !text.includes('/Users/ian'))).toBe(true);
+    expect(sentTexts().every((text) => !text.includes('second line'))).toBe(true);
+  });
+
+  test('removes addresses, credentials and emails from an unknown error', async () => {
+    await connectAndPair('55');
+    const cases: [string, string][] = [
+      ['connect ECONNREFUSED 10.0.0.5:5432', 'connect ECONNREFUSED'],
+      [
+        'Incorrect API key provided: ' + ['sk', 'abcd1234efgh'].join('-'),
+        'Incorrect API key provided',
+      ],
+      ['mail owner@example.com', 'mail'],
+      ['dial api.internal:5432', 'dial'],
+    ];
+    for (const [reason, expected] of cases) {
+      sessions[0]?.handlers.onMessage(inbound('55', 'unknown failure'));
+      failTurn(pendingChiefStep().id, reason);
+      await vi.waitFor(() => expect(sentTexts()).toContain(failureText(expected)));
+    }
+  });
+
+  test('caps an unknown error at one sentence', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'long failure'));
+    const long = 'the quick brown fox '.repeat(20);
+    failTurn(latestChiefStep().id, long);
+
+    await vi.waitFor(() =>
+      expect(sentTexts()).toContain(failureText(long.trim().slice(0, 120).trim())),
+    );
+  });
+});

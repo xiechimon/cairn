@@ -132,8 +132,34 @@ export interface ImService {
 const PAIRING_REQUESTED_TEXT =
   '你的配对请求已记录：请在 Cairn 应用弹窗或「设置 → 聊天应用」里批准后，再继续对话。';
 const PAIRING_APPROVED_TEXT = '已通过配对：现在可以直接在这里和 Cairn 对话。';
-const TURN_FAILED_TEXT = '本轮处理失败，请稍后重试。';
 const SEND_ATTEMPTS = 4;
+const TURN_FAILURE_REASONS: readonly [RegExp, string][] = [
+  [/ACP initialization timed out/i, '模型运行环境启动超时'],
+  [/MCP servers did not become ready in time/i, '模型运行环境需要的工具服务没能按时启动'],
+  [/(?:ACP exited|auth_unavailable|运行时与共享服务断开连接)/i, '模型服务连接断开了'],
+  [/team skills distribution failed/i, '技能服务连不上'],
+];
+
+function scrubFailureLine(text: string): string {
+  return (
+    text
+      .split('\n')[0]
+      ?.replace(/https?:\/\/\S+/g, '')
+      .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, ' ')
+      .replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, ' ')
+      .replace(/\b(?:sk|pk|ghp|gho|ghs|xox[abprs])[-_][A-Za-z0-9_-]{4,}\b/gi, ' ')
+      .replace(/\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g, ' ')
+      .replace(/\b[A-Za-z][A-Za-z0-9.-]*:\d{2,5}\b/g, ' ')
+      .replace(/\b[A-Za-z0-9+/_=-]{32,}\b/g, ' ')
+      .replace(/(?:^|\s)(?:[A-Za-z]:)?[\\/][^\s]+/g, ' ')
+      .replace(/\p{Cc}/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[。.!！?？:：]+$/, '')
+      .slice(0, 120)
+      .trim() ?? ''
+  );
+}
 
 interface Origin {
   connId: string;
@@ -472,6 +498,25 @@ export function createImService(deps: ImServiceDeps): ImService {
       if (text !== null && text.trim() !== '') return text.trim();
     }
     return null;
+  };
+
+  const turnFailureText = (stepRow: ImStepRow): string => {
+    const row = deps.db
+      .select({ content: chiefMessage.content })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, `chief-err-${stepRow.id}`))
+      .get();
+    let message = '';
+    if (typeof row?.content === 'string') {
+      try {
+        const parsed = JSON.parse(row.content) as { message?: unknown } | null;
+        if (typeof parsed?.message === 'string') message = parsed.message;
+      } catch {}
+    }
+    const known = TURN_FAILURE_REASONS.find(([pattern]) => pattern.test(message));
+    const scrubbed = known?.[1] ?? scrubFailureLine(message);
+    const sentence = scrubbed === '' ? '服务没有记录原因' : scrubbed;
+    return `本轮处理失败：${sentence}。请再发一次。`;
   };
 
   const blockFallbacks = (stepRow: ImStepRow): string[] => {
@@ -1214,7 +1259,7 @@ export function createImService(deps: ImServiceDeps): ImService {
           return;
         }
         if (stepRow.status === 'failed') {
-          sendToOrigin(origin, TURN_FAILED_TEXT, stepRow);
+          sendToOrigin(origin, turnFailureText(stepRow), stepRow);
           return;
         }
         const text = stepAlreadySentToIm(stepRow.id) ? null : lastAssistantText(stepRow);
