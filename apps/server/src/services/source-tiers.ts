@@ -7,7 +7,7 @@ import {
   DEFAULT_DEVIN_MODELS,
   type Difficulty,
   devinInferredThinking,
-  devinWireModel,
+  devinWireModelAtEffort,
   isInternalAntigravityModelId,
   type ModelRef,
   orderByKeys,
@@ -155,7 +155,7 @@ function devinTierModels(db: Pick<Db, 'select'>, teamId: string): CatalogTierMod
         known?.thinkingLevels ??
         inferred.thinkingLevels;
       return {
-        id: devinWireModel('devin', m.id, m.thinkingDefault) ?? m.id,
+        id: devinWireModelAtEffort('devin', m.id, m.thinkingDefault) ?? m.id,
         name: m.name,
         ...(thinkingLevels !== undefined ? { thinkingLevels } : {}),
       };

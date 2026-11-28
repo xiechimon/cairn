@@ -532,8 +532,7 @@ export function buildWorkerClaimPayload(
         model.modelId,
         fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
       ),
-      thinkingLevel:
-        fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
+      thinkingLevel: fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
       memories: injectWorkerStepMemories(db, stepRow.id, claimedAt, {
         agentId: memoryOwnerOf(db, teamId, stepRow.kind),
         teamId,

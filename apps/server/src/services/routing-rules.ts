@@ -5,6 +5,7 @@ import {
   DEFAULT_DEVIN_MODELS,
   devinSweVariant,
   devinWireModel,
+  devinWireModelAtEffort,
   filterAgentTools,
   isInternalAntigravityModelId,
   isSessionStepKind,
@@ -804,7 +805,7 @@ function toRoutingRuleRecord(row: RoutingRuleRow): RoutingRuleRecord {
     use: row.use,
     provider: row.provider,
     modelId: variant?.baseId ?? row.modelId,
-    thinkingLevel: row.thinkingLevel ?? variant?.level ?? null,
+    thinkingLevel: variant?.level ?? row.thinkingLevel ?? null,
     fallbackModels: row.fallbackModels?.map(hydrateFallback) ?? null,
     machineId: row.machineId,
     requiredCapabilities: row.requiredCapabilities,
@@ -945,7 +946,10 @@ function writeRoutingRule(
         );
       });
       if (index !== -1) return remainingFallbacks.splice(index, 1)[0]!;
-      return { provider, modelId: devinWireModel(provider, modelId, thinkingLevel) ?? modelId };
+      return {
+        provider,
+        modelId: devinWireModelAtEffort(provider, modelId, thinkingLevel) ?? modelId,
+      };
     }) ?? body.fallbackModels;
   const now = nowMs();
   if (existing === undefined) {
@@ -968,7 +972,8 @@ function writeRoutingRule(
         use,
         provider: created.provider,
         modelId:
-          devinWireModel(created.provider, created.modelId, body.thinkingLevel) ?? created.modelId,
+          devinWireModelAtEffort(created.provider, created.modelId, body.thinkingLevel) ??
+          created.modelId,
         thinkingLevel: body.thinkingLevel ?? null,
         fallbackModels: fallbackModels ?? null,
         machineId: body.machineId ?? null,
@@ -1000,7 +1005,7 @@ function writeRoutingRule(
       (body.thinkingLevel === undefined || prior.thinkingLevel === body.thinkingLevel);
     sets.modelId = unchangedView
       ? existing.modelId
-      : (devinWireModel(provider, modelId, effort) ?? modelId);
+      : (devinWireModelAtEffort(provider, modelId, effort) ?? modelId);
   }
   if (body.thinkingLevel !== undefined) sets.thinkingLevel = body.thinkingLevel;
   if (fallbackModels !== undefined) sets.fallbackModels = fallbackModels;

@@ -29,6 +29,9 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import { activeDoubaoSource } from './doubao-subscriptions.js';
 import { githubRepoOfProject } from './git.js';
+import { type MachineRuntimeFacts, machineRuntimeAvailable } from './runtime-availability.js';
+
+export { type MachineRuntimeFacts, machineRuntimeAvailable } from './runtime-availability.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -38,28 +41,6 @@ export function stepRuntimeFor(
   if (agentProvider === 'antigravity') return 'antigravity';
   if (agentProvider === 'doubao') return 'doubao';
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
-}
-
-export interface MachineRuntimeFacts {
-  claudeCodeReport: Pick<ClaudeCodeReport, 'installed'> | null;
-  capabilities: Pick<
-    MachineCapabilities,
-    'executor' | 'devin' | 'antigravity' | 'doubao' | 'osPlatform' | 'confinement'
-  > | null;
-}
-
-export function machineRuntimeAvailable(
-  machineRow: MachineRuntimeFacts,
-  runtime: MachineRuntime,
-): boolean {
-  if (runtime === 'pi') return true;
-  if (runtime === 'gemini') return false;
-  if (runtime === 'devin') return machineRow.capabilities?.devin?.installed === true;
-  if (runtime === 'antigravity') return machineRow.capabilities?.antigravity?.installed === true;
-  if (runtime === 'doubao') return machineRow.capabilities?.doubao?.installed === true;
-  return (
-    machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
-  );
 }
 
 export function machineRuntimeClaimable(

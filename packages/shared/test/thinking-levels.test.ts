@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   claudeCodeThinkingDefault,
   claudeCodeThinkingLevels,
-  devinSweVariant,
   devinWireModel,
+  devinWireModelAtEffort,
 } from '../src/thinking-levels.js';
 
 const FULL = ['low', 'medium', 'high', 'xhigh', 'max'];
@@ -106,16 +106,34 @@ describe('devinWireModel', () => {
     expect(devinWireModel('devin', id, effort)).toBe(expected);
   });
 
-  it('re-encodes an existing variant when a different effort is chosen', () => {
-    expect(devinWireModel('devin', 'swe-2-high', 'low')).toBe('swe-2-low');
-    expect(devinSweVariant(devinWireModel('devin', 'swe-2-1-medium', 'xhigh') ?? '')).toEqual({
-      baseId: 'swe-2-1',
-      level: 'xhigh',
-    });
+  it('keeps a saved variant as the exact model it names', () => {
+    expect(devinWireModel('devin', 'swe-2-high', 'off')).toBe('swe-2-high');
   });
 
   it('leaves other providers and unknown families alone', () => {
     expect(devinWireModel('claude', 'swe-2', 'high')).toBe('swe-2');
     expect(devinWireModel('devin', 'glm-5-high', 'low')).toBe('glm-5-high');
+  });
+});
+
+describe('devinWireModelAtEffort', () => {
+  it('encodes a family at the chosen effort', () => {
+    expect(devinWireModelAtEffort('devin', 'swe-2-1', 'xhigh')).toBe('swe-2-1-xhigh');
+    expect(devinWireModelAtEffort('devin', 'swe-2', 'off')).toBe('swe-2-none');
+  });
+
+  it('replaces an existing suffix when a different effort is chosen', () => {
+    expect(devinWireModelAtEffort('devin', 'swe-2-high', 'low')).toBe('swe-2-low');
+    expect(devinWireModelAtEffort('devin', 'swe-2-flash-medium', 'max')).toBe('swe-2-flash-max');
+  });
+
+  it('keeps an existing suffix when no effort is chosen', () => {
+    expect(devinWireModelAtEffort('devin', 'swe-2-low', null)).toBe('swe-2-low');
+    expect(devinWireModelAtEffort('devin', 'swe-2-flash', null)).toBe('swe-2-flash-medium');
+  });
+
+  it('leaves other providers and unknown families alone', () => {
+    expect(devinWireModelAtEffort('claude', 'swe-2-high', 'low')).toBe('swe-2-high');
+    expect(devinWireModelAtEffort('devin', 'glm-5-high', 'low')).toBe('glm-5-high');
   });
 });

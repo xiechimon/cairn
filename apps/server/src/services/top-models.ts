@@ -1,6 +1,6 @@
 import {
   devinSweVariant,
-  devinWireModel,
+  devinWireModelAtEffort,
   type TopModel,
   type TopModelsEnvelope,
   topModelsSchema,
@@ -60,7 +60,8 @@ export function writeTopModels(db: Db, teamId: string, models: TopModel[]): TopM
         old ?? {
           ...model,
           modelId:
-            devinWireModel(model.provider, model.modelId, model.thinkingLevel) ?? model.modelId,
+            devinWireModelAtEffort(model.provider, model.modelId, model.thinkingLevel) ??
+            model.modelId,
         }
       );
     }),

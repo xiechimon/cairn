@@ -28,6 +28,7 @@ import {
   memoryOwnerOf,
   profileForStep,
   routeForStep,
+  routeProfile,
   upsertRoutingRule,
   withOverride,
 } from '../src/services/routing-rules.js';
@@ -1095,6 +1096,31 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       (entry) => entry.use === 'session',
     );
     expect(rule).toMatchObject({ provider: 'devin', modelId: 'swe-2', thinkingLevel: 'high' });
+  });
+
+  test('changing only the effort of a saved Devin variant rewrites the model it runs', () => {
+    const s = bare();
+    seedRoute(s, 'session', { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: 'high' });
+    upsertRoutingRule(s.db, s.team.id, 'session', { thinkingLevel: 'low' });
+    const row = s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get();
+    expect(row?.modelId).toBe('swe-2-low');
+    expect(row?.thinkingLevel).toBe('low');
+    expect(routeProfile(row!)).toMatchObject({ modelId: 'swe-2-low', thinkingLevel: 'low' });
+    expect(listRoutingSettings(s.db, s.team.id).rules[0]).toMatchObject({
+      modelId: 'swe-2',
+      thinkingLevel: 'low',
+    });
+  });
+
+  test('a legacy variant keeps its exact model even when the row carries another effort', () => {
+    const s = bare();
+    seedRoute(s, 'session', { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: 'off' });
+    const rule = listRoutingSettings(s.db, s.team.id).rules.find(
+      (entry) => entry.use === 'session',
+    );
+    expect(rule).toMatchObject({ modelId: 'swe-2', thinkingLevel: 'high' });
+    const row = s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get();
+    expect(routeProfile(row!).modelId).toBe('swe-2-high');
   });
 
   test('naming a Runner on an empty Session rule creates it with the default provider and model', () => {

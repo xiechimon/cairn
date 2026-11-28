@@ -135,6 +135,18 @@ export function devinWireModel(
   id: string | null,
   effort?: string | null,
 ): string | null {
+  const model = provider === 'devin' && id !== null ? sweModel(id) : undefined;
+  if (model === undefined || id === null) return id;
+  const level = thinkingLevelSchema.safeParse(effort);
+  const suffix = level.success ? level.data : model.defaultEffort;
+  return `${id}-${suffix === 'off' ? 'none' : suffix}`;
+}
+
+export function devinWireModelAtEffort(
+  provider: string | null,
+  id: string | null,
+  effort?: string | null,
+): string | null {
   if (provider !== 'devin' || id === null) return id;
   const variant = devinSweVariant(id);
   const baseId = variant?.baseId ?? id;

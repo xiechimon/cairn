@@ -14,7 +14,7 @@ import {
   DEFAULT_DEVIN_MODELS,
   devinCatalogFamilies,
   devinSweVariant,
-  devinWireModel,
+  devinWireModelAtEffort,
   isRegisteredMachine,
 } from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
@@ -27,8 +27,8 @@ import {
   fetchDevinSubscriptionModels,
 } from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
-import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { machineRuntimeAvailable } from './runtime-availability.js';
 import { timedCheck } from './subscription-check.js';
 import {
   assertLabelHidesToken,
@@ -126,7 +126,7 @@ export function updateDevinSubscription(
       ? undefined
       : dedupeSubscriptionModels(
           patch.models.flatMap((model) => {
-            const id = devinWireModel('devin', model.id, model.thinkingDefault) ?? model.id;
+            const id = devinWireModelAtEffort('devin', model.id, model.thinkingDefault) ?? model.id;
             if (id === model.id) return [model];
             const previous = row.models.filter(
               (entry) => devinSweVariant(entry.id)?.baseId === model.id,
@@ -457,7 +457,8 @@ export async function testDevinSubscriptionModel(
   if (!selected) throw new HttpError(400, 'Unknown model for this subscription');
   const variant = devinSweVariant(model);
   const wire =
-    devinWireModel('devin', model, variant === null ? selected.thinkingDefault : null) ?? model;
+    devinWireModelAtEffort('devin', model, variant === null ? selected.thinkingDefault : null) ??
+    model;
   return runSubscriptionModelTurn(
     deps.db,
     deps.machineHub,
