@@ -1,4 +1,5 @@
 import { blockDemoWrite } from '../demo/demo-gate.js';
+import { ServerUnreachableError } from '../lib/send-errors.js';
 import { clearLegacyBrowserToken, fetchWithSession } from './auth.js';
 
 export class ApiError extends Error {
@@ -46,7 +47,14 @@ async function request<T>(path: string, init?: ApiRequest): Promise<T> {
   if (init?.method != null && init.method !== 'GET' && blockDemoWrite()) {
     return new Promise<T>(() => {});
   }
-  return settle<T>(await send(path, init));
+  let response: Response;
+  try {
+    response = await send(path, init);
+  } catch (error) {
+    if (error instanceof TypeError) throw new ServerUnreachableError(error);
+    throw error;
+  }
+  return settle<T>(response);
 }
 
 export const api = {

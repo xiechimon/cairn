@@ -2,12 +2,14 @@ import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useCreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
+import { ApiError } from '../api/client.js';
 import { useCreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
+import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import {
   AddAntigravitySubscriptionDialog,
   AntigravityReloginDialog,
@@ -55,7 +57,7 @@ function useDeviceLogin({
   active: boolean;
   poll: DevicePoll;
   onComplete: () => void;
-  messages: { denied: string; superseded: string; expired: string; failed: string };
+  messages: { denied: string; superseded: string; expired: string; gone: string; failed: string };
 }) {
   const [device, setDevice] = useState<DeviceLogin | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +83,15 @@ function useDeviceLogin({
             setError(messagesRef.current[result.status]);
           }
         },
-        () => {
-          if (!stopped) setError(messagesRef.current.failed);
+        (error) => {
+          if (stopped) return;
+          markErrorSurfaced(error);
+          if (error instanceof ApiError && error.status === 404) {
+            setDevice(null);
+            setError(messagesRef.current.gone);
+            return;
+          }
+          setError(messagesRef.current.failed);
         },
       );
     }, device.intervalSeconds * 1000);
@@ -157,6 +166,7 @@ export function AddProviderFlow({
       denied: t('xAI 登录被拒绝。'),
       superseded: t('已有更新的 xAI 凭证，这次登录没有覆盖它。'),
       expired: t('验证码已过期，请重试。'),
+      gone: t('登录已过期，请重新开始'),
       failed: t('xAI 登录失败，请重试。'),
     },
   });
@@ -168,6 +178,7 @@ export function AddProviderFlow({
       denied: t('ChatGPT 订阅登录被拒绝。'),
       superseded: t('已有更新的 ChatGPT 订阅凭证，这次登录没有覆盖它。'),
       expired: t('验证码已过期，请重试。'),
+      gone: t('登录已过期，请重新开始'),
       failed: t('ChatGPT 订阅登录失败，请重试。'),
     },
   });

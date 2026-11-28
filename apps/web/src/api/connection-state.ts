@@ -124,3 +124,17 @@ export function useConnectionOutage(): {
     retryNow: connectionStore.retryNow,
   };
 }
+
+export function onConnectionRestored(listener: () => void): () => void {
+  let was = connectionStore.getSnapshot();
+  const stopSubscribe = connectionStore.subscribe(() => {
+    const now = connectionStore.getSnapshot();
+    if (now && !was) listener();
+    was = now;
+  });
+  const stopOnline = connectionStore.onOnlineHint(listener);
+  return () => {
+    stopSubscribe();
+    stopOnline();
+  };
+}

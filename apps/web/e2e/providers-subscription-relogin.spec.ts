@@ -367,3 +367,69 @@ test('other expired or unauthenticated subscription cards (Claude, Devin, Codex)
   await expect(page.getByTestId('codex-device-login')).toContainText('ABCD-1234');
   expect(codexDeviceStarted).toBe(1);
 });
+
+test('a device login the server lost on restart shows one expired state, not a raw toast per poll', async ({
+  page,
+}) => {
+  const codex: ProviderRecord = {
+    id: 'prov-codex',
+    label: 'ChatGPT',
+    kind: 'custom',
+    providerId: 'openai-codex',
+    baseUrl: 'https://chatgpt.com/backend-api/codex',
+    api: 'openai-responses',
+    authHeader: false,
+    compat: {},
+    models: [{ id: 'gpt-5-codex', name: 'GPT-5 Codex' }],
+    createdBy: 'owner',
+    createdAt: 3,
+    updatedAt: 3,
+  };
+  let codexPolls = 0;
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/claude-subscriptions') return json([]);
+    if (path === '/api/teams/t1/devin-subscriptions') return json([]);
+    if (path === '/api/teams/t1/antigravity-subscriptions') return json([]);
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [codex] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/model-routing') {
+      return json({
+        edges: [],
+        connections: [
+          {
+            id: 'prov-codex',
+            vendor: 'openai',
+            kind: 'subscription',
+            models: ['gpt-5-codex'],
+            available: false,
+          },
+        ],
+        quota: [],
+      });
+    }
+    if (path === '/api/teams/t1/providers/oauth/openai-codex/device') {
+      return json({
+        state: 'codex-state-gone',
+        userCode: 'ABCD-1234',
+        verificationUri: 'https://auth.example.test/device',
+        intervalSeconds: 1,
+      });
+    }
+    if (path === '/api/teams/t1/providers/oauth/openai-codex/device/poll') {
+      codexPolls += 1;
+      return json({ error: 'Codex device login not found' }, 404);
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing?item=provider:prov-codex');
+  await page.getByTestId('provider-sign-in-again').click();
+  await expect(page.getByTestId('codex-device-login')).toContainText('ABCD-1234');
+
+  await expect(page.getByText('登录已过期，请重新开始')).toBeVisible();
+  await expect(page.getByText('Codex device login not found')).toHaveCount(0);
+  const pollsAfterExpired = codexPolls;
+  expect(pollsAfterExpired).toBeGreaterThanOrEqual(1);
+  await page.waitForTimeout(1500);
+  expect(codexPolls).toBe(pollsAfterExpired);
+});

@@ -1,8 +1,14 @@
 import { QUEUED_MESSAGE_CANCELLED } from '@cairn/shared';
 import { ApiError } from '../api/client.js';
+import { onConnectionRestored } from '../api/connection-state.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { randomId } from '../lib/random-id.js';
-import { SendCancelledError, SendStaleError, SendTimeoutError } from '../lib/send-errors.js';
+import {
+  SendCancelledError,
+  SendStaleError,
+  SendTimeoutError,
+  ServerUnreachableError,
+} from '../lib/send-errors.js';
 
 export type OutboxState = 'sending' | 'failed' | 'sent';
 
@@ -115,6 +121,10 @@ export const RETURNED_KEY_TTL_MS = 10 * 60_000;
 export const RESEND_WINDOW_MS = 10 * 60_000;
 
 export const SEND_TIMEOUT_MS = 30_000;
+
+const RETRY_BASE_MS = 500;
+
+const RETRY_MAX_MS = 10_000;
 
 const LOAD_TIMEOUT_MS = 5_000;
 
@@ -236,6 +246,9 @@ export function createOutbox({
   owner = solitary,
   writeTimeoutMs = 1000,
   sendTimeoutMs = SEND_TIMEOUT_MS,
+  retryBaseMs = RETRY_BASE_MS,
+  retryMaxMs = RETRY_MAX_MS,
+  reconnect,
 }: {
   now?: () => number;
   mintKey?: () => string;
@@ -243,6 +256,9 @@ export function createOutbox({
   owner?: OutboxOwner;
   writeTimeoutMs?: number;
   sendTimeoutMs?: number;
+  retryBaseMs?: number;
+  retryMaxMs?: number;
+  reconnect?: (retry: () => void) => () => void;
 } = {}): Outbox {
   let list: readonly OutboxEntry[] = [];
   let returned: readonly OutboxEntry[] = [];
@@ -254,6 +270,12 @@ export function createOutbox({
   const sentKeys = new Map<string, string>();
   const pendingRefetchKeys = new Set<string>();
   const pendingLateArrivals = new Map<string, string>();
+  const retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const retryAttempts = new Map<string, number>();
+  const retryWaiters = new Map<
+    string,
+    { lane: string; deliver: Deliver; onFailed: SendFailed | undefined }
+  >();
   const knownLoaded = new Map<string, string>();
   const recordKnownLoaded = (key: string, messageId: string) => {
     if (knownLoaded.has(key)) knownLoaded.delete(key);
@@ -363,6 +385,7 @@ export function createOutbox({
     if (entry === null) return;
     try {
       const delivered = await withinTimeout(entry, deliver);
+      cancelRetry(key);
       if (delivered.messageId !== null) sentKeys.set(delivered.messageId, key);
       if (delivered.threadId !== entry.threadId)
         laneAliases.set(conversationOf({ ...entry, threadId: delivered.threadId }), lane);
@@ -386,6 +409,11 @@ export function createOutbox({
       );
       forget(key);
     } catch (error) {
+      if (error instanceof ServerUnreachableError && sendingEntry(key) !== null) {
+        await keep(entry, 'sending');
+        scheduleRetry(key, lane, deliver, onFailed);
+        return;
+      }
       await fail(key, failureOf(error), error, onFailed);
     }
   };
@@ -397,7 +425,52 @@ export function createOutbox({
       }),
     );
   };
+  const cancelRetry = (key: string) => {
+    const timer = retryTimers.get(key);
+    if (timer !== undefined) clearTimeout(timer);
+    retryTimers.delete(key);
+    retryAttempts.delete(key);
+    retryWaiters.delete(key);
+  };
+  const scheduleRetry = (
+    key: string,
+    lane: string,
+    deliver: Deliver,
+    onFailed: SendFailed | undefined,
+  ) => {
+    const attempts = (retryAttempts.get(key) ?? 0) + 1;
+    retryAttempts.set(key, attempts);
+    retryWaiters.set(key, { lane, deliver, onFailed });
+    const previous = retryTimers.get(key);
+    if (previous !== undefined) clearTimeout(previous);
+    const delay = Math.min(retryBaseMs * 2 ** (attempts - 1), retryMaxMs);
+    retryTimers.set(
+      key,
+      setTimeout(() => {
+        retryTimers.delete(key);
+        const waiter = retryWaiters.get(key);
+        if (waiter === undefined || sendingEntry(key) === null) return;
+        chain(waiter.lane, async () => {
+          await send(key, waiter.lane, waiter.deliver, waiter.onFailed);
+        });
+      }, delay),
+    );
+  };
+  const retryPending = () => {
+    for (const [key, timer] of [...retryTimers]) {
+      clearTimeout(timer);
+      retryTimers.delete(key);
+      retryAttempts.delete(key);
+      const waiter = retryWaiters.get(key);
+      if (waiter === undefined || sendingEntry(key) === null) continue;
+      chain(waiter.lane, async () => {
+        await send(key, waiter.lane, waiter.deliver, waiter.onFailed);
+      });
+    }
+  };
+  reconnect?.(retryPending);
   const landEntry = (key: string, messageId: string) => {
+    cancelRetry(key);
     recordKnownLoaded(key, messageId);
     pendingRefetchKeys.delete(key);
     const handedBack = returned.find((candidate) => candidate.key === key);
@@ -480,6 +553,7 @@ export function createOutbox({
     discard(key) {
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
+      cancelRetry(key);
       pendingRefetchKeys.delete(key);
       pendingLateArrivals.delete(key);
       replace(list.filter((candidate) => candidate.key !== key));
@@ -708,4 +782,8 @@ export function keepSentKeys(
   });
 }
 
-export const chiefOutbox = createOutbox({ store: indexedDbOutboxStore(), owner: pageLockOwner() });
+export const chiefOutbox = createOutbox({
+  store: indexedDbOutboxStore(),
+  owner: pageLockOwner(),
+  reconnect: onConnectionRestored,
+});

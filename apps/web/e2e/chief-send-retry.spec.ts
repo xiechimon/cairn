@@ -208,7 +208,7 @@ test('a rejected send returns the text to the composer, and sending it again reu
   expect(ledger.size).toBe(1);
 });
 
-test('a send whose response is lost is sent again with the same client message id and shows one message', async ({
+test('a send whose response is lost stays pending and is delivered once with the same client message id', async ({
   page,
 }) => {
   const { posts, ledger } = await mockCoordinator(page, true);
@@ -216,15 +216,14 @@ test('a send whose response is lost is sent again with the same client message i
   await expect(bubbles(page)).toHaveCount(1);
   await composer(page).fill('Retry me');
   await composer(page).press('Enter');
-  await expect(composer(page)).toHaveValue('Retry me');
-  await composer(page).press('Enter');
+  await expect(composer(page)).toHaveValue('');
+  await expect(sending(page)).toHaveText('Retry me');
   await expect.poll(() => posts.length).toBe(2);
   const [first, second] = posts;
   expect(first?.clientMessageId).toEqual(expect.any(String));
   expect(second?.clientMessageId).toBe(first?.clientMessageId);
   expect(ledger.size).toBe(1);
-  await expect(composer(page)).toHaveValue('');
-  await expect(bubbles(page)).toHaveCount(2);
+  await expect(sending(page)).toHaveCount(0);
   await expect(bubbles(page).filter({ hasText: 'Retry me' })).toHaveCount(1);
 });
 

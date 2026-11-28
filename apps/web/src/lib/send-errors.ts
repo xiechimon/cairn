@@ -18,3 +18,10 @@ export class SendStaleError extends Error {
     this.name = 'SendStaleError';
   }
 }
+
+export class ServerUnreachableError extends Error {
+  constructor(cause?: unknown) {
+    super('The server could not be reached', { cause });
+    this.name = 'ServerUnreachableError';
+  }
+}

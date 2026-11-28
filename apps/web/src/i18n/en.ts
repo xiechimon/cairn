@@ -1934,6 +1934,7 @@ export const EN: Record<string, string> = {
   '已有更新的 xAI 凭证，这次登录没有覆盖它。':
     'A newer xAI credential is already stored. This sign-in did not replace it.',
   '验证码已过期，请重试。': 'The code expired. Try again.',
+  '登录已过期，请重新开始': 'Login expired. Please start again.',
   'xAI 登录失败，请重试。': 'xAI sign-in failed. Try again.',
   'ChatGPT 订阅登录被拒绝。': 'ChatGPT subscription sign-in was denied.',
   '已有更新的 ChatGPT 订阅凭证，这次登录没有覆盖它。':

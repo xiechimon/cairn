@@ -13,7 +13,12 @@ import { EN } from '../i18n/en.js';
 import { activeLocale } from '../i18n/locale.js';
 import { type TFunc, translate } from '../i18n/translate.js';
 import { safeLocalStorage } from '../safe-storage.js';
-import { SendCancelledError, SendStaleError, SendTimeoutError } from './send-errors.js';
+import {
+  SendCancelledError,
+  SendStaleError,
+  SendTimeoutError,
+  ServerUnreachableError,
+} from './send-errors.js';
 
 const REMOVED_FROM_QUEUE_COPY = '这条消息已从队列删除，没有再次发送。';
 
@@ -77,6 +82,7 @@ function isNetworkFailure(error: unknown): boolean {
 const UNREACHABLE_GATEWAY_STATUSES = new Set([502, 503, 504]);
 
 export function isServerUnreachable(error: unknown): boolean {
+  if (error instanceof ServerUnreachableError) return true;
   if (error instanceof ApiError) return UNREACHABLE_GATEWAY_STATUSES.has(error.status);
   return isNetworkFailure(error);
 }
@@ -84,6 +90,7 @@ export function isServerUnreachable(error: unknown): boolean {
 export function describeError(error: unknown, t: TFunc): string | null {
   if (error == null) return null;
   if (error instanceof SendTimeoutError) return t('不确定是否送达，重发前请先看对话里有没有这条。');
+  if (error instanceof ServerUnreachableError) return t('网络连接异常，请检查网络后重试。');
   if (error instanceof SendStaleError) return t('超过 10 分钟未确认送达，已停止自动重发。');
   if (error instanceof SendCancelledError) return t(REMOVED_FROM_QUEUE_COPY);
   if (error instanceof ApiError) {

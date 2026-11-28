@@ -1,3 +1,4 @@
+import { onConnectionRestored } from '../api/connection-state.js';
 import {
   createOutbox,
   type Deliver,
@@ -27,6 +28,7 @@ function notifyErrorListeners(): void {
 export const taskOutbox = createOutbox({
   store: indexedDbOutboxStore('cairn-task-outbox'),
   owner: pageLockOwner(),
+  reconnect: onConnectionRestored,
 });
 
 export const taskOutboxErrors = {
