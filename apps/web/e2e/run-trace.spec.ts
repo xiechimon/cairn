@@ -238,6 +238,22 @@ test.describe('narrow window', () => {
     await column.locator('a[data-run-row="turn-b"]').click();
     await expect(page.getByTestId('run-failure')).toBeVisible();
     await expect(column).toHaveCount(0);
+    const rows = await page
+      .locator('[data-slot="trace-collapsible-trigger"]')
+      .evaluateAll((els) =>
+        els.map((el) => ({
+          right: el.getBoundingClientRect().right,
+          title: el.querySelector('[data-slot="trace-title"]')?.getBoundingClientRect().width ?? 0,
+          clipped: el.scrollWidth > el.clientWidth + 1,
+        })),
+      );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.right).toBeLessThanOrEqual(390);
+      expect(row.title).toBeGreaterThan(0);
+      expect(row.clipped).toBe(false);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.getByTestId('run-back').click();
     await expect(page).toHaveURL(/\/app\/runs\/?\?thread=thread-run-trace&scenario=run-trace$/);
     await expect(column.locator('a[data-run-row="turn-b"]')).toBeVisible();

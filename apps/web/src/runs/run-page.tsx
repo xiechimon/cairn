@@ -108,9 +108,11 @@ function Folded({
     >
       <TraceCollapsibleTrigger className="pointer-coarse:min-h-11">
         <TraceLine status={status}>
-          <TraceTitle>{title}</TraceTitle>
+          <TraceTitle className="max-w-full shrink-0">{title}</TraceTitle>
           {description !== undefined && description !== '' && (
-            <TraceDescription className="max-w-[48ch] truncate">{description}</TraceDescription>
+            <TraceDescription className="max-w-[48ch] min-w-0 shrink truncate">
+              {description}
+            </TraceDescription>
           )}
         </TraceLine>
       </TraceCollapsibleTrigger>
