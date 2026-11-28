@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { cliModelFromEnv, runCliCase } from './cli-arm.js';
+import { cliModelFromEnv, probeCliLauncher, runCliCase } from './cli-arm.js';
 import { runPilot } from './pilot.js';
 import type { JourneyTask } from './types.js';
 
@@ -83,16 +83,25 @@ function fakeCli(body: string): { command: string; args: string[] } {
   return { command: process.execPath, args: [path] };
 }
 
+const helpLine = `
+if (args.includes('--help')) {
+  console.log('-p -C --model --output-format --permission-mode --effort');
+  process.exit(0);
+}
+`;
+
 const fixScript = `
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 const args = process.argv.slice(2);
+${helpLine}
 const dir = args[args.indexOf('-C') + 1];
 writeFileSync(join(dir, 'src', 'sum.mjs'), 'export const add = (a, b) => b + a;\\n');
 `;
 
 const noopScript = `
 const args = process.argv.slice(2);
+${helpLine}
 if (args[args.indexOf('-p') + 1] !== 'demo 的 add 算出来不对，修一下并跑测试') process.exit(2);
 `;
 
@@ -174,6 +183,19 @@ describe('cli model from the environment', () => {
       effort: 'low',
       permissionMode: 'always_allow',
     });
+  });
+
+  test('a launcher whose help does not document the flags is refused before spending', async () => {
+    const fake = fakeCli("console.log('no flags here');");
+    const unsupported = await probeCliLauncher({
+      command: fake.command,
+      args: fake.args,
+      modelId: 'fake/model',
+      effort: 'low',
+      permissionMode: 'always_allow',
+      timeoutMs: 30_000,
+    });
+    expect(unsupported).toContain('does not document');
   });
 
   test('a timeout that is not a positive number is refused, never read as zero', () => {

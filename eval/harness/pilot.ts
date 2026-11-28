@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { journeyPassed } from '../scorers/journey-checks.js';
-import { type CliModel, cliModelFromEnv, runCliCase } from './cli-arm.js';
+import { type CliModel, cliModelFromEnv, probeCliLauncher, runCliCase } from './cli-arm.js';
 import { type JourneyArm, runJourneyTask } from './journey.js';
 import { type Decision, decide, discordance, type Pair, powerAt } from './paired.js';
 import { ReservationLedger } from './reserve.js';
@@ -388,6 +388,10 @@ function pilotModel(options: PilotOptions): PilotModel {
 export async function runPilot(options: PilotOptions = {}): Promise<PilotResult> {
   const startedAt = new Date().toISOString();
   const model = pilotModel(options);
+  if (model.kind === 'cli') {
+    const unsupported = await probeCliLauncher(model.config);
+    if (unsupported !== null) throw new Error(`eval: ${unsupported}`);
+  }
   const families = CASE_FAMILIES.slice(0, options.cases ?? CASE_FAMILIES.length);
   const cases = families.map((family) => makeCase(family));
   const ledger = new ReservationLedger(CALIBRATION_CAP);

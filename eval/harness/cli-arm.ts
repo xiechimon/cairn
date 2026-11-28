@@ -44,6 +44,44 @@ export function cliModelFromEnv(env: NodeJS.ProcessEnv = process.env): CliModel 
   };
 }
 
+const REQUIRED_FLAGS = ['-p', '-C', '--model', '--output-format', '--permission-mode', '--effort'];
+
+/**
+ * Refuses a launcher whose own help does not document every flag this arm
+ * passes, before a single model start is spent on it.
+ */
+export function probeCliLauncher(model: CliModel): Promise<string | null> {
+  return new Promise((resolve) => {
+    const child = spawn(model.command, [...(model.args ?? []), '--help'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let text = '';
+    child.stdout.on('data', (chunk: Buffer) => {
+      text += chunk.toString();
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      text += chunk.toString();
+    });
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      resolve('launcher --help timed out');
+    }, 15_000);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      resolve(error.message);
+    });
+    child.on('close', () => {
+      clearTimeout(timer);
+      const missing = REQUIRED_FLAGS.filter((flag) => !text.includes(flag));
+      resolve(
+        missing.length === 0
+          ? null
+          : `launcher --help does not document ${missing.join(', ')}, so this arm will not spend a start on it`,
+      );
+    });
+  });
+}
+
 export interface CliLaunch {
   exitCode: number | null;
   timedOut: boolean;
