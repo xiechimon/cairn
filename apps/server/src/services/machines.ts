@@ -75,6 +75,10 @@ import {
   ownedStepRow,
   profileForStep,
 } from './machine-deps.js';
+import {
+  cancelMachineTokenRotation,
+  scheduleMachineTokenRotation,
+} from './machine-token-rotation-schedule.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
@@ -581,9 +585,11 @@ export function enrollMachine(
       return retired;
     });
     notifyRetiredMachines(deps, input.teamId, retiredIds);
+    for (const retiredId of retiredIds) cancelMachineTokenRotation(db, retiredId);
     if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
     beginMachineStarting(deps, existing);
     adoptAsDefaultIfUnset(db, input.teamId, existing.id);
+    scheduleMachineTokenRotation(db, existing.id);
     return {
       machineId: existing.id,
       token: token.plain,
@@ -623,8 +629,10 @@ export function enrollMachine(
     ];
   });
   notifyRetiredMachines(deps, input.teamId, retiredIds);
+  for (const retiredId of retiredIds) cancelMachineTokenRotation(db, retiredId);
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
   adoptAsDefaultIfUnset(db, input.teamId, machineId);
+  scheduleMachineTokenRotation(db, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
 
@@ -820,9 +828,11 @@ export function authorizeEnrollmentMachine(
       return retired;
     });
     notifyRetiredMachines(deps, input.teamId, retiredIds);
+    for (const retiredId of retiredIds) cancelMachineTokenRotation(db, retiredId);
     if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
     beginMachineStarting(deps, existing);
     adoptAsDefaultIfUnset(db, input.teamId, existing.id);
+    scheduleMachineTokenRotation(db, existing.id);
     return {
       machineId: existing.id,
       token: token.plain,
@@ -860,8 +870,10 @@ export function authorizeEnrollmentMachine(
     });
   });
   notifyRetiredMachines(deps, input.teamId, retiredIds);
+  for (const retiredId of retiredIds) cancelMachineTokenRotation(db, retiredId);
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
   adoptAsDefaultIfUnset(db, input.teamId, machineId);
+  scheduleMachineTokenRotation(db, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
 

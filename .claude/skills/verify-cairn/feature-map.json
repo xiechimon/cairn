@@ -1235,8 +1235,8 @@
     {
       "id": "machines",
       "name": "Machines",
-      "summary": "A compact machine list with names, default marker, system, online state, reconnect guidance after offline token rotation, and a menu for default, token rotation and delete.",
-      "states": "Empty, loading and error states; online and offline rows; offline token-rotation reconnect status and command drawer; default machine; long names; row menu with in-menu token-rotation confirm and confirmation dialogs. No expandable capability controls.",
+      "summary": "A compact machine list with names, default marker, system, online state, and a menu for default and delete.",
+      "states": "Empty, loading and error states; online and offline rows; default machine; long names; row menu with default/delete actions and confirmation dialogs. No expandable capability controls or manual token rotation controls.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1249,6 +1249,7 @@
           "apps/server/src/services/machines.ts",
           "apps/server/src/services/machine-revoke.ts",
           "apps/server/src/services/machine-rotate-token.ts",
+          "apps/server/src/services/machine-token-rotation-schedule.ts",
           "apps/server/src/services/runner-offline.ts"
         ]
       },
@@ -1281,10 +1282,12 @@
       ],
       "frontendDesign": [
         "docs/design/references/settings",
+        "docs/design/settings-trim.md",
         "docs/design/runner-token-rotation.md",
         "docs/spec/11-model-service-and-machine-localization.md"
       ],
       "backendDesign": [
+        "docs/design/settings-trim.md",
         "docs/design/runner-token-rotation.md",
         "docs/spec/11-model-service-and-machine-localization.md"
       ],

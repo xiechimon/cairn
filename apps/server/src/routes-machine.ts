@@ -90,6 +90,7 @@ import { withFencedTransaction } from './services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import {
   ackMachineTokenRotation,
+  armOverdueTokenRotationOnConnect,
   claimMachineTokenRotation,
 } from './services/machine-rotate-token.js';
 import {
@@ -645,6 +646,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       lastWrite = stream
         .writeSSE({ data: JSON.stringify({ type: 'hello', connectionId }) })
         .catch(() => {});
+      armOverdueTokenRotationOnConnect(ctx.db, row.id);
       const pingTimer = setInterval(() => {
         if (findMachineByToken(ctx.db, token)?.id !== row.id) {
           if (ctx.machineHub.endConnection(row.id, connectionId)) markOffline(deps, row.id);

@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { dueEvent } from '../db/schema.js';
 
@@ -32,7 +32,9 @@ export interface DueEventRecord {
   lastError: string | null;
 }
 
-export type DueHandlerResult = undefined | { rescheduleAt: number | null };
+export type DueHandlerResult =
+  | undefined
+  | { rescheduleAt: number | null; intervalMs?: number | null };
 
 export type DueHandler = (event: DueEventRecord, now: number) => unknown;
 
@@ -124,47 +126,72 @@ export function createDueRunner(
     );
   }
 
-  function reserve(event: DueEventRecord, now: number): void {
+  function reserve(event: DueEventRecord, now: number): number {
+    const reservedDueAt =
+      event.intervalMs !== null ? now + event.intervalMs : now + DUE_BACKOFF_CAP_MS;
     db.update(dueEvent)
       .set(
         event.intervalMs !== null
-          ? { dueAt: now + event.intervalMs, attempts: 0, lastError: null }
-          : { dueAt: now + DUE_BACKOFF_CAP_MS },
+          ? { dueAt: reservedDueAt, attempts: 0, lastError: null }
+          : { dueAt: reservedDueAt },
       )
       .where(eq(dueEvent.id, event.id))
       .run();
+    return reservedDueAt;
   }
 
   function handlerResult(value: unknown): DueHandlerResult {
     if (!value || typeof value !== 'object' || !('rescheduleAt' in value)) return undefined;
     const at = value.rescheduleAt;
     if (at !== null && typeof at !== 'number') return undefined;
+    if (
+      'intervalMs' in value &&
+      (value.intervalMs === null || typeof value.intervalMs === 'number')
+    ) {
+      return { rescheduleAt: at, intervalMs: value.intervalMs };
+    }
     return { rescheduleAt: at };
   }
 
-  function finishSuccess(event: DueEventRecord, now: number, result: DueHandlerResult): void {
+  function finishSuccess(
+    event: DueEventRecord,
+    now: number,
+    result: DueHandlerResult,
+    expectedDueAt = event.dueAt,
+  ): void {
+    const matchesRow = and(eq(dueEvent.id, event.id), eq(dueEvent.dueAt, expectedDueAt));
     if (result && 'rescheduleAt' in result) {
       if (result.rescheduleAt === null) {
-        db.delete(dueEvent).where(eq(dueEvent.id, event.id)).run();
+        db.delete(dueEvent).where(matchesRow).run();
         return;
       }
       db.update(dueEvent)
-        .set({ dueAt: result.rescheduleAt, attempts: 0, lastError: null })
-        .where(eq(dueEvent.id, event.id))
+        .set({
+          dueAt: result.rescheduleAt,
+          attempts: 0,
+          lastError: null,
+          ...(result.intervalMs !== undefined ? { intervalMs: result.intervalMs } : {}),
+        })
+        .where(matchesRow)
         .run();
       return;
     }
     if (event.intervalMs !== null) {
       db.update(dueEvent)
         .set({ dueAt: now + event.intervalMs, attempts: 0, lastError: null })
-        .where(eq(dueEvent.id, event.id))
+        .where(matchesRow)
         .run();
       return;
     }
-    db.delete(dueEvent).where(eq(dueEvent.id, event.id)).run();
+    db.delete(dueEvent).where(matchesRow).run();
   }
 
-  function recordFailure(event: DueEventRecord, now: number, error: unknown): void {
+  function recordFailure(
+    event: DueEventRecord,
+    now: number,
+    error: unknown,
+    expectedDueAt = event.dueAt,
+  ): void {
     const attempts = event.attempts + 1;
     db.update(dueEvent)
       .set({
@@ -172,7 +199,7 @@ export function createDueRunner(
         lastError: error instanceof Error ? error.message : String(error),
         dueAt: now + dueBackoffMs(attempts),
       })
-      .where(eq(dueEvent.id, event.id))
+      .where(and(eq(dueEvent.id, event.id), eq(dueEvent.dueAt, expectedDueAt)))
       .run();
   }
 
@@ -180,20 +207,21 @@ export function createDueRunner(
     event: DueEventRecord,
     now: number,
     value: Promise<unknown>,
+    reservedDueAt: number,
   ): Promise<void> {
     try {
       const result = handlerResult(await value);
       if (event.intervalMs !== null && result === undefined) {
         db.update(dueEvent)
           .set({ attempts: 0, lastError: null })
-          .where(eq(dueEvent.id, event.id))
+          .where(and(eq(dueEvent.id, event.id), eq(dueEvent.dueAt, reservedDueAt)))
           .run();
         return;
       }
-      finishSuccess(event, now, result);
+      finishSuccess(event, now, result, reservedDueAt);
     } catch (error) {
       if (error instanceof DueDeliveryCrash) throw error;
-      recordFailure(event, clock.now(), error);
+      recordFailure(event, clock.now(), error, reservedDueAt);
     }
   }
 
@@ -212,9 +240,9 @@ export function createDueRunner(
           const value = handler(event, now);
           if (isThenable(value)) {
             inFlight.add(event.id);
-            reserve(event, now);
+            const reservedDueAt = reserve(event, now);
             background.push(
-              settleDetached(event, now, value).finally(() => {
+              settleDetached(event, now, value, reservedDueAt).finally(() => {
                 inFlight.delete(event.id);
               }),
             );

@@ -22,11 +22,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
-import {
-  SETTINGS_SELECT_TRIGGER_CLS,
-  SettingsCard,
-  SettingsSection,
-} from '../components/settings-list.js';
+import { SETTINGS_SELECT_TRIGGER_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
@@ -660,15 +656,16 @@ export function ImConnectionsPage() {
   };
 
   return (
-    <PageShell route={IM_ROUTE} fixture={fixture} selected="none" title={t('聊天应用')}>
-      <SettingsSection
-        className="mt-6"
-        title={t('聊天应用')}
-        info={t(
-          '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
-        )}
-        testId="im-platforms"
-      >
+    <PageShell
+      route={IM_ROUTE}
+      fixture={fixture}
+      selected="none"
+      title={t('聊天应用')}
+      info={t(
+        '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
+      )}
+    >
+      <div data-testid="im-platforms" className="mt-6">
         <QueryBoundary
           query={live ? mergeQueries(connectionsQ, requestsQ) : undefined}
           isEmpty={live && connectionsQ.data === undefined}
@@ -678,7 +675,7 @@ export function ImConnectionsPage() {
         >
           <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
         </QueryBoundary>
-      </SettingsSection>
+      </div>
       {connecting && (
         <ConnectDialog
           pending={mutations.connectTelegram.isPending}

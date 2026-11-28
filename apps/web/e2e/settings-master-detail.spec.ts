@@ -14,15 +14,40 @@ test('the breadcrumb is the only page title: no second heading repeats it', asyn
   await expect(settings(page).getByTestId('settings-head')).toContainText('执行机');
 });
 
-test('other sections keep one heading for the page, the breadcrumb', async ({ page }) => {
-  for (const [section, label] of [
+test('every settings section keeps one heading for the page and clears page info on tab switch', async ({
+  page,
+}) => {
+  const sections = [
+    ['account', '账号'],
+    ['routing', '模型'],
+    ['machines', '执行机'],
     ['skills', '技能'],
     ['mcp', '应用'],
-  ] as const) {
+    ['secrets', '密钥与环境变量'],
+    ['vault', '保险库'],
+    ['api-keys', 'API 密钥'],
+    ['remote', '远程访问'],
+    ['im', '聊天应用'],
+  ] as const;
+  for (const [section, label] of sections) {
     await page.goto(`/app/settings/${section}?scenario=providers-fleet`);
     await expect(settings(page).getByTestId('settings-head')).toHaveText(label);
-    await expect(settings(page).getByRole('heading', { name: label, exact: true })).toHaveCount(1);
+    await expect(
+      settings(page).getByRole('heading', { name: label, exact: true, level: 2 }),
+    ).toHaveCount(1);
   }
+  await expect(
+    settings(page).getByRole('button', {
+      name: '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
+    }),
+  ).toHaveCount(1);
+  await settings(page).locator('[data-settings-section="account"]').click();
+  await expect(settings(page).getByTestId('settings-head')).toHaveText('账号');
+  await expect(
+    settings(page).getByRole('button', {
+      name: '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
+    }),
+  ).toHaveCount(0);
 });
 
 test('search is quiet, shows no key hint, and typing with nothing focused goes into it', async ({

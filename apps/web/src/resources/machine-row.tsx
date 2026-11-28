@@ -1,7 +1,6 @@
 import {
   type MachineCapabilities,
   MIN_SUPPORTED_RUNNER_PROTOCOL,
-  PUBLISHED_PACKAGES,
   runnerNeedsUpdate,
   runnerOutOfWindow,
 } from '@cairn/shared';
@@ -16,13 +15,12 @@ import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
-import { toast, toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { CopyCommand, startCommand, useRunnerServerAccess } from './create-machine-dialog.js';
 import { useOwnComputerRow } from './own-computer-panel.js';
 
 export interface RunnerUpdateSummary {
@@ -107,49 +105,11 @@ export function MachineRowView({
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
-  const isLocal = machine.kind === 'local';
-  const reauthRequired = machine.tokenReauthRequired === true;
   const updateSummary = runnerUpdateSummary(machine.capabilities, online, t);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmRotate, setConfirmRotate] = useState(false);
 
   const ownComputer = useOwnComputerRow(machine);
-  const { access } = useRunnerServerAccess(reauthRequired && !isLocal);
-  const serverOrigin = access?.state === 'ready' && access.url !== null ? access.url : null;
-  const reconnectCmd =
-    serverOrigin === null
-      ? null
-      : `${PUBLISHED_PACKAGES.cli.command} logout && ${startCommand(serverOrigin)}`;
-
-  const handleMenuOpenChange = (nextOpen: boolean) => {
-    setMenuOpen(nextOpen);
-    if (!nextOpen) setConfirmRotate(false);
-  };
-
-  const rotateToken = () => {
-    if (!confirmRotate) {
-      setConfirmRotate(true);
-      return;
-    }
-    setConfirmRotate(false);
-    setMenuOpen(false);
-    if (!live) {
-      blockDemoWrite();
-      return;
-    }
-    mutations.rotateMachineToken.mutate(machineId, {
-      onSuccess: (result) => {
-        if (result.delivery === 'pushed') {
-          toastSuccess(t('已更换令牌，执行机保持在线'));
-        } else {
-          toast.info(t('旧令牌已失效，请在该电脑上重新连接'));
-        }
-      },
-      onError: (error) => toastError(t('更换令牌失败，请重试。'), error),
-    });
-  };
 
   const makeDefault = () => {
     if (!live) {
@@ -234,19 +194,6 @@ export function MachineRowView({
             >
               {online ? t('在线') : t('离线')}
             </span>
-            {reauthRequired && (
-              <>
-                <span aria-hidden className="text-content-dim">
-                  ·
-                </span>
-                <span
-                  data-testid="machine-token-reauth-status"
-                  className="whitespace-nowrap text-(--waiting-ink)"
-                >
-                  {t('需要重新连接')}
-                </span>
-              </>
-            )}
             {updateSummary !== null && (
               <>
                 <span aria-hidden className="text-content-dim">
@@ -269,7 +216,7 @@ export function MachineRowView({
             {ownComputer.meta}
           </div>
         </div>
-        <DropdownMenu open={menuOpen} onOpenChange={handleMenuOpenChange}>
+        <DropdownMenu>
           <IconTooltip
             label={t('{name} 的菜单', { name: machine.name })}
             trigger={
@@ -287,82 +234,37 @@ export function MachineRowView({
           >
             <Ellipsis aria-hidden strokeWidth={1.75} />
           </IconTooltip>
-          <div
-            className="contents"
-            onKeyDownCapture={(event) => {
-              if (event.repeat) event.stopPropagation();
-            }}
-          >
-            <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
+          <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
+            <KeyedMenuItem
+              shortcut="F"
+              data-testid="machine-menu-default"
+              disabled={isDefault || machine.id == null || mutations.patchMachine.isPending}
+              onClick={makeDefault}
+            >
+              {isDefault ? t('已是默认执行机') : t('设为默认执行机')}
+            </KeyedMenuItem>
+            {onPairPhone !== undefined && (
               <KeyedMenuItem
-                shortcut="F"
-                data-testid="machine-menu-default"
-                disabled={isDefault || machine.id == null || mutations.patchMachine.isPending}
-                onClick={makeDefault}
+                shortcut="P"
+                data-testid="machine-menu-pair-phone"
+                onClick={onPairPhone}
               >
-                {isDefault ? t('已是默认执行机') : t('设为默认执行机')}
+                {t('配对安卓手机…')}
               </KeyedMenuItem>
-              <KeyedMenuItem
-                shortcut="R"
-                data-testid="machine-menu-rotate-token"
-                data-confirming={confirmRotate ? 'true' : undefined}
-                closeOnClick={confirmRotate}
-                variant={confirmRotate ? 'destructive' : 'default'}
-                disabled={machine.id == null || mutations.rotateMachineToken.isPending}
-                title={t('如果执行机在线，会自动切换到新令牌；离线或已丢失请用「删除执行机」')}
-                onClick={rotateToken}
-              >
-                {confirmRotate ? t('确认更换令牌') : t('更换令牌')}
-              </KeyedMenuItem>
-              {onPairPhone !== undefined && (
-                <KeyedMenuItem
-                  shortcut="P"
-                  data-testid="machine-menu-pair-phone"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onPairPhone();
-                  }}
-                >
-                  {t('配对安卓手机…')}
-                </KeyedMenuItem>
-              )}
-              <KeyedMenuItem
-                shortcut="D"
-                confirms
-                data-testid="machine-menu-delete"
-                disabled={machine.id == null || mutations.deleteMachine.isPending}
-                title={t('删除后，这台执行机要重新注册才能再接任务')}
-                onClick={() => setConfirmOpen(true)}
-              >
-                {t('删除执行机')}
-              </KeyedMenuItem>
-            </KeyedMenuContent>
-          </div>
+            )}
+            <KeyedMenuItem
+              shortcut="D"
+              confirms
+              data-testid="machine-menu-delete"
+              disabled={machine.id == null || mutations.deleteMachine.isPending}
+              title={t('删除后，这台执行机要重新注册才能再接任务')}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {t('删除执行机')}
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
       </div>
-      {reauthRequired && (
-        <div
-          data-testid="machine-token-reauth-drawer"
-          className="flex min-w-0 flex-col gap-2 border-t border-border px-4 py-2"
-        >
-          {isLocal ? (
-            <p className="m-0 text-meta text-content-secondary">
-              {t('旧令牌已失效。重启桌面端或在主机终端重启 Cairn 后，这台执行机即可重新连接。')}
-            </p>
-          ) : reconnectCmd !== null ? (
-            <>
-              <p className="m-0 text-meta text-content-secondary">
-                {t('旧令牌已失效。在这台电脑运行以下命令重新连接：')}
-              </p>
-              <CopyCommand command={reconnectCmd} />
-            </>
-          ) : (
-            <p className="m-0 text-meta text-content-secondary">
-              {t('旧令牌已失效。开启远程访问后，在那台电脑登出并重新连接这台主机。')}
-            </p>
-          )}
-        </div>
-      )}
       {ownComputer.drawer}
       <DeleteConfirm
         open={confirmOpen}

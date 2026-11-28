@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { machine, team } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import type { MachineDeps } from './machine-deps.js';
+import { cancelMachineTokenRotation } from './machine-token-rotation-schedule.js';
 import { markOffline } from './machines.js';
 
 export function revokeMachineToken(
@@ -25,4 +26,5 @@ export function revokeMachineToken(
     .run();
   markOffline(deps, machineId);
   deps.machineHub.revokeMachine(machineId);
+  cancelMachineTokenRotation(deps.db, machineId);
 }

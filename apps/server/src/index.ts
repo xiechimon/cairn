@@ -429,6 +429,7 @@ const scheduler = createScheduler(
   {
     tickMs: config.schedulerTickMs,
     pushDigestTimes: config.pushDigestTimes,
+    logger,
   },
   { attachmentsDir, logger },
   { githubFetch, logger },

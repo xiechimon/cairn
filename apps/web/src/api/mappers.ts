@@ -1637,7 +1637,6 @@ export function mapMachines(
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
     ...(m.providers !== undefined ? { providers: m.providers } : {}),
-    ...(m.tokenReauthRequired ? { tokenReauthRequired: true } : {}),
   }));
 }
 

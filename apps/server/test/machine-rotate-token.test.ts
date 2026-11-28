@@ -20,6 +20,7 @@ import { offlineDaemonRuntimeOpts } from '../../daemon/test/runtime-stubs.js';
 import {
   build as buildTable,
   computer as computerTable,
+  dueEvent as dueEventTable,
   machine as machineTable,
   pairedDevice as pairedDeviceTable,
   phone as phoneTable,
@@ -30,6 +31,17 @@ import {
 } from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
 import { createApiKey } from '../src/services/api-keys.js';
+import { createDueRunner, type DueClock } from '../src/services/due-events.js';
+import {
+  armOverdueTokenRotationOnConnect,
+  MACHINE_TOKEN_ROTATION_CONNECT_GRACE_MS,
+  MACHINE_TOKEN_ROTATION_EVENT_KIND,
+  MACHINE_TOKEN_ROTATION_INTERVAL_MS,
+  MACHINE_TOKEN_ROTATION_RETRY_MS,
+  machineTokenRotationEventId,
+  processMachineTokenRotationDue,
+} from '../src/services/machine-rotate-token.js';
+import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, postProject, seedSessionRoute, type TestServer } from './helpers.js';
 
 const OWNER_TOKEN = 'cairn-owner-rotate-token-test';
@@ -986,6 +998,805 @@ describe('in-place runner token rotation', () => {
       expect(surfaces).not.toContain(newHash);
       expect(surfaces).not.toContain('tokenHash');
       expect(surfaces).not.toContain('pendingTokenHash');
+    } finally {
+      w.s.dispose();
+    }
+  });
+});
+
+function createControlledClock(initialNow = Date.now()) {
+  let current = initialNow;
+  let nextHandle = 1;
+  const timers = new Map<
+    number,
+    { fireAt: number; cb: () => void | Promise<void>; native?: ReturnType<typeof setTimeout> }
+  >();
+  const clock: DueClock = {
+    now: () => current,
+    setTimer(cb, delayMs) {
+      const id = nextHandle++;
+      const fireAt = current + Math.max(0, delayMs);
+      const native =
+        delayMs <= 0
+          ? setTimeout(() => {
+              const entry = timers.get(id);
+              if (!entry) return;
+              timers.delete(id);
+              void entry.cb();
+            }, 0)
+          : undefined;
+      timers.set(id, { fireAt, cb, ...(native !== undefined ? { native } : {}) });
+      return id;
+    },
+    clearTimer(handle) {
+      const entry = timers.get(handle as number);
+      if (entry?.native !== undefined) clearTimeout(entry.native);
+      timers.delete(handle as number);
+    },
+  };
+  return {
+    clock,
+    now: () => current,
+    async advanceTo(targetMs: number) {
+      if (targetMs > current) current = targetMs;
+      for (;;) {
+        let soonestId: number | null = null;
+        let soonestAt = Number.POSITIVE_INFINITY;
+        for (const [id, entry] of timers.entries()) {
+          if (entry.fireAt <= current && entry.fireAt < soonestAt) {
+            soonestAt = entry.fireAt;
+            soonestId = id;
+          }
+        }
+        if (soonestId === null) break;
+        const entry = timers.get(soonestId);
+        if (entry?.native !== undefined) clearTimeout(entry.native);
+        timers.delete(soonestId);
+        if (entry) await entry.cb();
+      }
+    },
+  };
+}
+
+describe('automatic runner token rotation', () => {
+  test('scheduled auto-rotation rotates online runner in place while active step finishes and queued task dispatches', async () => {
+    const w = await setupWorld({ hostKey: HOST_KEY_A });
+    const stream = await openMachineStream(w.s.app, w.a.token);
+    const controlled = createControlledClock();
+    const scheduler = createScheduler(
+      {
+        db: w.s.db,
+        hub: w.s.hub,
+        user: w.s.user,
+        machineHub: w.s.machineHub,
+        convHub: w.s.convHub,
+        reposDir: w.s.reposDir,
+        attachmentsDir: w.s.attachmentsDir,
+      },
+      { tickMs: 3_600_000, clock: controlled.clock },
+    );
+    try {
+      await waitFor(() => stream.getConnectionId() !== '');
+      const projectId = await postProject(w.s.app);
+      const todo1Res = await call(w.s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        body: { title: 'active task', spec: 'finish after auto rotation' },
+      });
+      const todo2Res = await call(w.s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        body: { title: 'queued task', spec: 'dispatch after auto rotation' },
+      });
+      const todo1 = (await todo1Res.json()) as { id: string };
+      const todo2 = (await todo2Res.json()) as { id: string };
+      await call(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {
+        body: { todoIds: [todo1.id, todo2.id] },
+      });
+
+      const claimed1 = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+        cred: w.a.token,
+        body: {},
+      });
+      const step1Id = ((await claimed1.json()) as { step: { step: { id: string } } | null }).step
+        ?.step.id;
+      expect(step1Id).toBeTruthy();
+
+      const eventId = machineTokenRotationEventId(w.a.machineId);
+      w.s.db
+        .update(dueEventTable)
+        .set({ dueAt: controlled.now() })
+        .where(eq(dueEventTable.id, eventId))
+        .run();
+
+      scheduler.start();
+      await waitFor(() => stream.events.some((ev) => ev.type === 'token.rotate'));
+      const rotateEv = stream.events.find((ev) => ev.type === 'token.rotate') as {
+        rotationId: string;
+      };
+
+      const claimRot = await call(w.s.app, 'POST', '/api/machine/token-rotate/claim', {
+        cred: w.a.token,
+        body: {
+          rotationId: rotateEv.rotationId,
+          connectionId: stream.getConnectionId(),
+          hostKey: HOST_KEY_A,
+        },
+      });
+      expect(claimRot.status).toBe(200);
+      const { token: newToken } = (await claimRot.json()) as { token: string };
+
+      const ackRot = await call(w.s.app, 'POST', '/api/machine/token-rotate/ack', {
+        cred: newToken,
+        body: { rotationId: rotateEv.rotationId },
+      });
+      expect(ackRot.status).toBe(200);
+
+      await waitFor(() => {
+        const due = w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, eventId)).get();
+        return (
+          due !== undefined &&
+          due.dueAt >= controlled.now() + MACHINE_TOKEN_ROTATION_INTERVAL_MS - 10_000
+        );
+      });
+
+      const oldProbe = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+        cred: w.a.token,
+        body: {},
+      });
+      expect(oldProbe.status).toBe(401);
+
+      const newStream = await openMachineStream(w.s.app, newToken);
+      try {
+        await waitFor(() => newStream.getConnectionId() !== '');
+        const done1 = await call(w.s.app, 'POST', `/api/machine/done/${step1Id}`, {
+          cred: newToken,
+          body: { status: 'success' },
+        });
+        expect(done1.status).toBe(200);
+
+        const claimed2 = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+          cred: newToken,
+          body: {},
+        });
+        expect(claimed2.status).toBe(200);
+        const step2Id = ((await claimed2.json()) as { step: { step: { id: string } } | null }).step
+          ?.step.id;
+        expect(step2Id).toBeTruthy();
+
+        const row = machineRowOf(w.s, w.a.machineId);
+        expect(row?.online).toBe(true);
+        expect(row?.tokenReauthRequired).toBe(false);
+        expect(row?.pendingTokenHash).toBeNull();
+        const due = w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, eventId)).get();
+        expect(due?.intervalMs).toBeNull();
+        expect(due?.attempts).toBe(0);
+      } finally {
+        newStream.abort();
+      }
+    } finally {
+      scheduler.stop();
+      stream.abort();
+      w.s.dispose();
+    }
+  });
+
+  test('offline auto-rotation keeps old token valid, retries 1h, arms 5s on reconnect (not normal 7d <1h), and survives restart', async () => {
+    const w = await setupWorld({ hostKey: HOST_KEY_A });
+    const eventId = machineTokenRotationEventId(w.a.machineId);
+    try {
+      const dueNow = Date.now() - 1000;
+      w.s.db
+        .update(dueEventTable)
+        .set({ dueAt: dueNow, intervalMs: null, attempts: 0 })
+        .where(eq(dueEventTable.id, eventId))
+        .run();
+
+      const dueRow = w.s.db
+        .select()
+        .from(dueEventTable)
+        .where(eq(dueEventTable.id, eventId))
+        .get()!;
+      const resOffline = await processMachineTokenRotationDue(
+        { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+        dueRow,
+        Date.now(),
+      );
+      expect(resOffline.rescheduleAt).toBeGreaterThanOrEqual(
+        Date.now() + MACHINE_TOKEN_ROTATION_RETRY_MS - 5000,
+      );
+      expect(resOffline.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+      const afterOffline = machineRowOf(w.s, w.a.machineId);
+      expect(afterOffline?.tokenReauthRequired).toBe(false);
+      expect(afterOffline?.tokenHash).toBe(hashCredential(w.a.token));
+
+      const pollWhileOffline = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+        cred: w.a.token,
+        body: {},
+      });
+      expect(pollWhileOffline.status).toBe(200);
+
+      w.s.db
+        .update(dueEventTable)
+        .set({
+          dueAt: resOffline.rescheduleAt!,
+          intervalMs: resOffline.intervalMs ?? null,
+          attempts: 0,
+        })
+        .where(eq(dueEventTable.id, eventId))
+        .run();
+
+      const connectBefore = Date.now();
+      const stream = await openMachineStream(w.s.app, w.a.token);
+      try {
+        await waitFor(() => stream.getConnectionId() !== '');
+        const armed = w.s.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, eventId))
+          .get();
+        expect(armed).toBeDefined();
+        expect(armed!.dueAt).toBeGreaterThanOrEqual(connectBefore);
+        expect(armed!.dueAt).toBeLessThanOrEqual(
+          Date.now() + MACHINE_TOKEN_ROTATION_CONNECT_GRACE_MS + 1000,
+        );
+        expect(armed!.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+      } finally {
+        stream.abort();
+      }
+
+      const normalShortDue = Date.now() + 30 * 60_000;
+      w.s.db
+        .update(dueEventTable)
+        .set({ dueAt: normalShortDue, intervalMs: null, attempts: 0 })
+        .where(eq(dueEventTable.id, eventId))
+        .run();
+      armOverdueTokenRotationOnConnect(w.s.db, w.a.machineId, Date.now());
+      const afterNormalConnect = w.s.db
+        .select()
+        .from(dueEventTable)
+        .where(eq(dueEventTable.id, eventId))
+        .get();
+      expect(afterNormalConnect?.dueAt).toBe(normalShortDue);
+      expect(afterNormalConnect?.intervalMs).toBeNull();
+
+      const restarted = bootServer({ db: w.s.db });
+      try {
+        const persisted = restarted.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, eventId))
+          .get();
+        expect(persisted?.dueAt).toBe(normalShortDue);
+      } finally {
+        restarted.dispose();
+      }
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('online timeout, claimed-then-timeout + late ack, idempotent ack, and concurrency cap preserve old token and schedule integrity', async () => {
+    const w = await setupWorld({ hostKey: HOST_KEY_A, tokenRotationTimeoutMs: 60 });
+    const stream = await openMachineStream(w.s.app, w.a.token);
+    const eventId = machineTokenRotationEventId(w.a.machineId);
+    try {
+      await waitFor(() => stream.getConnectionId() !== '');
+      const dueRow = w.s.db
+        .select()
+        .from(dueEventTable)
+        .where(eq(dueEventTable.id, eventId))
+        .get()!;
+
+      const timedOut = await processMachineTokenRotationDue(
+        { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+        dueRow,
+        Date.now(),
+        { timeoutMs: 60 },
+      );
+      expect(timedOut.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+      expect(machineRowOf(w.s, w.a.machineId)?.online).toBe(true);
+      expect(machineRowOf(w.s, w.a.machineId)?.tokenReauthRequired).toBe(false);
+      expect(machineRowOf(w.s, w.a.machineId)?.tokenHash).toBe(hashCredential(w.a.token));
+
+      const rotatePromise = processMachineTokenRotationDue(
+        { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+        dueRow,
+        Date.now(),
+        { timeoutMs: 120 },
+      );
+      await waitFor(() => stream.events.filter((e) => e.type === 'token.rotate').length >= 2);
+      const latestEv = stream.events.filter((e) => e.type === 'token.rotate').at(-1) as {
+        rotationId: string;
+      };
+      const claimRes = await call(w.s.app, 'POST', '/api/machine/token-rotate/claim', {
+        cred: w.a.token,
+        body: {
+          rotationId: latestEv.rotationId,
+          connectionId: stream.getConnectionId(),
+          hostKey: HOST_KEY_A,
+        },
+      });
+      expect(claimRes.status).toBe(200);
+      const { token: stagedToken } = (await claimRes.json()) as { token: string };
+
+      const claimTimeoutRes = await rotatePromise;
+      expect(claimTimeoutRes.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+      expect(machineRowOf(w.s, w.a.machineId)?.tokenHash).toBe(hashCredential(w.a.token));
+      expect(machineRowOf(w.s, w.a.machineId)?.pendingTokenHash).toBe(hashCredential(stagedToken));
+
+      const blockingRot = processMachineTokenRotationDue(
+        { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+        dueRow,
+        Date.now(),
+        { timeoutMs: 120 },
+      );
+      const activeBlockedAck = await call(w.s.app, 'POST', '/api/machine/token-rotate/ack', {
+        cred: stagedToken,
+        body: { rotationId: latestEv.rotationId },
+      });
+      expect(activeBlockedAck.status).toBe(401);
+      await blockingRot;
+
+      const lateAck = await call(w.s.app, 'POST', '/api/machine/token-rotate/ack', {
+        cred: stagedToken,
+        body: { rotationId: latestEv.rotationId },
+      });
+      expect(lateAck.status).toBe(200);
+      expect(machineRowOf(w.s, w.a.machineId)?.tokenHash).toBe(hashCredential(stagedToken));
+
+      const sentinelDue = Date.now() + 123_456;
+      w.s.db
+        .update(dueEventTable)
+        .set({ dueAt: sentinelDue, intervalMs: null })
+        .where(eq(dueEventTable.id, eventId))
+        .run();
+      const replayAck = await call(w.s.app, 'POST', '/api/machine/token-rotate/ack', {
+        cred: stagedToken,
+        body: { rotationId: latestEv.rotationId },
+      });
+      expect(replayAck.status).toBe(200);
+      expect(
+        w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, eventId)).get()?.dueAt,
+      ).toBe(sentinelDue);
+
+      const extras = await Promise.all(
+        ['b', 'c', 'd', 'e'].map((n) =>
+          enroll(w.s, issueKey(w.s, `key-${n}`), `cap-${n}`, n.repeat(64)),
+        ),
+      );
+      const streams = await Promise.all(
+        [stagedToken, ...extras.map((e) => e.token)].map((tok) => openMachineStream(w.s.app, tok)),
+      );
+      try {
+        await waitFor(() => streams.every((st) => st.getConnectionId() !== ''));
+        const ids = [w.a.machineId, ...extras.map((e) => e.machineId)];
+        const slowCalls = ids.slice(0, 4).map((id) =>
+          processMachineTokenRotationDue(
+            { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+            w.s.db
+              .select()
+              .from(dueEventTable)
+              .where(eq(dueEventTable.id, machineTokenRotationEventId(id)))
+              .get()!,
+            Date.now(),
+            { timeoutMs: 150 },
+          ),
+        );
+        const fifthStart = Date.now();
+        const fifthRes = await processMachineTokenRotationDue(
+          { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+          w.s.db
+            .select()
+            .from(dueEventTable)
+            .where(eq(dueEventTable.id, machineTokenRotationEventId(ids[4]!)))
+            .get()!,
+          fifthStart,
+          { timeoutMs: 150 },
+        );
+        expect(Date.now() - fifthStart).toBeLessThan(80);
+        expect(fifthRes.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+        await Promise.all(slowCalls);
+      } finally {
+        for (const st of streams) st.abort();
+      }
+    } finally {
+      stream.abort();
+      w.s.dispose();
+    }
+  });
+
+  test('lifecycle reset/cancel, concurrent re-enroll & reservedDueAt CAS, and syncDueSources staggered seed/prune', async () => {
+    const w = await setupWorld({ hostKey: HOST_KEY_A });
+    const stream = await openMachineStream(w.s.app, w.a.token);
+    const controlled = createControlledClock();
+    try {
+      await waitFor(() => stream.getConnectionId() !== '');
+      const eventId = machineTokenRotationEventId(w.a.machineId);
+
+      const runner = createDueRunner(w.s.db, controlled.clock, {
+        [MACHINE_TOKEN_ROTATION_EVENT_KIND]: async (event, now) => {
+          return processMachineTokenRotationDue(
+            { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+            event,
+            now,
+            { timeoutMs: 120 },
+          );
+        },
+      });
+      try {
+        w.s.db
+          .update(dueEventTable)
+          .set({ dueAt: controlled.now(), intervalMs: null, attempts: 0 })
+          .where(eq(dueEventTable.id, eventId))
+          .run();
+        runner.arm();
+        await waitFor(() => stream.events.some((ev) => ev.type === 'token.rotate'));
+
+        const reEnrolled = await enroll(w.s, w.apiKey, 'host-a', HOST_KEY_A);
+        expect(reEnrolled.machineId).toBe(w.a.machineId);
+        const dueAfterEnroll = w.s.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, eventId))
+          .get();
+        expect(dueAfterEnroll?.intervalMs).toBeNull();
+        expect(dueAfterEnroll!.dueAt).toBeGreaterThanOrEqual(
+          Date.now() + MACHINE_TOKEN_ROTATION_INTERVAL_MS - 10_000,
+        );
+        const targetDueAt = dueAfterEnroll!.dueAt;
+
+        await new Promise((r) => setTimeout(r, 180));
+        const dueAfterSettle = w.s.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, eventId))
+          .get();
+        expect(dueAfterSettle?.dueAt).toBe(targetDueAt);
+        expect(dueAfterSettle?.intervalMs).toBeNull();
+      } finally {
+        runner.stop();
+      }
+
+      await call(w.s.app, 'POST', `/api/machines/${w.a.machineId}/revoke`);
+      expect(
+        w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, eventId)).get(),
+      ).toBeUndefined();
+
+      const b = await enroll(w.s, issueKey(w.s, 'key-b-del'), 'host-b', HOST_KEY_B);
+      const bEvent = machineTokenRotationEventId(b.machineId);
+      expect(
+        w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, bEvent)).get(),
+      ).toBeDefined();
+      await call(w.s.app, 'DELETE', `/api/machines/${b.machineId}`);
+      expect(
+        w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, bEvent)).get(),
+      ).toBeUndefined();
+
+      const active = await enroll(w.s, issueKey(w.s, 'key-seed'), 'host-seed', 'c'.repeat(64));
+      w.s.db.delete(dueEventTable).run();
+      w.s.db
+        .insert(dueEventTable)
+        .values({
+          id: machineTokenRotationEventId('orphan-id'),
+          kind: MACHINE_TOKEN_ROTATION_EVENT_KIND,
+          dueAt: controlled.now() + 1000,
+          intervalMs: null,
+          attempts: 0,
+          lastError: null,
+        })
+        .run();
+
+      const sched = createScheduler(
+        {
+          db: w.s.db,
+          hub: w.s.hub,
+          user: w.s.user,
+          machineHub: w.s.machineHub,
+          convHub: w.s.convHub,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        { tickMs: 3_600_000, clock: controlled.clock },
+      );
+      try {
+        sched.start();
+        const seeded = w.s.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, machineTokenRotationEventId(active.machineId)))
+          .get();
+        expect(seeded).toBeDefined();
+        expect(seeded!.intervalMs).toBeNull();
+        expect(seeded!.dueAt).toBeGreaterThanOrEqual(
+          controlled.now() + MACHINE_TOKEN_ROTATION_INTERVAL_MS * 0.5,
+        );
+        expect(seeded!.dueAt).toBeLessThanOrEqual(
+          controlled.now() + MACHINE_TOKEN_ROTATION_INTERVAL_MS,
+        );
+        expect(
+          w.s.db
+            .select()
+            .from(dueEventTable)
+            .where(eq(dueEventTable.id, machineTokenRotationEventId('orphan-id')))
+            .get(),
+        ).toBeUndefined();
+      } finally {
+        sched.stop();
+      }
+    } finally {
+      stream.abort();
+      w.s.dispose();
+    }
+  });
+
+  test('mid-flight SSE replacement on initial rotation retains 5s arming, restart scheduler consumes persisted dueEvent, push failure and handler error log cleanly and retry 1h, and in-flight delete stays deleted', async () => {
+    const w = await setupWorld({ hostKey: HOST_KEY_A });
+    const stream1 = await openMachineStream(w.s.app, w.a.token);
+    const controlled = createControlledClock();
+    const infoLogs: Array<{ msg?: string; obj?: object }> = [];
+    const warnLogs: Array<{ msg?: string; obj?: object }> = [];
+    const logger = {
+      info(obj: object, msg?: string) {
+        infoLogs.push({ obj, msg });
+      },
+      warn(obj: object, msg?: string) {
+        warnLogs.push({ obj, msg });
+      },
+    };
+    const eventId = machineTokenRotationEventId(w.a.machineId);
+    let stream2: Awaited<ReturnType<typeof openMachineStream>> | null = null;
+    try {
+      await waitFor(() => stream1.getConnectionId() !== '');
+      const sched = createScheduler(
+        {
+          db: w.s.db,
+          hub: w.s.hub,
+          user: w.s.user,
+          machineHub: w.s.machineHub,
+          convHub: w.s.convHub,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        { tickMs: 3_600_000, clock: controlled.clock, tokenRotationTimeoutMs: 120, logger },
+      );
+      try {
+        w.s.db
+          .update(dueEventTable)
+          .set({ dueAt: controlled.now(), intervalMs: null, attempts: 0 })
+          .where(eq(dueEventTable.id, eventId))
+          .run();
+        sched.start();
+        await waitFor(() => stream1.events.some((ev) => ev.type === 'token.rotate'));
+
+        const reconnectStart = Date.now();
+        stream2 = await openMachineStream(w.s.app, w.a.token);
+        await waitFor(() => (stream2?.getConnectionId() ?? '') !== '');
+        await new Promise((r) => setTimeout(r, 160));
+        expect(stream2.events).toBeDefined();
+
+        const afterReplaceDue = w.s.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, eventId))
+          .get();
+        expect(afterReplaceDue).toBeDefined();
+        expect(afterReplaceDue!.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+        expect(afterReplaceDue!.dueAt).toBeGreaterThanOrEqual(reconnectStart);
+        expect(afterReplaceDue!.dueAt).toBeLessThanOrEqual(
+          Date.now() + MACHINE_TOKEN_ROTATION_CONNECT_GRACE_MS + 1000,
+        );
+      } finally {
+        sched.stop();
+        stream2?.abort();
+        stream1.abort();
+      }
+
+      const streamRestart = await openMachineStream(w.s.app, w.a.token);
+      const restartedServer = bootServer({ db: w.s.db, machineHub: w.s.machineHub });
+      const restartClock = createControlledClock(Date.now());
+      const restartSched = createScheduler(
+        {
+          db: restartedServer.db,
+          hub: restartedServer.hub,
+          user: restartedServer.user,
+          machineHub: restartedServer.machineHub,
+          convHub: restartedServer.convHub,
+          reposDir: restartedServer.reposDir,
+          attachmentsDir: restartedServer.attachmentsDir,
+        },
+        { tickMs: 3_600_000, clock: restartClock.clock, tokenRotationTimeoutMs: 500, logger },
+      );
+      try {
+        await waitFor(() => streamRestart.getConnectionId() !== '');
+        w.s.db
+          .update(dueEventTable)
+          .set({ dueAt: restartClock.now() })
+          .where(eq(dueEventTable.id, eventId))
+          .run();
+        restartSched.start();
+        await waitFor(() => streamRestart.events.some((ev) => ev.type === 'token.rotate'));
+        const ev = streamRestart.events.find((e) => e.type === 'token.rotate') as {
+          rotationId: string;
+        };
+        const claimRes = await call(
+          restartedServer.app,
+          'POST',
+          '/api/machine/token-rotate/claim',
+          {
+            cred: w.a.token,
+            body: {
+              rotationId: ev.rotationId,
+              connectionId: streamRestart.getConnectionId(),
+              hostKey: HOST_KEY_A,
+            },
+          },
+        );
+        expect(claimRes.status).toBe(200);
+        const { token: freshToken } = (await claimRes.json()) as { token: string };
+        const ackRes = await call(restartedServer.app, 'POST', '/api/machine/token-rotate/ack', {
+          cred: freshToken,
+          body: { rotationId: ev.rotationId },
+        });
+        expect(ackRes.status).toBe(200);
+        await waitFor(() => {
+          const row = restartedServer.db
+            .select()
+            .from(dueEventTable)
+            .where(eq(dueEventTable.id, eventId))
+            .get();
+          return (
+            row !== undefined && row.intervalMs === null && row.dueAt > restartClock.now() + 1000
+          );
+        });
+        w.a.token = freshToken;
+      } finally {
+        restartSched.stop();
+        streamRestart.abort();
+        restartedServer.dispose();
+      }
+
+      const streamFail = await openMachineStream(w.s.app, w.a.token);
+      const origPush = w.s.machineHub.pushTokenRotate.bind(w.s.machineHub);
+      const origConnId = w.s.machineHub.connectionId.bind(w.s.machineHub);
+      const diagClock = createControlledClock(Date.now());
+      const diagSched = createScheduler(
+        {
+          db: w.s.db,
+          hub: w.s.hub,
+          user: w.s.user,
+          machineHub: w.s.machineHub,
+          convHub: w.s.convHub,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        { tickMs: 3_600_000, clock: diagClock.clock, tokenRotationTimeoutMs: 120, logger },
+      );
+      try {
+        await waitFor(() => streamFail.getConnectionId() !== '');
+        w.s.machineHub.pushTokenRotate = () => false;
+        w.s.db
+          .update(dueEventTable)
+          .set({ dueAt: diagClock.now(), intervalMs: null, attempts: 0 })
+          .where(eq(dueEventTable.id, eventId))
+          .run();
+        const infoBeforePushFail = infoLogs.length;
+        diagSched.start();
+        await waitFor(() => {
+          const row = w.s.db
+            .select()
+            .from(dueEventTable)
+            .where(eq(dueEventTable.id, eventId))
+            .get();
+          return (
+            infoLogs.length > infoBeforePushFail &&
+            row?.intervalMs === MACHINE_TOKEN_ROTATION_RETRY_MS
+          );
+        });
+        const afterPushFail = w.s.db
+          .select()
+          .from(dueEventTable)
+          .where(eq(dueEventTable.id, eventId))
+          .get();
+        expect(afterPushFail?.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+        expect(machineRowOf(w.s, w.a.machineId)?.tokenReauthRequired).toBe(false);
+        expect(
+          (await call(w.s.app, 'POST', '/api/machine/tasks/claim', { cred: w.a.token, body: {} }))
+            .status,
+        ).toBe(200);
+
+        diagSched.stop();
+        w.s.machineHub.pushTokenRotate = origPush;
+        w.s.machineHub.connectionId = () => {
+          throw new Error('push-boom');
+        };
+        w.s.db
+          .update(dueEventTable)
+          .set({ dueAt: diagClock.now(), intervalMs: null, attempts: 0 })
+          .where(eq(dueEventTable.id, eventId))
+          .run();
+        const throwSched = createScheduler(
+          {
+            db: w.s.db,
+            hub: w.s.hub,
+            user: w.s.user,
+            machineHub: w.s.machineHub,
+            convHub: w.s.convHub,
+            reposDir: w.s.reposDir,
+            attachmentsDir: w.s.attachmentsDir,
+          },
+          { tickMs: 3_600_000, clock: diagClock.clock, tokenRotationTimeoutMs: 120, logger },
+        );
+        try {
+          throwSched.start();
+          await waitFor(() => {
+            const row = w.s.db
+              .select()
+              .from(dueEventTable)
+              .where(eq(dueEventTable.id, eventId))
+              .get();
+            return warnLogs.length > 0 && row?.intervalMs === MACHINE_TOKEN_ROTATION_RETRY_MS;
+          });
+          expect(JSON.stringify(warnLogs)).toContain('push-boom');
+          expect(JSON.stringify(warnLogs)).not.toContain(w.a.token);
+          const afterThrow = w.s.db
+            .select()
+            .from(dueEventTable)
+            .where(eq(dueEventTable.id, eventId))
+            .get();
+          expect(afterThrow?.intervalMs).toBe(MACHINE_TOKEN_ROTATION_RETRY_MS);
+          expect(afterThrow?.attempts).toBe(0);
+        } finally {
+          throwSched.stop();
+        }
+      } finally {
+        w.s.machineHub.pushTokenRotate = origPush;
+        w.s.machineHub.connectionId = origConnId;
+        diagSched.stop();
+        streamFail.abort();
+      }
+
+      const delConnectAt = Date.now();
+      const streamDel = await openMachineStream(w.s.app, w.a.token);
+      const clockDel = createControlledClock(Date.now());
+      const runnerDel = createDueRunner(w.s.db, clockDel.clock, {
+        [MACHINE_TOKEN_ROTATION_EVENT_KIND]: async (event, now) => {
+          return processMachineTokenRotationDue(
+            { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub },
+            event,
+            now,
+            { timeoutMs: 150 },
+          );
+        },
+      });
+      try {
+        await waitFor(() => {
+          const armed = w.s.db
+            .select()
+            .from(dueEventTable)
+            .where(eq(dueEventTable.id, eventId))
+            .get();
+          return (
+            streamDel.getConnectionId() !== '' &&
+            armed !== undefined &&
+            armed.dueAt <= delConnectAt + MACHINE_TOKEN_ROTATION_CONNECT_GRACE_MS + 1000 &&
+            armed.intervalMs === MACHINE_TOKEN_ROTATION_RETRY_MS &&
+            armed.attempts === 0
+          );
+        });
+        w.s.db
+          .update(dueEventTable)
+          .set({ dueAt: 0, intervalMs: null, attempts: 0 })
+          .where(eq(dueEventTable.id, eventId))
+          .run();
+        runnerDel.arm();
+        await waitFor(() => streamDel.events.some((e) => e.type === 'token.rotate'));
+        const delRes = await call(w.s.app, 'DELETE', `/api/machines/${w.a.machineId}`);
+        expect(delRes.status).toBe(204);
+        await new Promise((r) => setTimeout(r, 200));
+        expect(
+          w.s.db.select().from(dueEventTable).where(eq(dueEventTable.id, eventId)).get(),
+        ).toBeUndefined();
+      } finally {
+        runnerDel.stop();
+        streamDel.abort();
+      }
     } finally {
       w.s.dispose();
     }

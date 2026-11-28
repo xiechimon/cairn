@@ -43,6 +43,9 @@ test('IM: a connected Telegram bot is one row, and deleting it asks first', asyn
   const settings = page.getByRole('dialog', { name: 'Settings' });
   const row = settings.getByTestId('im-connection-conn-tg');
   await expect(row).toBeVisible();
+  await expect(settings.getByTestId('settings-head')).toHaveText('Chat apps');
+  await expect(settings.getByRole('heading', { name: 'Chat apps', exact: true })).toHaveCount(1);
+  await expect(settings.getByTestId('im-platforms')).toBeVisible();
   await expect(settings.getByTestId('im-platform-telegram')).toHaveCount(0);
   await expect(settings.getByTestId('im-connect-telegram')).toHaveCount(0);
   await expect(row).toContainText('Connected · 1 paired contact');
@@ -54,6 +57,7 @@ test('IM: a connected Telegram bot is one row, and deleting it asks first', asyn
   await settings.getByRole('button', { name: why }).focus();
   await expect(page.getByText(why)).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(page.getByText(why)).toHaveCount(0);
 
   await row.getByRole('button', { name: '@cairn_home_bot menu' }).click();
   await page.getByTestId('im-delete-conn-tg').click();
@@ -62,6 +66,88 @@ test('IM: a connected Telegram bot is one row, and deleting it asks first', asyn
   expect(deletes).toEqual([]);
   await confirm.getByRole('button', { name: 'Delete' }).click();
   await expect.poll(() => deletes.length).toBe(1);
+});
+
+test.describe('IM InfoTip on touch device at 390px', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('tapping InfoTip opens the tooltip beside the single heading and Escape closes it with no overflow', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+    await page.route('**/api/**', (route, request) =>
+      request.method() === 'GET'
+        ? route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } })
+        : route.fallback(),
+    );
+    await page.route('**/api/teams', (route) =>
+      route.fulfill({
+        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+      }),
+    );
+    await page.route('**/api/user/me', (route) =>
+      route.fulfill({ json: { id: 'user-1', displayName: 'Me', avatarUrl: null } }),
+    );
+    await page.route('**/api/teams/team-1/machines', (route) => route.fulfill({ json: [] }));
+    await page.route('**/api/teams/team-1/im/connections', (route) =>
+      route.fulfill({ json: { connections: [] } }),
+    );
+    await page.route('**/api/teams/team-1/im/pairing-requests', (route) =>
+      route.fulfill({ json: { requests: [] } }),
+    );
+
+    const why =
+      'Connect a Telegram bot, Slack, iMessage or WeChat and talk to the Coordinator from your phone.';
+    await page.goto('/app/settings/im');
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByTestId('settings-head')).toHaveText('Chat apps');
+    await expect(settings.getByRole('heading', { name: 'Chat apps', exact: true })).toHaveCount(1);
+    const infoButton = settings.getByRole('button', { name: why });
+    await expect(infoButton).toBeVisible();
+    await expect(page.getByText(why)).toHaveCount(0);
+    await infoButton.tap();
+    await expect(page.getByText(why)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByText(why)).toHaveCount(0);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(overflow).toBe(false);
+  });
+});
+
+test('IM: im-platforms keeps single heading and InfoTip across loading and error states', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+  await page.route('**/api/**', (route, request) =>
+    request.method() === 'GET'
+      ? route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } })
+      : route.fallback(),
+  );
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: 'Me', avatarUrl: null } }),
+  );
+  await page.route('**/api/teams/team-1/machines', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/teams/team-1/im/pairing-requests', (route) =>
+    route.fulfill({ json: { requests: [] } }),
+  );
+  await page.route('**/api/teams/team-1/im/connections', async (route) => {
+    await new Promise((r) => setTimeout(r, 120));
+    await route.fulfill({ status: 500, json: { error: 'boom' } });
+  });
+
+  await page.goto('/app/settings/im');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await expect(settings.getByTestId('settings-head')).toHaveText('Chat apps');
+  await expect(settings.getByRole('heading', { name: 'Chat apps', exact: true })).toHaveCount(1);
+  await expect(settings.getByTestId('im-platforms')).toBeVisible();
+  await expect(settings.getByText('Could not load chat apps')).toBeVisible();
 });
 
 test('IM: the Slack connect dialog opens with the App-Level Token field focused', async ({

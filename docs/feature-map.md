@@ -381,11 +381,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### machines
 
-**Machines** (shipped). A compact machine list with names, default marker, system, online state, reconnect guidance after offline token rotation, and a menu for default, token rotation and delete.
+**Machines** (shipped). A compact machine list with names, default marker, system, online state, and a menu for default and delete.
 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main), [docs/research/runner-token-rotation-2026-11-27.md](research/runner-token-rotation-2026-11-27.md)
-- Frontend design: [docs/design/references/settings](design/references/settings), [docs/design/runner-token-rotation.md](design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
-- Backend design: [docs/design/runner-token-rotation.md](design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
+- Frontend design: [docs/design/references/settings](design/references/settings), [docs/design/settings-trim.md](design/settings-trim.md), [docs/design/runner-token-rotation.md](design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
+- Backend design: [docs/design/settings-trim.md](design/settings-trim.md), [docs/design/runner-token-rotation.md](design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
 
 ### mobile-web
 

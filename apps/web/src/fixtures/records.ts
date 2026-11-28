@@ -345,7 +345,6 @@ export interface MachineRow {
   } | null;
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
-  tokenReauthRequired?: boolean;
   phonesFixture?: PhonesFixture;
 }
 

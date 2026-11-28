@@ -35,6 +35,12 @@ import { createDueRunner, type DueClock } from './due-events.js';
 import { drainEffects, effectRegistry, reconcileEffects } from './external-effects.js';
 import { projectOfTodo } from './git.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
+import {
+  MACHINE_TOKEN_ROTATION_EVENT_KIND,
+  processMachineTokenRotationDue,
+  setMachineTokenRotationClockListener,
+  syncMachineTokenRotationDueEvents,
+} from './machine-rotate-token.js';
 import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepAbandonedMemoryEditSteps } from './memory-edit-turns.js';
@@ -83,6 +89,13 @@ export interface SchedulerOptions {
   tickMs: number;
   pushDigestTimes?: readonly string[];
   clock?: DueClock;
+  tokenRotationIntervalMs?: number;
+  tokenRotationRetryMs?: number;
+  tokenRotationTimeoutMs?: number;
+  logger?: {
+    info?: (obj: object, msg?: string) => void;
+    warn?: (obj: object, msg?: string) => void;
+  };
 }
 
 export interface CiPollRun {
@@ -536,6 +549,7 @@ export function createScheduler(
   }
 
   function syncDueSources(): void {
+    syncMachineTokenRotationDueEvents(deps.db, clock.now(), opts.tokenRotationIntervalMs);
     const liveSchedules = new Set<string>();
     for (const row of deps.db.select().from(schedule).all()) {
       if (!row.enabled || row.nextRunAt === null || archivedProject(row.projectId)) continue;
@@ -639,6 +653,24 @@ export function createScheduler(
         await watchPrs();
         await taskIssueSync?.sweep();
       },
+      [MACHINE_TOKEN_ROTATION_EVENT_KIND]: (event, now) => {
+        if (deps.machineHub === undefined) return { rescheduleAt: null };
+        return processMachineTokenRotationDue(
+          {
+            db: deps.db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
+          },
+          event,
+          now,
+          {
+            intervalMs: opts.tokenRotationIntervalMs,
+            retryMs: opts.tokenRotationRetryMs,
+            timeoutMs: opts.tokenRotationTimeoutMs,
+          },
+        );
+      },
     },
     syncDueSources,
   );
@@ -659,6 +691,7 @@ export function createScheduler(
       if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir);
       setScheduleClockListener(deps.db, () => dueRunner.arm());
       setNotificationClockListener(deps.db, () => dueRunner.arm());
+      setMachineTokenRotationClockListener(deps.db, () => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       ensureDue(
         'gc:coordinator-snapshots',
@@ -673,6 +706,7 @@ export function createScheduler(
       dueStarted = false;
       setScheduleClockListener(deps.db, null);
       setNotificationClockListener(deps.db, null);
+      setMachineTokenRotationClockListener(deps.db, null);
       dueRunner.stop();
       if (gcImmediate !== null) clearImmediate(gcImmediate);
       gcImmediate = null;

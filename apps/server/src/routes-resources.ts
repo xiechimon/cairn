@@ -136,7 +136,7 @@ import { mintGithubWebhook, revokeGithubWebhook } from './services/github-webhoo
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
-import { rotateMachineToken } from './services/machine-rotate-token.js';
+import { cancelMachineTokenRotation, rotateMachineToken } from './services/machine-rotate-token.js';
 import { machineRunningCount, toMachineRecord } from './services/machines.js';
 import {
   bindGithubConnector,
@@ -432,6 +432,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
     releasePendingOutput();
+    cancelMachineTokenRotation(ctx.db, id);
     ctx.machineHub.revokeMachine(id);
     if (isCurrentDefault && nextDefaultId !== null) {
       ctx.machineHub.wake(row.teamId);
