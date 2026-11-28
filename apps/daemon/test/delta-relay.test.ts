@@ -147,3 +147,38 @@ test('leading mode sends first delta immediately, serializes flushNow, and recov
   subject.push('e');
   expect(events.at(-2)).toBe('send:e');
 });
+
+test('leading mode discard drops timer-queued chunks before in-flight first delta resolves', async () => {
+  const gate: { releaseFirst?: () => void } = {};
+  const sent: string[] = [];
+  const subject = new DeltaRelay({
+    flushMs: 250,
+    leading: true,
+    send: (text) => {
+      sent.push(text);
+      if (text === 'first') {
+        return new Promise<void>((resolve) => {
+          gate.releaseFirst = resolve;
+        });
+      }
+      return Promise.resolve();
+    },
+    onError: () => {},
+  });
+
+  subject.push('first');
+  expect(sent).toEqual(['first']);
+
+  subject.push('queued-stale');
+  await vi.advanceTimersByTimeAsync(250);
+  expect(sent).toEqual(['first']);
+
+  subject.discard();
+  gate.releaseFirst?.();
+  await subject.flushNow();
+
+  expect(sent).toEqual(['first']);
+
+  subject.push('retry-first');
+  expect(sent).toEqual(['first', 'retry-first']);
+});

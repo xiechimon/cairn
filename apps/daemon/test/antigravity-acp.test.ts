@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -1957,5 +1957,100 @@ describe('warm Antigravity Coordinator session pool', () => {
     backend.close?.();
     await new Promise((r) => setTimeout(r, 100));
     expect(existsSync(profile1.home)).toBe(false);
+  });
+
+  test('restores pre-existing cairn-relay-guard on exit and leaves externally replaced cairn-relay-guard untouched', async () => {
+    const dirPrior = tempDir('ag-warm-prior-hook-');
+    const dirReplaced = tempDir('ag-warm-replaced-hook-');
+    const logFile = join(dirPrior, 'events.jsonl');
+    const agent = writeWarmMock(dirPrior, logFile);
+
+    const originalGuard = {
+      PreToolUse: [{ matcher: 'custom', hooks: [{ type: 'command', command: 'echo prior' }] }],
+    };
+    mkdirSync(join(dirPrior, '.agents'), { recursive: true });
+    writeFileSync(
+      join(dirPrior, '.agents/hooks.json'),
+      JSON.stringify({ 'cairn-relay-guard': originalGuard, keepMe: true }),
+    );
+
+    const backendPrior = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 120,
+    });
+    const sPrior = await backendPrior.createSession(baseChiefOpts(dirPrior, { prompt: 'one' }));
+    await collect(sPrior.events);
+    await new Promise((r) => setTimeout(r, 260));
+    const afterPrior = JSON.parse(
+      readFileSync(join(dirPrior, '.agents/hooks.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(afterPrior).toEqual({ 'cairn-relay-guard': originalGuard, keepMe: true });
+
+    const externalGuard = {
+      PreToolUse: [{ matcher: 'ext', hooks: [{ type: 'command', command: 'echo ext' }] }],
+    };
+    const backendReplaced = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 120,
+    });
+    const sReplaced = await backendReplaced.createSession(
+      baseChiefOpts(dirReplaced, { prompt: 'two' }),
+    );
+    await collect(sReplaced.events);
+    writeFileSync(
+      join(dirReplaced, '.agents/hooks.json'),
+      JSON.stringify({ 'cairn-relay-guard': externalGuard }),
+    );
+    await new Promise((r) => setTimeout(r, 260));
+    const afterReplaced = JSON.parse(
+      readFileSync(join(dirReplaced, '.agents/hooks.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(afterReplaced).toEqual({ 'cairn-relay-guard': externalGuard });
+  });
+
+  test('keeps cwd resources pinned until child close and rejects overlapping open on exit timeout', {
+    timeout: 15_000,
+  }, async () => {
+    const dir = tempDir('ag-warm-no-premature-release-');
+    const logFile = join(dir, 'events.jsonl');
+    const agent = writeWarmMock(dir, logFile);
+    const spawned: { child?: ReturnType<typeof spawn> } = {};
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+      spawnProcess: (command, args, opts) => {
+        const child = spawn(command, args, opts);
+        spawned.child = child;
+        const wrapped = Object.create(child) as typeof child;
+        Object.defineProperty(wrapped, 'pid', { value: undefined });
+        wrapped.kill = () => true;
+        return wrapped;
+      },
+    });
+
+    const s1 = await backend.createSession(baseChiefOpts(dir, { prompt: 'hold' }));
+    await collect(s1.events);
+    expect(existsSync(join(dir, '.agents/hooks.json'))).toBe(true);
+
+    await expect(backend.createSession(baseChiefOpts(dir, { prompt: 'overlap' }))).rejects.toThrow(
+      /did not exit within/,
+    );
+    expect(existsSync(join(dir, '.agents/hooks.json'))).toBe(true);
+
+    spawned.child?.kill('SIGKILL');
+    await new Promise((r) => setTimeout(r, 150));
+    expect(existsSync(join(dir, '.agents/hooks.json'))).toBe(false);
   });
 });

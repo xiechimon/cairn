@@ -8,6 +8,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { Readable, Writable } from 'node:stream';
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   type ContentBlock,
   client,
@@ -850,7 +851,7 @@ export interface GeminiBackendOptions {
 
 const HTTP_MCP_TOOLS_CACHE_TTL_MS = 5 * 60_000;
 const MAX_WARM_SESSIONS = 2;
-const CWD_TERMINATE_WAIT_MS = 1_500;
+const CWD_TERMINATE_WAIT_MS = 4_000;
 
 type WarmEntryState = 'opening' | 'active' | 'parked' | 'terminating' | 'terminated';
 
@@ -887,6 +888,24 @@ class AcpBackend implements AgentBackend {
   private readonly warmPool = new Map<string, WarmAcpEntry>();
   private readonly activeWarm = new Set<WarmAcpEntry>();
   private readonly cwdOwners = new Map<string, WarmAcpEntry>();
+  private readonly cwdLocks = new Map<string, Promise<void>>();
+
+  private async withCwdLock<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.cwdLocks.get(cwd) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const next = previous.then(() => gate);
+    this.cwdLocks.set(cwd, next);
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      if (this.cwdLocks.get(cwd) === next) this.cwdLocks.delete(cwd);
+      release();
+    }
+  }
   private readonly httpMcpToolsCache = new Map<
     string,
     { value: HttpMcpToolsResult; expiresAt: number }
@@ -1091,817 +1110,825 @@ class AcpBackend implements AgentBackend {
       ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
     });
 
-    if (warmEligible && resumeId !== undefined) {
-      const warm = this.takeWarm(
-        resumeId,
-        opts,
-        policy,
-        isRestricted,
-        authKey,
-        toolDigest,
-        externalMcpDigest,
-      );
-      if (warm !== null) {
-        if ((opts.promptImages?.length ?? 0) > 0 && !warm.imageCapability) {
-          warm.terminate();
-          throw new Error(`${adapter.harness} ACP backend: image capability is not advertised`);
-        }
-        warm.hostTools?.rebind?.(opts);
-        const session = new AcpSession(
-          warm.sessionId,
-          warm.connection,
-          validated.prompt,
-          (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
-          warm.imageCapability,
-          (keepWarm) => {
-            if (keepWarm) this.parkWarm(warm, warmIdleMs);
-            else warm.terminate();
-          },
-          adapter,
-          opts.modelId,
-          opts.compactAt,
-          warm.settleUnexpectedClose,
-          warm.hostTools
-            ? {
-                toolNames: warm.hostToolNames,
-                hasListedTools: warm.hostTools.hasListedTools,
-                runtime,
-              }
-            : undefined,
+    const runOpen = async (): Promise<AgentSessionHandle> => {
+      if (warmEligible && resumeId !== undefined) {
+        const warm = this.takeWarm(
+          resumeId,
+          opts,
+          policy,
+          isRestricted,
+          authKey,
+          toolDigest,
+          externalMcpDigest,
         );
-        warm.activeSession = session;
-        return session;
-      }
-    }
-
-    if (resumeId !== undefined) {
-      const parkedById = this.warmPool.get(resumeId);
-      if (parkedById !== undefined) {
-        this.warmPool.delete(resumeId);
-        parkedById.terminate();
-      }
-    }
-    const existingCwdOwner = this.cwdOwners.get(opts.cwd);
-    if (
-      existingCwdOwner !== undefined &&
-      (existingCwdOwner.state === 'parked' || existingCwdOwner.state === 'terminating')
-    ) {
-      if (this.warmPool.get(existingCwdOwner.sessionId) === existingCwdOwner) {
-        this.warmPool.delete(existingCwdOwner.sessionId);
-      }
-      existingCwdOwner.terminate();
-      await Promise.race([
-        existingCwdOwner.terminated,
-        new Promise<void>((resolveWait) => setTimeout(resolveWait, CWD_TERMINATE_WAIT_MS)),
-      ]);
-    }
-    const hostTools = await openAcpTools(opts, acpToolsOptions);
-    const hostToolNames =
-      hostTools?.toolNames ??
-      [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map((tool) => tool.name);
-    const liveCwdOwner = this.cwdOwners.get(opts.cwd);
-    const skipHookMutation = liveCwdOwner !== undefined;
-    let registerWarm = warmEligible && liveCwdOwner === undefined;
-    let releaseProfile: (() => void) | undefined;
-    if (registerWarm) {
-      const home = opts.env?.HOME;
-      if (home !== undefined && isDeterministicCredentialProfileHome(home)) {
-        const retained = retainDeterministicCredentialProfile(home);
-        if (retained === null) {
-          registerWarm = false;
-        } else {
-          releaseProfile = retained;
-        }
-      }
-    }
-    const mcpBridges: AcpStdioBridge[] = [];
-    const spawnProcess = this.options.spawnProcess ?? spawn;
-    const resolver = adapter?.resolveLaunch ?? this.options.resolveLaunch;
-    const resolvedLaunch = resolver !== undefined ? resolver() : null;
-    const releaseLaunch = resolvedLaunch?.release;
-    const command = resolvedLaunch?.command ?? adapter?.command ?? this.options.executablePath;
-    if (resolver !== undefined && resolvedLaunch === null) {
-      releaseProfile?.();
-      hostTools?.close();
-      throw new StepFailureError(
-        `${runtime} managed runtime binary is unavailable or failed integrity verification`,
-        'missing_tool',
-        { runtime, tool: runtime },
-      );
-    }
-    if (command === undefined) {
-      releaseProfile?.();
-      releaseLaunch?.();
-      hostTools?.close();
-      throw new StepFailureError(
-        'Gemini managed install is missing: the managed runtime setup did not complete',
-        'missing_tool',
-        { runtime, tool: runtime },
-      );
-    }
-    const releaseRuntime = adapter?.acquireRuntime?.();
-    let cleanupHooks: (() => void) | undefined;
-    let warmTemp: ReturnType<typeof createTempEnvironment> | undefined;
-    let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
-    try {
-      const rawArgs =
-        resolvedLaunch !== null
-          ? [...resolvedLaunch.args]
-          : adapter
-            ? [...(adapter.args ?? [])]
-            : [...(this.options.executableArgs ?? ['--acp'])];
-      const args =
-        adapter?.harness === 'antigravity' &&
-        rawArgs.includes('acp') &&
-        !rawArgs.some((arg) => arg.startsWith('--include-default-customizations'))
-          ? [...rawArgs, '--include-default-customizations=false']
-          : rawArgs;
-      const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
-      if (registerWarm) {
-        delete sessionEnv[STEP_TREE_ENV];
-        warmTemp = createTempEnvironment(sessionEnv);
-        Object.assign(sessionEnv, warmTemp.env);
-      }
-      const geminiHome = sessionEnv.GEMINI_CLI_HOME;
-      if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {
-        sessionEnv.GEMINI_CLI_SYSTEM_SETTINGS_PATH = geminiCompressionSettingsPath(
-          geminiHome,
-          opts.modelId,
-          opts.compactAt,
-        );
-      }
-      if (adapter?.harness === 'devin') {
-        for (const key of Object.keys(sessionEnv)) {
-          if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete sessionEnv[key];
-        }
-      }
-      if (adapter?.harness === 'antigravity') {
-        sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
-        syncAntigravityToolPermission(sessionEnv.HOME, policy);
-        if (!skipHookMutation) cleanupHooks = installAntigravityTurnHooks(opts.cwd, policy);
-      }
-      const env = runtimeChildEnv(sessionEnv);
-      child = spawnProcess(command, args, {
-        cwd: opts.cwd,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        ...(process.platform !== 'win32' ? { detached: true } : {}),
-        env,
-      });
-    } catch (error) {
-      cleanupHooks?.();
-      warmTemp?.cleanup();
-      releaseProfile?.();
-      releaseRuntime?.();
-      releaseLaunch?.();
-      hostTools?.close();
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        throw new StepFailureError(
-          error instanceof Error ? error.message : String(error),
-          'missing_tool',
-          { runtime, tool: boundedToolName(command) },
-        );
-      }
-      throw error;
-    }
-    const groupPid = process.platform !== 'win32' ? child.pid : undefined;
-    if (groupPid !== undefined) spawnedProcessGroups.add(groupPid);
-    let stderr = '';
-    const app = client({ name: 'cairn' });
-    const gateOptions = this.options.gate;
-    let session: AcpSession | null = null;
-    let warmEntry: WarmAcpEntry | null = null;
-    const currentSession = () => (warmEntry !== null ? warmEntry.activeSession : session);
-    app.onRequest(methods.client.session.requestPermission, ({ params }) => {
-      if (warmEntry?.state === 'parked') {
-        warmEntry.terminate();
-        return { outcome: { outcome: 'cancelled' } };
-      }
-      const active = currentSession();
-      const accepting =
-        active?.acceptingPermissions === true && params.sessionId === active.sessionId;
-      const toolCall = active ? active.describeToolCall(params.toolCall) : params.toolCall;
-      const decision = accepting
-        ? decideAcpPermission({
-            policy,
-            toolCall,
-            hostToolNames,
-            normal: {
-              mode: adapter
-                ? (adapter.permissions ?? 'deny')
-                : (this.options.permissions ?? 'allow-once'),
-            },
-          })
-        : {
-            allow: false,
-            reason: 'Cairn permission gate rejected: the session is not accepting permissions',
-          };
-      const allow = decision.allow;
-      if (!allow) {
-        active?.recordRejection(toolCall, decision.reason);
-        gateOptions?.log?.(`reject: policy=${policy} ${decision.reason}`);
-      }
-      const option = params.options
-        .filter((value) => value.optionId !== 'plan_bypass')
-        .find((value) => value.kind === (allow ? 'allow_once' : 'reject_once'));
-      return {
-        outcome: option
-          ? { outcome: 'selected', optionId: option.optionId }
-          : { outcome: 'cancelled' },
-      };
-    });
-    app.onNotification(methods.client.session.update, ({ params }) => {
-      if (warmEntry?.state === 'parked') {
-        warmEntry.terminate();
-        return;
-      }
-      const active = currentSession();
-      if (active && (!adapter || params.sessionId === active.sessionId))
-        active.onAcpUpdate(params.update);
-    });
-    const stream = ndJsonStream(
-      Writable.toWeb(child.stdin),
-      Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
-    );
-    const connection = app.connect(stream);
-    let interactiveAuthDetected = false;
-    let exited = false;
-    let cleanedUp = false;
-    let intentionalExit = false;
-    let stdoutEnded = false;
-    let terminalFailure: AcpTerminalFailure | null = null;
-    child.stdout.once('end', () => {
-      stdoutEnded = true;
-    });
-    const recordTerminalFailure = (
-      code: StepFailureCode,
-      message: string,
-      detail?: StepFailureDetail,
-    ): AcpTerminalFailure => {
-      if (
-        terminalFailure === null ||
-        (terminalFailure.code === 'runtime_exited' && code !== 'runtime_exited')
-      ) {
-        terminalFailure = { code, message, ...(detail !== undefined ? { detail } : {}) };
-      }
-      return terminalFailure;
-    };
-    const captureChildExit = (code: number | null, signal: NodeJS.Signals | null) => {
-      if (cleanedUp || intentionalExit || currentSession()?.isStopping === true) return;
-      if (warmEntry?.state === 'parked') {
-        warmEntry.terminate();
-        return;
-      }
-      const exitLabel = signal !== null && code === null ? signal : String(code);
-      const detail: StepFailureDetail = {
-        runtime,
-        ...(code !== null ? { exitCode: code } : {}),
-        ...(signal !== null ? { signal: signal.slice(0, 24) } : {}),
-      };
-      const recorded = recordTerminalFailure(
-        'runtime_exited',
-        `${runtime} ACP exited (${exitLabel}): ${stderr}`,
-        detail,
-      );
-      connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
-    };
-    const settleUnexpectedClose = async (): Promise<AcpTerminalFailure | null> => {
-      if (terminalFailure !== null) return terminalFailure;
-      if (cleanedUp || intentionalExit || currentSession()?.isStopping === true) return null;
-      const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
-      if (
-        (proc.exitCode === undefined || proc.exitCode === null) &&
-        (proc.signalCode === undefined || proc.signalCode === null) &&
-        stdoutEnded
-      ) {
-        await new Promise<void>((resolve) => {
-          let settled = false;
-          const done = () => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            resolve();
-          };
-          const timer = setTimeout(done, 200);
-          timer.unref?.();
-          child.once('exit', done);
-        });
-      }
-      if (
-        terminalFailure === null &&
-        ((proc.exitCode !== undefined && proc.exitCode !== null) ||
-          (proc.signalCode !== undefined && proc.signalCode !== null))
-      ) {
-        captureChildExit(proc.exitCode ?? null, proc.signalCode ?? null);
-      }
-      return terminalFailure;
-    };
-    child.stderr.on('data', (chunk: Buffer) => {
-      if (interactiveAuthDetected) return;
-      const text = chunk.toString();
-      if (
-        adapter?.harness === 'antigravity' &&
-        /Open the following link to authenticate/i.test(stderr + text)
-      ) {
-        interactiveAuthDetected = true;
-        const recorded = recordTerminalFailure(
-          'auth',
-          'Antigravity OAuth login expired or revoked; sign in again in Settings -> Model Routing',
-          { runtime },
-        );
-        connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
-        if (warmEntry?.state === 'parked') warmEntry.terminate();
-        return;
-      }
-      stderr = (stderr + text).slice(-8192);
-    });
-    child.once('error', (error) => {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        const recorded = recordTerminalFailure('missing_tool', error.message, {
-          runtime,
-          tool: boundedToolName(command),
-        });
-        connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
-        if (warmEntry?.state === 'parked') warmEntry.terminate();
-        return;
-      }
-      connection.close(error);
-      if (warmEntry?.state === 'parked') warmEntry.terminate();
-    });
-    child.once('exit', (code, signal) => captureChildExit(code, signal));
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
-    let resourcesReleased = false;
-    let resolveTerminated!: () => void;
-    const terminated = new Promise<void>((resolve) => {
-      resolveTerminated = resolve;
-    });
-    const finishWarmRelease = () => {
-      if (resourcesReleased) return;
-      resourcesReleased = true;
-      clearTimeout(releaseTimer);
-      try {
-        cleanupHooks?.();
-      } catch {}
-      try {
-        warmTemp?.cleanup();
-      } catch {}
-      try {
-        releaseProfile?.();
-      } catch {}
-      try {
-        releaseRuntime?.();
-      } catch {}
-      try {
-        releaseLaunch?.();
-      } catch {}
-      if (warmEntry !== null && this.cwdOwners.get(opts.cwd) === warmEntry) {
-        this.cwdOwners.delete(opts.cwd);
-      }
-      if (warmEntry !== null) {
-        warmEntry.state = 'terminated';
-      }
-      resolveTerminated();
-    };
-    const releaseOnce = () => {
-      clearTimeout(releaseTimer);
-      releaseLaunch?.();
-    };
-    child.once('close', () => {
-      exited = true;
-      if (groupPid === undefined) clearTimeout(killTimer);
-      if (warmEntry !== null) {
-        if (warmEntry.sessionId !== '' && this.warmPool.get(warmEntry.sessionId) === warmEntry) {
-          this.warmPool.delete(warmEntry.sessionId);
-        }
-        this.activeWarm.delete(warmEntry);
-        warmEntry.activeSession = null;
-        clearTimeout(warmEntry.idleTimer);
-        warmEntry.idleTimer = undefined;
-        hostTools?.close();
-        for (const bridge of mcpBridges) bridge.close();
-        mcpBridges.length = 0;
-        finishWarmRelease();
-      } else if (cleanedUp) {
-        releaseOnce();
-      }
-    });
-    const terminate = (signal: NodeJS.Signals) => {
-      if (groupPid !== undefined) {
-        try {
-          terminateSpawnedProcessGroup(groupPid, signal);
-        } catch {
-          child.kill(signal);
-        }
-      } else if (!exited) child.kill(signal);
-    };
-    const cleanup = () => {
-      if (cleanedUp) return;
-      cleanedUp = true;
-      cleanupHooks?.();
-      warmTemp?.cleanup();
-      releaseProfile?.();
-      releaseRuntime?.();
-      hostTools?.close();
-      for (const bridge of mcpBridges) bridge.close();
-      mcpBridges.length = 0;
-      connection.close();
-      terminate('SIGTERM');
-      if (exited) {
-        releaseOnce();
-      } else {
-        releaseTimer = setTimeout(releaseOnce, 2_000);
-        releaseTimer.unref();
-      }
-      if (adapter && (groupPid !== undefined || !exited)) {
-        killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
-      }
-    };
-    if (registerWarm) {
-      const entry: WarmAcpEntry = {
-        sessionId: resumeId ?? '',
-        cwd: opts.cwd,
-        policy,
-        isRestricted,
-        modelId: opts.modelId,
-        thinkingLevel: opts.thinkingLevel ?? null,
-        authKey,
-        toolDigest,
-        externalMcpDigest,
-        imageCapability: false,
-        connection,
-        hostTools,
-        hostToolNames,
-        settleUnexpectedClose,
-        state: 'opening',
-        activeSession: null,
-        terminated,
-        isAlive: () => {
-          const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
-          return (
-            !exited &&
-            !stdoutEnded &&
-            (proc.exitCode === undefined || proc.exitCode === null) &&
-            (proc.signalCode === undefined || proc.signalCode === null)
-          );
-        },
-        terminate: () => {
-          if (entry.state === 'terminated' || entry.state === 'terminating') return;
-          if (entry.sessionId !== '' && this.warmPool.get(entry.sessionId) === entry) {
-            this.warmPool.delete(entry.sessionId);
+        if (warm !== null) {
+          if ((opts.promptImages?.length ?? 0) > 0 && !warm.imageCapability) {
+            warm.terminate();
+            throw new Error(`${adapter.harness} ACP backend: image capability is not advertised`);
           }
-          this.activeWarm.delete(entry);
-          clearTimeout(entry.idleTimer);
-          entry.idleTimer = undefined;
-          entry.activeSession = null;
-          entry.state = 'terminating';
-          intentionalExit = true;
+          warm.hostTools?.rebind?.(opts);
+          const session = new AcpSession(
+            warm.sessionId,
+            warm.connection,
+            validated.prompt,
+            (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
+            warm.imageCapability,
+            (keepWarm) => {
+              if (keepWarm) this.parkWarm(warm, warmIdleMs);
+              else warm.terminate();
+            },
+            adapter,
+            opts.modelId,
+            opts.compactAt,
+            warm.settleUnexpectedClose,
+            warm.hostTools
+              ? {
+                  toolNames: warm.hostToolNames,
+                  hasListedTools: warm.hostTools.hasListedTools,
+                  runtime,
+                }
+              : undefined,
+          );
+          warm.activeSession = session;
+          return session;
+        }
+      }
+
+      if (resumeId !== undefined) {
+        const parkedById = this.warmPool.get(resumeId);
+        if (parkedById !== undefined) {
+          this.warmPool.delete(resumeId);
+          parkedById.terminate();
+        }
+      }
+      const existingCwdOwner = this.cwdOwners.get(opts.cwd);
+      if (existingCwdOwner !== undefined) {
+        if (existingCwdOwner.state === 'parked' || existingCwdOwner.state === 'terminating') {
+          if (this.warmPool.get(existingCwdOwner.sessionId) === existingCwdOwner) {
+            this.warmPool.delete(existingCwdOwner.sessionId);
+          }
+          existingCwdOwner.terminate();
+          const exitedInTime = await Promise.race([
+            existingCwdOwner.terminated.then(() => true),
+            delay(CWD_TERMINATE_WAIT_MS, false, { ref: false }),
+          ]);
+          if (!exitedInTime || this.cwdOwners.get(opts.cwd) !== undefined) {
+            throw new Error(
+              `Previous ${runtime} session in ${opts.cwd} did not exit within ${CWD_TERMINATE_WAIT_MS}ms`,
+            );
+          }
+        } else {
+          throw new Error(
+            `Cannot open ${runtime} session in ${opts.cwd}: an active session already owns workspace hooks`,
+          );
+        }
+      }
+      const hostTools = await openAcpTools(opts, acpToolsOptions);
+      const hostToolNames =
+        hostTools?.toolNames ??
+        [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map((tool) => tool.name);
+      let registerWarm = warmEligible && this.cwdOwners.get(opts.cwd) === undefined;
+      let releaseProfile: (() => void) | undefined;
+      if (registerWarm) {
+        const home = opts.env?.HOME;
+        if (home !== undefined && isDeterministicCredentialProfileHome(home)) {
+          const retained = retainDeterministicCredentialProfile(home);
+          if (retained === null) {
+            registerWarm = false;
+          } else {
+            releaseProfile = retained;
+          }
+        }
+      }
+      const mcpBridges: AcpStdioBridge[] = [];
+      const spawnProcess = this.options.spawnProcess ?? spawn;
+      const resolver = adapter?.resolveLaunch ?? this.options.resolveLaunch;
+      const resolvedLaunch = resolver !== undefined ? resolver() : null;
+      const releaseLaunch = resolvedLaunch?.release;
+      const command = resolvedLaunch?.command ?? adapter?.command ?? this.options.executablePath;
+      if (resolver !== undefined && resolvedLaunch === null) {
+        releaseProfile?.();
+        hostTools?.close();
+        throw new StepFailureError(
+          `${runtime} managed runtime binary is unavailable or failed integrity verification`,
+          'missing_tool',
+          { runtime, tool: runtime },
+        );
+      }
+      if (command === undefined) {
+        releaseProfile?.();
+        releaseLaunch?.();
+        hostTools?.close();
+        throw new StepFailureError(
+          'Gemini managed install is missing: the managed runtime setup did not complete',
+          'missing_tool',
+          { runtime, tool: runtime },
+        );
+      }
+      const releaseRuntime = adapter?.acquireRuntime?.();
+      let cleanupHooks: (() => void) | undefined;
+      let warmTemp: ReturnType<typeof createTempEnvironment> | undefined;
+      let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
+      try {
+        const rawArgs =
+          resolvedLaunch !== null
+            ? [...resolvedLaunch.args]
+            : adapter
+              ? [...(adapter.args ?? [])]
+              : [...(this.options.executableArgs ?? ['--acp'])];
+        const args =
+          adapter?.harness === 'antigravity' &&
+          rawArgs.includes('acp') &&
+          !rawArgs.some((arg) => arg.startsWith('--include-default-customizations'))
+            ? [...rawArgs, '--include-default-customizations=false']
+            : rawArgs;
+        const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
+        if (registerWarm) {
+          delete sessionEnv[STEP_TREE_ENV];
+          warmTemp = createTempEnvironment(sessionEnv);
+          Object.assign(sessionEnv, warmTemp.env);
+        }
+        const geminiHome = sessionEnv.GEMINI_CLI_HOME;
+        if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {
+          sessionEnv.GEMINI_CLI_SYSTEM_SETTINGS_PATH = geminiCompressionSettingsPath(
+            geminiHome,
+            opts.modelId,
+            opts.compactAt,
+          );
+        }
+        if (adapter?.harness === 'devin') {
+          for (const key of Object.keys(sessionEnv)) {
+            if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete sessionEnv[key];
+          }
+        }
+        if (adapter?.harness === 'antigravity') {
+          sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
+          syncAntigravityToolPermission(sessionEnv.HOME, policy);
+          cleanupHooks = installAntigravityTurnHooks(opts.cwd, policy);
+        }
+        const env = runtimeChildEnv(sessionEnv);
+        child = spawnProcess(command, args, {
+          cwd: opts.cwd,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          ...(process.platform !== 'win32' ? { detached: true } : {}),
+          env,
+        });
+      } catch (error) {
+        cleanupHooks?.();
+        warmTemp?.cleanup();
+        releaseProfile?.();
+        releaseRuntime?.();
+        releaseLaunch?.();
+        hostTools?.close();
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          throw new StepFailureError(
+            error instanceof Error ? error.message : String(error),
+            'missing_tool',
+            { runtime, tool: boundedToolName(command) },
+          );
+        }
+        throw error;
+      }
+      const groupPid = process.platform !== 'win32' ? child.pid : undefined;
+      if (groupPid !== undefined) spawnedProcessGroups.add(groupPid);
+      let stderr = '';
+      const app = client({ name: 'cairn' });
+      const gateOptions = this.options.gate;
+      let session: AcpSession | null = null;
+      let warmEntry: WarmAcpEntry | null = null;
+      const currentSession = () => (warmEntry !== null ? warmEntry.activeSession : session);
+      app.onRequest(methods.client.session.requestPermission, ({ params }) => {
+        if (warmEntry?.state === 'parked') {
+          warmEntry.terminate();
+          return { outcome: { outcome: 'cancelled' } };
+        }
+        const active = currentSession();
+        const accepting =
+          active?.acceptingPermissions === true && params.sessionId === active.sessionId;
+        const toolCall = active ? active.describeToolCall(params.toolCall) : params.toolCall;
+        const decision = accepting
+          ? decideAcpPermission({
+              policy,
+              toolCall,
+              hostToolNames,
+              normal: {
+                mode: adapter
+                  ? (adapter.permissions ?? 'deny')
+                  : (this.options.permissions ?? 'allow-once'),
+              },
+            })
+          : {
+              allow: false,
+              reason: 'Cairn permission gate rejected: the session is not accepting permissions',
+            };
+        const allow = decision.allow;
+        if (!allow) {
+          active?.recordRejection(toolCall, decision.reason);
+          gateOptions?.log?.(`reject: policy=${policy} ${decision.reason}`);
+        }
+        const option = params.options
+          .filter((value) => value.optionId !== 'plan_bypass')
+          .find((value) => value.kind === (allow ? 'allow_once' : 'reject_once'));
+        return {
+          outcome: option
+            ? { outcome: 'selected', optionId: option.optionId }
+            : { outcome: 'cancelled' },
+        };
+      });
+      app.onNotification(methods.client.session.update, ({ params }) => {
+        if (warmEntry?.state === 'parked') {
+          warmEntry.terminate();
+          return;
+        }
+        const active = currentSession();
+        if (active && (!adapter || params.sessionId === active.sessionId))
+          active.onAcpUpdate(params.update);
+      });
+      const stream = ndJsonStream(
+        Writable.toWeb(child.stdin),
+        Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
+      );
+      const connection = app.connect(stream);
+      let interactiveAuthDetected = false;
+      let exited = false;
+      let cleanedUp = false;
+      let intentionalExit = false;
+      let stdoutEnded = false;
+      let terminalFailure: AcpTerminalFailure | null = null;
+      child.stdout.once('end', () => {
+        stdoutEnded = true;
+      });
+      const recordTerminalFailure = (
+        code: StepFailureCode,
+        message: string,
+        detail?: StepFailureDetail,
+      ): AcpTerminalFailure => {
+        if (
+          terminalFailure === null ||
+          (terminalFailure.code === 'runtime_exited' && code !== 'runtime_exited')
+        ) {
+          terminalFailure = { code, message, ...(detail !== undefined ? { detail } : {}) };
+        }
+        return terminalFailure;
+      };
+      const captureChildExit = (code: number | null, signal: NodeJS.Signals | null) => {
+        if (cleanedUp || intentionalExit || currentSession()?.isStopping === true) return;
+        if (warmEntry?.state === 'parked') {
+          warmEntry.terminate();
+          return;
+        }
+        const exitLabel = signal !== null && code === null ? signal : String(code);
+        const detail: StepFailureDetail = {
+          runtime,
+          ...(code !== null ? { exitCode: code } : {}),
+          ...(signal !== null ? { signal: signal.slice(0, 24) } : {}),
+        };
+        const recorded = recordTerminalFailure(
+          'runtime_exited',
+          `${runtime} ACP exited (${exitLabel}): ${stderr}`,
+          detail,
+        );
+        connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+      };
+      const settleUnexpectedClose = async (): Promise<AcpTerminalFailure | null> => {
+        if (terminalFailure !== null) return terminalFailure;
+        if (cleanedUp || intentionalExit || currentSession()?.isStopping === true) return null;
+        const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
+        if (
+          (proc.exitCode === undefined || proc.exitCode === null) &&
+          (proc.signalCode === undefined || proc.signalCode === null) &&
+          stdoutEnded
+        ) {
+          await new Promise<void>((resolve) => {
+            let settled = false;
+            const done = () => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve();
+            };
+            const timer = setTimeout(done, 200);
+            timer.unref?.();
+            child.once('exit', done);
+          });
+        }
+        if (
+          terminalFailure === null &&
+          ((proc.exitCode !== undefined && proc.exitCode !== null) ||
+            (proc.signalCode !== undefined && proc.signalCode !== null))
+        ) {
+          captureChildExit(proc.exitCode ?? null, proc.signalCode ?? null);
+        }
+        return terminalFailure;
+      };
+      child.stderr.on('data', (chunk: Buffer) => {
+        if (interactiveAuthDetected) return;
+        const text = chunk.toString();
+        if (
+          adapter?.harness === 'antigravity' &&
+          /Open the following link to authenticate/i.test(stderr + text)
+        ) {
+          interactiveAuthDetected = true;
+          const recorded = recordTerminalFailure(
+            'auth',
+            'Antigravity OAuth login expired or revoked; sign in again in Settings -> Model Routing',
+            { runtime },
+          );
+          connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+          if (warmEntry?.state === 'parked') warmEntry.terminate();
+          return;
+        }
+        stderr = (stderr + text).slice(-8192);
+      });
+      child.once('error', (error) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          const recorded = recordTerminalFailure('missing_tool', error.message, {
+            runtime,
+            tool: boundedToolName(command),
+          });
+          connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+          if (warmEntry?.state === 'parked') warmEntry.terminate();
+          return;
+        }
+        connection.close(error);
+        if (warmEntry?.state === 'parked') warmEntry.terminate();
+      });
+      child.once('exit', (code, signal) => captureChildExit(code, signal));
+      let killTimer: ReturnType<typeof setTimeout> | undefined;
+      let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+      let resourcesReleased = false;
+      let resolveTerminated!: () => void;
+      const terminated = new Promise<void>((resolve) => {
+        resolveTerminated = resolve;
+      });
+      const finishWarmRelease = () => {
+        if (resourcesReleased) return;
+        resourcesReleased = true;
+        clearTimeout(releaseTimer);
+        try {
+          cleanupHooks?.();
+        } catch {}
+        try {
+          warmTemp?.cleanup();
+        } catch {}
+        try {
+          releaseProfile?.();
+        } catch {}
+        try {
+          releaseRuntime?.();
+        } catch {}
+        try {
+          releaseLaunch?.();
+        } catch {}
+        if (warmEntry !== null && this.cwdOwners.get(opts.cwd) === warmEntry) {
+          this.cwdOwners.delete(opts.cwd);
+        }
+        if (warmEntry !== null) {
+          warmEntry.state = 'terminated';
+        }
+        resolveTerminated();
+      };
+      const releaseOnce = () => {
+        clearTimeout(releaseTimer);
+        releaseLaunch?.();
+      };
+      child.once('close', () => {
+        exited = true;
+        if (warmEntry !== null || groupPid === undefined) clearTimeout(killTimer);
+        if (warmEntry !== null) {
+          if (warmEntry.sessionId !== '' && this.warmPool.get(warmEntry.sessionId) === warmEntry) {
+            this.warmPool.delete(warmEntry.sessionId);
+          }
+          this.activeWarm.delete(warmEntry);
+          warmEntry.activeSession = null;
+          clearTimeout(warmEntry.idleTimer);
+          warmEntry.idleTimer = undefined;
           hostTools?.close();
           for (const bridge of mcpBridges) bridge.close();
           mcpBridges.length = 0;
-          connection.close();
-          terminate('SIGTERM');
-          if (exited) {
-            finishWarmRelease();
-          } else {
-            releaseTimer = setTimeout(finishWarmRelease, 2_000);
-            releaseTimer.unref?.();
-            if (adapter && (groupPid !== undefined || !exited)) {
+          finishWarmRelease();
+        } else if (cleanedUp) {
+          releaseOnce();
+        }
+      });
+      const terminate = (signal: NodeJS.Signals) => {
+        if (groupPid !== undefined) {
+          try {
+            terminateSpawnedProcessGroup(groupPid, signal);
+          } catch {
+            child.kill(signal);
+          }
+        } else if (!exited) child.kill(signal);
+      };
+      const cleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        cleanupHooks?.();
+        warmTemp?.cleanup();
+        releaseProfile?.();
+        releaseRuntime?.();
+        hostTools?.close();
+        for (const bridge of mcpBridges) bridge.close();
+        mcpBridges.length = 0;
+        connection.close();
+        terminate('SIGTERM');
+        if (exited) {
+          releaseOnce();
+        } else {
+          releaseTimer = setTimeout(releaseOnce, 2_000);
+          releaseTimer.unref();
+        }
+        if (adapter && (groupPid !== undefined || !exited)) {
+          killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
+        }
+      };
+      if (registerWarm) {
+        const entry: WarmAcpEntry = {
+          sessionId: resumeId ?? '',
+          cwd: opts.cwd,
+          policy,
+          isRestricted,
+          modelId: opts.modelId,
+          thinkingLevel: opts.thinkingLevel ?? null,
+          authKey,
+          toolDigest,
+          externalMcpDigest,
+          imageCapability: false,
+          connection,
+          hostTools,
+          hostToolNames,
+          settleUnexpectedClose,
+          state: 'opening',
+          activeSession: null,
+          terminated,
+          isAlive: () => {
+            const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
+            return (
+              !exited &&
+              !stdoutEnded &&
+              (proc.exitCode === undefined || proc.exitCode === null) &&
+              (proc.signalCode === undefined || proc.signalCode === null)
+            );
+          },
+          terminate: () => {
+            if (entry.state === 'terminated' || entry.state === 'terminating') return;
+            if (entry.sessionId !== '' && this.warmPool.get(entry.sessionId) === entry) {
+              this.warmPool.delete(entry.sessionId);
+            }
+            this.activeWarm.delete(entry);
+            clearTimeout(entry.idleTimer);
+            entry.idleTimer = undefined;
+            entry.activeSession = null;
+            entry.state = 'terminating';
+            intentionalExit = true;
+            hostTools?.close();
+            for (const bridge of mcpBridges) bridge.close();
+            mcpBridges.length = 0;
+            connection.close();
+            terminate('SIGTERM');
+            if (exited) {
+              finishWarmRelease();
+            } else if (adapter && (groupPid !== undefined || !exited)) {
               killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
               killTimer.unref?.();
             }
-          }
-        },
-      };
-      warmEntry = entry;
-      this.cwdOwners.set(opts.cwd, entry);
-      this.activeWarm.add(entry);
-      hostTools?.setOnStrayCall?.(() => {
-        entry.terminate();
-      });
-    }
-    const initializeTimeoutMs = adapter?.initializeTimeoutMs ?? 30_000;
-    const initializeTimer = adapter
-      ? setTimeout(() => {
-          const recorded = recordTerminalFailure(
-            'runtime_startup_timeout',
-            'ACP initialization timed out',
-            { runtime, timeoutMs: initializeTimeoutMs },
-          );
-          connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
-        }, initializeTimeoutMs)
-      : undefined;
-    initializeTimer?.unref();
-    let agentVersion: number | string = 'unavailable';
-    try {
-      const initialized = await connection.agent.request(methods.agent.initialize, {
-        protocolVersion: PROTOCOL_VERSION,
-        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, session: {} },
-        clientInfo: { name: 'cairn', version: DAEMON_VERSION },
-      });
-      agentVersion = initialized.protocolVersion;
-      if (agentVersion !== PROTOCOL_VERSION) throw new Error('Protocol version mismatch');
-      const caps = initialized.agentCapabilities;
-      this.imageSupport.set(
-        `${opts.provider.providerId}/${opts.modelId}`,
-        caps?.promptCapabilities?.image === true,
-      );
-      if (adapter) {
-        if ((opts.promptImages?.length ?? 0) > 0 && !caps?.promptCapabilities?.image) {
-          throw new Error(`${adapter.harness} ACP backend: image capability is not advertised`);
-        }
-      } else
-        validateGeminiSession({
-          ...opts,
-          imageCapability: caps?.promptCapabilities?.image === true,
+          },
+        };
+        warmEntry = entry;
+        this.cwdOwners.set(opts.cwd, entry);
+        this.activeWarm.add(entry);
+        hostTools?.setOnStrayCall?.(() => {
+          entry.terminate();
         });
-      if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
-        throw new Error('ACP resume is unsupported by this adapter');
       }
-      const externalMcpServers: McpServer[] = [];
-      if (externalMcpAllowed) {
-        for (const endpoint of opts.mcpServers ?? []) {
-          if (endpoint.transport === 'http' && endpoint.url !== undefined) {
-            if (caps?.mcpCapabilities?.http === true) {
+      const initializeTimeoutMs = adapter?.initializeTimeoutMs ?? 30_000;
+      const initializeTimer = adapter
+        ? setTimeout(() => {
+            const recorded = recordTerminalFailure(
+              'runtime_startup_timeout',
+              'ACP initialization timed out',
+              { runtime, timeoutMs: initializeTimeoutMs },
+            );
+            connection.close(
+              new StepFailureError(recorded.message, recorded.code, recorded.detail),
+            );
+          }, initializeTimeoutMs)
+        : undefined;
+      initializeTimer?.unref();
+      let agentVersion: number | string = 'unavailable';
+      try {
+        const initialized = await connection.agent.request(methods.agent.initialize, {
+          protocolVersion: PROTOCOL_VERSION,
+          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, session: {} },
+          clientInfo: { name: 'cairn', version: DAEMON_VERSION },
+        });
+        agentVersion = initialized.protocolVersion;
+        if (agentVersion !== PROTOCOL_VERSION) throw new Error('Protocol version mismatch');
+        const caps = initialized.agentCapabilities;
+        this.imageSupport.set(
+          `${opts.provider.providerId}/${opts.modelId}`,
+          caps?.promptCapabilities?.image === true,
+        );
+        if (adapter) {
+          if ((opts.promptImages?.length ?? 0) > 0 && !caps?.promptCapabilities?.image) {
+            throw new Error(`${adapter.harness} ACP backend: image capability is not advertised`);
+          }
+        } else
+          validateGeminiSession({
+            ...opts,
+            imageCapability: caps?.promptCapabilities?.image === true,
+          });
+        if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
+          throw new Error('ACP resume is unsupported by this adapter');
+        }
+        const externalMcpServers: McpServer[] = [];
+        if (externalMcpAllowed) {
+          for (const endpoint of opts.mcpServers ?? []) {
+            if (endpoint.transport === 'http' && endpoint.url !== undefined) {
+              if (caps?.mcpCapabilities?.http === true) {
+                externalMcpServers.push({
+                  type: 'http',
+                  name: endpoint.slug,
+                  url: endpoint.url,
+                  headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
+                    name,
+                    value,
+                  })),
+                });
+              } else {
+                const bridge = await bridgeHttpMcpToStdio(endpoint, {
+                  toolsCache: this.httpMcpToolsAdapter,
+                });
+                mcpBridges.push(bridge);
+                externalMcpServers.push(bridge.declaration);
+              }
+            } else if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
               externalMcpServers.push({
-                type: 'http',
                 name: endpoint.slug,
-                url: endpoint.url,
-                headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
+                command: endpoint.command,
+                args: endpoint.args ?? [],
+                env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
                   name,
                   value,
                 })),
               });
-            } else {
-              const bridge = await bridgeHttpMcpToStdio(endpoint, {
-                toolsCache: this.httpMcpToolsAdapter,
-              });
-              mcpBridges.push(bridge);
-              externalMcpServers.push(bridge.declaration);
             }
-          } else if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
-            externalMcpServers.push({
-              name: endpoint.slug,
-              command: endpoint.command,
-              args: endpoint.args ?? [],
-              env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
-                name,
-                value,
-              })),
-            });
           }
         }
-      }
-      const combinedSystemPrompt =
-        opts.systemPrompt && hostTools?.systemPromptAppendix
-          ? `${opts.systemPrompt}\n\n${hostTools.systemPromptAppendix}`
-          : (opts.systemPrompt ?? hostTools?.systemPromptAppendix);
-      const sessionMeta =
-        adapter?.harness === 'claude-code'
-          ? claudeAcpSessionMeta(policy)
-          : adapter?.harness === 'antigravity' && !resumeId && combinedSystemPrompt
-            ? { antigravity: { systemPrompt: { append: combinedSystemPrompt } } }
-            : undefined;
-      const request = {
-        cwd: opts.cwd,
-        ...(sessionMeta !== undefined ? { _meta: sessionMeta } : {}),
-        mcpServers: [...externalMcpServers, ...(hostTools ? [hostTools.declaration] : [])],
-      };
-      const response = resumeId
-        ? await (async () => {
-            if (caps?.sessionCapabilities?.resume) {
-              try {
-                return await connection.agent.request<ResumeSessionResponse>(
-                  methods.agent.session.resume,
-                  { ...request, sessionId: resumeId },
-                );
-              } catch (error) {
-                const crash = await settleUnexpectedClose();
-                if (crash !== null) {
-                  throw new StepFailureError(crash.message, crash.code, crash.detail);
+        const combinedSystemPrompt =
+          opts.systemPrompt && hostTools?.systemPromptAppendix
+            ? `${opts.systemPrompt}\n\n${hostTools.systemPromptAppendix}`
+            : (opts.systemPrompt ?? hostTools?.systemPromptAppendix);
+        const sessionMeta =
+          adapter?.harness === 'claude-code'
+            ? claudeAcpSessionMeta(policy)
+            : adapter?.harness === 'antigravity' && !resumeId && combinedSystemPrompt
+              ? { antigravity: { systemPrompt: { append: combinedSystemPrompt } } }
+              : undefined;
+        const request = {
+          cwd: opts.cwd,
+          ...(sessionMeta !== undefined ? { _meta: sessionMeta } : {}),
+          mcpServers: [...externalMcpServers, ...(hostTools ? [hostTools.declaration] : [])],
+        };
+        const response = resumeId
+          ? await (async () => {
+              if (caps?.sessionCapabilities?.resume) {
+                try {
+                  return await connection.agent.request<ResumeSessionResponse>(
+                    methods.agent.session.resume,
+                    { ...request, sessionId: resumeId },
+                  );
+                } catch (error) {
+                  const crash = await settleUnexpectedClose();
+                  if (crash !== null) {
+                    throw new StepFailureError(crash.message, crash.code, crash.detail);
+                  }
+                  const detail = error instanceof Error ? error.message : String(error);
+                  if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
+                    throw error;
+                  }
+                  if (!caps?.loadSession) {
+                    throw new SessionNotResumableError(resumeId, detail);
+                  }
                 }
-                const detail = error instanceof Error ? error.message : String(error);
-                if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
-                  throw error;
-                }
-                if (!caps?.loadSession) {
+              }
+              if (caps?.loadSession) {
+                try {
+                  return await connection.agent.request<LoadSessionResponse>(
+                    methods.agent.session.load,
+                    { ...request, sessionId: resumeId },
+                  );
+                } catch (error) {
+                  const crash = await settleUnexpectedClose();
+                  if (crash !== null) {
+                    throw new StepFailureError(crash.message, crash.code, crash.detail);
+                  }
+                  const detail = error instanceof Error ? error.message : String(error);
+                  if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
+                    throw error;
+                  }
                   throw new SessionNotResumableError(resumeId, detail);
                 }
               }
-            }
-            if (caps?.loadSession) {
-              try {
-                return await connection.agent.request<LoadSessionResponse>(
-                  methods.agent.session.load,
-                  { ...request, sessionId: resumeId },
-                );
-              } catch (error) {
-                const crash = await settleUnexpectedClose();
-                if (crash !== null) {
-                  throw new StepFailureError(crash.message, crash.code, crash.detail);
-                }
-                const detail = error instanceof Error ? error.message : String(error);
-                if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
-                  throw error;
-                }
-                throw new SessionNotResumableError(resumeId, detail);
-              }
-            }
-            throw new SessionNotResumableError(resumeId);
-          })()
-        : await connection.agent.request<NewSessionResponse>(methods.agent.session.new, request);
-      const sessionId =
-        'sessionId' in response && typeof response.sessionId === 'string'
-          ? response.sessionId
-          : resumeId;
-      if (!sessionId) throw new Error(`${adapter?.harness ?? 'Gemini'} ACP returned no sessionId`);
-      const modelOption = response.configOptions?.find((option) => option.category === 'model');
-      let configOptions = response.configOptions ?? [];
-      if (modelOption) {
-        if (currentValueOf(modelOption) !== opts.modelId) {
-          const selected = await connection.agent.request<SetSessionConfigOptionResponse>(
-            methods.agent.session.setConfigOption,
-            { sessionId, configId: modelOption.id, value: opts.modelId },
-          );
-          configOptions = selected.configOptions ?? [];
-        }
-        if (adapter?.harness === 'devin') {
-          const models = advertisedAcpModels(modelOption, {
-            [currentValueOf(modelOption)]: response.configOptions ?? [],
-            [opts.modelId]: configOptions,
-          });
-          if (models.length > 0) adapter.onDevinModels?.(models);
-        } else if (adapter?.harness === 'antigravity') {
-          const models = advertisedAcpModels(
-            modelOption,
-            {
+              throw new SessionNotResumableError(resumeId);
+            })()
+          : await connection.agent.request<NewSessionResponse>(methods.agent.session.new, request);
+        const sessionId =
+          'sessionId' in response && typeof response.sessionId === 'string'
+            ? response.sessionId
+            : resumeId;
+        if (!sessionId)
+          throw new Error(`${adapter?.harness ?? 'Gemini'} ACP returned no sessionId`);
+        const modelOption = response.configOptions?.find((option) => option.category === 'model');
+        let configOptions = response.configOptions ?? [];
+        if (modelOption) {
+          if (currentValueOf(modelOption) !== opts.modelId) {
+            const selected = await connection.agent.request<SetSessionConfigOptionResponse>(
+              methods.agent.session.setConfigOption,
+              { sessionId, configId: modelOption.id, value: opts.modelId },
+            );
+            configOptions = selected.configOptions ?? [];
+          }
+          if (adapter?.harness === 'devin') {
+            const models = advertisedAcpModels(modelOption, {
               [currentValueOf(modelOption)]: response.configOptions ?? [],
               [opts.modelId]: configOptions,
-            },
-            isInternalAntigravityModelId,
-          );
-          if (models.length > 0) adapter.onAntigravityModels?.(models);
-        }
-      } else if (adapter) {
-        throw new Error('ACP adapter did not advertise model configuration');
-      } else {
-        process.stderr.write(
-          `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
-        );
-      }
-      const thinkingOption = configOptions.find(isThoughtOption);
-      const thinkingValues =
-        thinkingOption === undefined ? undefined : selectOptionValues(thinkingOption);
-      const thinkingValue =
-        thinkingOption === undefined || thinkingValues === undefined
-          ? undefined
-          : opts.thinkingLevel !== undefined
-            ? acpThoughtValue(opts.thinkingLevel, thinkingValues)
-            : adapter?.harness === 'antigravity' &&
-                opts.compactAt !== undefined &&
-                (currentValueOf(thinkingOption) === 'high' ||
-                  currentValueOf(thinkingOption) === 'xhigh') &&
-                thinkingValues.has('medium')
-              ? 'medium'
-              : undefined;
-      if (
-        thinkingOption !== undefined &&
-        thinkingValue !== undefined &&
-        currentValueOf(thinkingOption) !== thinkingValue
-      ) {
-        await connection.agent.request(methods.agent.session.setConfigOption, {
-          sessionId,
-          configId: thinkingOption.id,
-          value: thinkingValue,
-        });
-      }
-      const modes = 'modes' in response ? response.modes : null;
-      if (policy !== 'normal') {
-        if (modes) {
-          const target = restrictiveAcpMode(modes);
-          if (target !== null) {
-            await connection.agent.request(methods.agent.session.setMode, {
-              sessionId,
-              modeId: target,
             });
+            if (models.length > 0) adapter.onDevinModels?.(models);
+          } else if (adapter?.harness === 'antigravity') {
+            const models = advertisedAcpModels(
+              modelOption,
+              {
+                [currentValueOf(modelOption)]: response.configOptions ?? [],
+                [opts.modelId]: configOptions,
+              },
+              isInternalAntigravityModelId,
+            );
+            if (models.length > 0) adapter.onAntigravityModels?.(models);
           }
-        } else if (adapter?.harness === 'devin') {
-          throw new Error(
-            `${adapter.harness} ACP did not report its modes: refusing a locked turn (fail-closed)`,
+        } else if (adapter) {
+          throw new Error('ACP adapter did not advertise model configuration');
+        } else {
+          process.stderr.write(
+            `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
           );
         }
-      }
-      if (adapter?.harness === 'devin' && policy === 'normal' && !isRestricted) {
-        if (!modes?.availableModes.some((mode) => mode.id === 'bypass'))
-          throw new Error('Devin ACP did not offer bypass mode for unattended steps');
-        await connection.agent.request(methods.agent.session.setMode, {
-          sessionId,
-          modeId: 'bypass',
-        });
-      }
-      if (adapter?.harness === 'antigravity') {
+        const thinkingOption = configOptions.find(isThoughtOption);
+        const thinkingValues =
+          thinkingOption === undefined ? undefined : selectOptionValues(thinkingOption);
+        const thinkingValue =
+          thinkingOption === undefined || thinkingValues === undefined
+            ? undefined
+            : opts.thinkingLevel !== undefined
+              ? acpThoughtValue(opts.thinkingLevel, thinkingValues)
+              : adapter?.harness === 'antigravity' &&
+                  opts.compactAt !== undefined &&
+                  (currentValueOf(thinkingOption) === 'high' ||
+                    currentValueOf(thinkingOption) === 'xhigh') &&
+                  thinkingValues.has('medium')
+                ? 'medium'
+                : undefined;
+        if (
+          thinkingOption !== undefined &&
+          thinkingValue !== undefined &&
+          currentValueOf(thinkingOption) !== thinkingValue
+        ) {
+          await connection.agent.request(methods.agent.session.setConfigOption, {
+            sessionId,
+            configId: thinkingOption.id,
+            value: thinkingValue,
+          });
+        }
         const modes = 'modes' in response ? response.modes : null;
-        if (modes !== null && modes !== undefined) {
-          const preferred = !isRestricted
-            ? (modes.availableModes.find((mode) => mode.id === 'auto') ??
-              modes.availableModes.find((mode) => mode.id === 'accept-edits'))
-            : (modes.availableModes.find((mode) => mode.id === 'default') ??
-              modes.availableModes.find((mode) => mode.id === 'plan'));
-          if (preferred !== undefined && modes.currentModeId !== preferred.id) {
-            await connection.agent.request(methods.agent.session.setMode, {
-              sessionId,
-              modeId: preferred.id,
-            });
+        if (policy !== 'normal') {
+          if (modes) {
+            const target = restrictiveAcpMode(modes);
+            if (target !== null) {
+              await connection.agent.request(methods.agent.session.setMode, {
+                sessionId,
+                modeId: target,
+              });
+            }
+          } else if (adapter?.harness === 'devin') {
+            throw new Error(
+              `${adapter.harness} ACP did not report its modes: refusing a locked turn (fail-closed)`,
+            );
           }
         }
-      }
-      const sessionPrompt =
-        adapter?.harness === 'antigravity'
-          ? validated.prompt
-          : combinedSystemPrompt && validated.prompt !== undefined
-            ? `${combinedSystemPrompt}\n\n${validated.prompt}`
-            : validated.prompt;
-      const onSessionFinish = warmEntry
-        ? (keepWarm: boolean) => {
-            if (keepWarm && !this.closed && warmEntry.state === 'active') {
-              this.parkWarm(warmEntry, warmIdleMs);
-            } else {
-              warmEntry.terminate();
+        if (adapter?.harness === 'devin' && policy === 'normal' && !isRestricted) {
+          if (!modes?.availableModes.some((mode) => mode.id === 'bypass'))
+            throw new Error('Devin ACP did not offer bypass mode for unattended steps');
+          await connection.agent.request(methods.agent.session.setMode, {
+            sessionId,
+            modeId: 'bypass',
+          });
+        }
+        if (adapter?.harness === 'antigravity') {
+          const modes = 'modes' in response ? response.modes : null;
+          if (modes !== null && modes !== undefined) {
+            const preferred = !isRestricted
+              ? (modes.availableModes.find((mode) => mode.id === 'auto') ??
+                modes.availableModes.find((mode) => mode.id === 'accept-edits'))
+              : (modes.availableModes.find((mode) => mode.id === 'default') ??
+                modes.availableModes.find((mode) => mode.id === 'plan'));
+            if (preferred !== undefined && modes.currentModeId !== preferred.id) {
+              await connection.agent.request(methods.agent.session.setMode, {
+                sessionId,
+                modeId: preferred.id,
+              });
             }
           }
-        : () => {
-            cleanup();
-          };
-      session = new AcpSession(
-        sessionId,
-        connection,
-        sessionPrompt,
-        (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
-        caps?.promptCapabilities?.image === true,
-        onSessionFinish,
-        adapter,
-        opts.modelId,
-        opts.compactAt,
-        settleUnexpectedClose,
-        resumeId && hostTools
-          ? { toolNames: hostToolNames, hasListedTools: hostTools.hasListedTools, runtime }
-          : undefined,
-      );
-      if (warmEntry !== null) {
-        warmEntry.sessionId = sessionId;
-        warmEntry.imageCapability = caps?.promptCapabilities?.image === true;
-        warmEntry.activeSession = session;
-        warmEntry.state = 'active';
+        }
+        const sessionPrompt =
+          adapter?.harness === 'antigravity'
+            ? validated.prompt
+            : combinedSystemPrompt && validated.prompt !== undefined
+              ? `${combinedSystemPrompt}\n\n${validated.prompt}`
+              : validated.prompt;
+        const onSessionFinish = warmEntry
+          ? (keepWarm: boolean) => {
+              if (keepWarm && !this.closed && warmEntry.state === 'active') {
+                this.parkWarm(warmEntry, warmIdleMs);
+              } else {
+                warmEntry.terminate();
+              }
+            }
+          : () => {
+              cleanup();
+            };
+        session = new AcpSession(
+          sessionId,
+          connection,
+          sessionPrompt,
+          (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
+          caps?.promptCapabilities?.image === true,
+          onSessionFinish,
+          adapter,
+          opts.modelId,
+          opts.compactAt,
+          settleUnexpectedClose,
+          resumeId && hostTools
+            ? { toolNames: hostToolNames, hasListedTools: hostTools.hasListedTools, runtime }
+            : undefined,
+        );
+        if (warmEntry !== null) {
+          warmEntry.sessionId = sessionId;
+          warmEntry.imageCapability = caps?.promptCapabilities?.image === true;
+          warmEntry.activeSession = session;
+          warmEntry.state = 'active';
+        }
+        return session;
+      } catch (error) {
+        const recorded =
+          acpErrorCode(error) !== undefined || error instanceof SessionNotResumableError
+            ? null
+            : await settleUnexpectedClose();
+        if (warmEntry !== null) warmEntry.terminate();
+        else cleanup();
+        if (error instanceof SessionNotResumableError) throw error;
+        const rawMessage = error instanceof Error ? error.message : String(error);
+        const message = recorded !== null ? recorded.message : rawMessage;
+        const mapped = adapter
+          ? adapter.harness === 'antigravity'
+            ? antigravityAcpErrorMessage(error, message)
+            : message
+          : acpErrorMessage(recorded !== null ? message : error);
+        const finalMessage =
+          recorded !== null || mapped !== message
+            ? mapped
+            : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`;
+        const isMissingBinary =
+          /^Antigravity executable not found:|^Gemini executable not found:/.test(finalMessage) ||
+          FAILED_SPAWN.test(message);
+        const isAuth =
+          adapter?.harness === 'antigravity'
+            ? isAntigravityAuthError(error, message) || isAntigravityAuthError(error, finalMessage)
+            : !adapter && isGeminiAuthMessage(finalMessage);
+        const direct = stepFailureOf(error);
+        if (recorded !== null && recorded.code !== 'runtime_exited') {
+          throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
+        }
+        if (isMissingBinary) {
+          throw new StepFailureError(finalMessage, 'missing_tool', {
+            runtime,
+            tool: boundedToolName(command),
+          });
+        }
+        if (isAuth) {
+          throw new StepFailureError(finalMessage, 'auth', { runtime });
+        }
+        if (recorded !== null) {
+          throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
+        }
+        if (direct !== null) {
+          throw new StepFailureError(finalMessage, direct.failureCode, direct.failureDetail);
+        }
+        throw new Error(finalMessage);
+      } finally {
+        clearTimeout(initializeTimer);
       }
-      return session;
-    } catch (error) {
-      const recorded =
-        acpErrorCode(error) !== undefined || error instanceof SessionNotResumableError
-          ? null
-          : await settleUnexpectedClose();
-      if (warmEntry !== null) warmEntry.terminate();
-      else cleanup();
-      if (error instanceof SessionNotResumableError) throw error;
-      const rawMessage = error instanceof Error ? error.message : String(error);
-      const message = recorded !== null ? recorded.message : rawMessage;
-      const mapped = adapter
-        ? adapter.harness === 'antigravity'
-          ? antigravityAcpErrorMessage(error, message)
-          : message
-        : acpErrorMessage(recorded !== null ? message : error);
-      const finalMessage =
-        recorded !== null || mapped !== message
-          ? mapped
-          : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`;
-      const isMissingBinary =
-        /^Antigravity executable not found:|^Gemini executable not found:/.test(finalMessage) ||
-        FAILED_SPAWN.test(message);
-      const isAuth =
-        adapter?.harness === 'antigravity'
-          ? isAntigravityAuthError(error, message) || isAntigravityAuthError(error, finalMessage)
-          : !adapter && isGeminiAuthMessage(finalMessage);
-      const direct = stepFailureOf(error);
-      if (recorded !== null && recorded.code !== 'runtime_exited') {
-        throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
-      }
-      if (isMissingBinary) {
-        throw new StepFailureError(finalMessage, 'missing_tool', {
-          runtime,
-          tool: boundedToolName(command),
-        });
-      }
-      if (isAuth) {
-        throw new StepFailureError(finalMessage, 'auth', { runtime });
-      }
-      if (recorded !== null) {
-        throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
-      }
-      if (direct !== null) {
-        throw new StepFailureError(finalMessage, direct.failureCode, direct.failureDetail);
-      }
-      throw new Error(finalMessage);
-    } finally {
-      clearTimeout(initializeTimer);
-    }
+    };
+    return adapter?.harness === 'antigravity' ? this.withCwdLock(opts.cwd, runOpen) : runOpen();
   }
 }
 

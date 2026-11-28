@@ -10,6 +10,7 @@ export class DeltaRelay {
   private timer: NodeJS.Timeout | null = null;
   private inWindow = false;
   private pending: Promise<void> | null = null;
+  private epoch = 0;
 
   constructor(private readonly options: DeltaRelayOptions) {}
 
@@ -45,6 +46,7 @@ export class DeltaRelay {
   }
 
   discard(): void {
+    this.epoch += 1;
     this.inWindow = false;
     this.take();
   }
@@ -77,8 +79,9 @@ export class DeltaRelay {
   }
 
   private enqueue(text: string): Promise<void> {
-    const start =
-      this.pending === null ? this.sendNow(text) : this.pending.then(() => this.sendNow(text));
+    const expectedEpoch = this.epoch;
+    const run = () => (this.epoch === expectedEpoch ? this.sendNow(text) : Promise.resolve());
+    const start = this.pending === null ? run() : this.pending.then(run);
     const tracked = start.finally(() => {
       if (this.pending === tracked) this.pending = null;
     });
