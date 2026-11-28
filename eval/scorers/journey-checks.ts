@@ -36,9 +36,11 @@ export function scoreJourney(task: JourneyTask, record: TurnRecord): CheckResult
   );
   const badCommands = journey.commandChecks.filter((check) => !check.ok);
   results.push(
-    badCommands.length === 0
-      ? ok('journey.tests_pass', gate)
-      : fail('journey.tests_pass', badCommands.map((check) => check.command).join(', '), gate),
+    journey.commandChecks.length === 0
+      ? fail('journey.tests_pass', 'no trusted test ran', gate)
+      : badCommands.length === 0
+        ? ok('journey.tests_pass', gate)
+        : fail('journey.tests_pass', badCommands.map((check) => check.command).join(', '), gate),
   );
   return results;
 }

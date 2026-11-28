@@ -11,6 +11,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { startBuilds } from '../../apps/server/src/services/builds.js';
 import { claimStep } from '../../apps/server/src/services/machines.js';
+import { activateInServer, deactivateInServer } from './world.js';
 import { insertMessageRow } from '../../apps/server/src/services/transcript.js';
 import {
   bootServer,
@@ -161,6 +162,7 @@ export async function runJourneyTask(
   let diagnostics: string | undefined;
   try {
     s = bootServer({});
+    activateInServer();
     const teamId = s.team.id;
     const machineId = insertMachine(s, { name: 'bench' });
     seedStubRoute(s, teamId);
@@ -324,6 +326,7 @@ export async function runJourneyTask(
     return { record };
   } finally {
     await coordinator?.close();
+    deactivateInServer();
     s?.dispose();
     releaseTestTempDir(storageDir);
     rmSync(workDir, { recursive: true, force: true });
