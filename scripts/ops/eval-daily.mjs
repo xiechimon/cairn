@@ -18,7 +18,8 @@ import {
   writeSync,
 } from 'node:fs';
 import { constants as osConstants } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { scrubDiagnostics } from '../../eval/harness/devin-env.mjs';
@@ -309,6 +310,74 @@ export function isItemPassed(item) {
   if (item?.incomplete !== undefined) return false;
   const values = Object.values(item?.scores ?? {});
   return values.length > 0 && values.every((v) => v === 1);
+}
+
+const VALID_MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/ -]{0,79}$/;
+
+function cleanModelName(raw) {
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  return VALID_MODEL_NAME.test(trimmed) ? trimmed : '';
+}
+
+export function attachLaneModels(
+  outJson,
+  { devinHome, env = process.env, startedMs = 0, finishedMs = Date.now() } = {},
+) {
+  if (!outJson || !Array.isArray(outJson.items)) return outJson;
+  const laneCaseIds = [
+    ...new Set(
+      outJson.items
+        .filter((item) => item?.kind === 'lane' && typeof item.caseId === 'string' && item.caseId)
+        .map((item) => item.caseId),
+    ),
+  ].sort((a, b) => b.length - a.length);
+  if (laneCaseIds.length === 0) return outJson;
+
+  const detectedByCase = new Map();
+  const dbPath = devinHome ? join(devinHome, '.local', 'share', 'devin', 'cli', 'sessions.db') : '';
+  if (dbPath && existsSync(dbPath)) {
+    let db = null;
+    try {
+      db = new DatabaseSync(dbPath, { readOnly: true });
+      const rows = db
+        .prepare(
+          'SELECT model, working_directory, created_at FROM sessions ORDER BY created_at DESC LIMIT 200',
+        )
+        .all();
+      const minMs = startedMs - 5_000;
+      const maxMs = finishedMs + 5_000;
+      for (const row of rows) {
+        const model = cleanModelName(row?.model);
+        const workDir = typeof row?.working_directory === 'string' ? row.working_directory : '';
+        const rawTs = Number(row?.created_at);
+        if (!model || !workDir || !Number.isFinite(rawTs)) continue;
+        const tsMs = rawTs > 1e12 ? rawTs : rawTs * 1000;
+        if (tsMs < minMs || tsMs > maxMs) continue;
+        const dirName = basename(workDir);
+        const matchedCase = laneCaseIds.find((caseId) =>
+          dirName.startsWith(`eval-lane-${caseId}-`),
+        );
+        if (matchedCase && !detectedByCase.has(matchedCase)) {
+          detectedByCase.set(matchedCase, model);
+        }
+      }
+    } catch {
+    } finally {
+      try {
+        db?.close();
+      } catch {}
+    }
+  }
+
+  const fallbackModel = cleanModelName(env?.DEVIN_MODEL);
+  for (const item of outJson.items) {
+    if (item?.kind !== 'lane') continue;
+    if (cleanModelName(item.ranModel)) continue;
+    const resolved = detectedByCase.get(item.caseId) || fallbackModel;
+    if (resolved) item.ranModel = resolved;
+  }
+  return outJson;
 }
 
 export function summarizeRun({
@@ -1099,6 +1168,12 @@ export async function runDailyEval({
 
     const outJson = readJsonOrNull(tmpOut);
     safeUnlink(tmpOut);
+    attachLaneModels(outJson, {
+      devinHome,
+      env: mergedEnv,
+      startedMs,
+      finishedMs: Date.now(),
+    });
 
     return persistAndReturn({
       evalExitCode: childRes.exitCode,

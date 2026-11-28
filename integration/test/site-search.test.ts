@@ -190,7 +190,7 @@ function publicEvalPayload(date = new Date().toISOString()) {
         failed: 0,
         incomplete: 0,
         trials: 1,
-        model: 'Devin CLI · model not recorded',
+        model: 'Devin CLI · swe-2-high',
       },
       {
         caseId: 'answer-read-01',
@@ -200,7 +200,7 @@ function publicEvalPayload(date = new Date().toISOString()) {
         failed: 1,
         incomplete: 0,
         trials: 2,
-        model: 'fauxProvider replay',
+        model: 'Recorded replay',
       },
       {
         caseId: 'canary-answer',
@@ -210,7 +210,7 @@ function publicEvalPayload(date = new Date().toISOString()) {
         failed: 0,
         incomplete: 1,
         trials: 1,
-        model: 'fauxProvider replay',
+        model: 'Recorded replay',
       },
     ],
   };
@@ -224,6 +224,7 @@ test.each([
     latest: 'Latest daily eval',
     kindScore: 'Real coding 1/1',
     shortKind: 'Real coding',
+    replayLabel: 'Recorded replay',
     details: 'Per-case results',
     status: 'Incomplete',
   },
@@ -234,13 +235,14 @@ test.each([
     latest: '最新每日评测',
     kindScore: '真实编码 1/1',
     shortKind: '真实编码',
+    replayLabel: '录制回放',
     details: '逐题结果',
     status: '未完成',
   },
 ])(
   'renders public eval results in both locales: $name',
-  async ({ path, locale, latest, kindScore, shortKind, details, status }) => {
-    const context = await browser.newContext({ locale });
+  async ({ path, locale, latest, kindScore, shortKind, replayLabel, details, status }) => {
+    const context = await browser.newContext({ locale, viewport: { width: 1280, height: 960 } });
     try {
       let requested = false;
       await context.route(evalResultsUrl, (route) => {
@@ -286,14 +288,25 @@ test.each([
       await browserExpect(rows).toHaveCount(3);
       await browserExpect(rows.nth(0)).toContainText('fix-bug');
       await browserExpect(rows.nth(0)).toContainText(shortKind);
-      await browserExpect(rows.nth(0)).toContainText('Devin CLI · model not recorded');
+      await browserExpect(rows.nth(0)).toContainText('Devin CLI · swe-2-high');
       await browserExpect(rows.nth(1).locator('td').nth(2)).toHaveText('1/2');
       await browserExpect(rows.nth(1).locator('td').nth(3)).toHaveText('1');
       await browserExpect(rows.nth(1).locator('td').nth(4)).toHaveText('0');
+      await browserExpect(rows.nth(1)).toContainText(replayLabel);
       await browserExpect(rows.nth(2).locator('td').nth(2)).toHaveText('0/1');
       await browserExpect(rows.nth(2).locator('td').nth(3)).toHaveText('0');
       await browserExpect(rows.nth(2).locator('td').nth(4)).toHaveText('1');
       await browserExpect(rows.nth(2)).toContainText(status);
+      const tableText = await page.locator('#eval-details').innerText();
+      expect(tableText).not.toContain('fauxProvider');
+      expect(tableText).not.toContain('model not recorded');
+      const fitsDesktop = await page
+        .locator('.proof-table-wrap')
+        .evaluate(
+          (node: { scrollWidth: number; clientWidth: number }) =>
+            node.scrollWidth <= node.clientWidth,
+        );
+      expect(fitsDesktop).toBe(true);
     } finally {
       await context.close();
     }
@@ -436,6 +449,27 @@ test('marks stale public eval results', async () => {
     await browserExpect(page.locator('#eval-live')).toBeVisible();
     await browserExpect(page.locator('#eval-date')).toContainText('Latest daily eval');
     await browserExpect(page.locator('#eval-stale')).toContainText('This snapshot may be stale');
+  } finally {
+    await context.close();
+  }
+});
+
+test('normalizes cached fauxProvider replay labels to user-facing copy', async () => {
+  const legacy = publicEvalPayload();
+  const runtimeCase = legacy.cases[1];
+  if (!runtimeCase) throw new Error('expected runtime case');
+  runtimeCase.model = 'fauxProvider replay';
+  const context = await browser.newContext({ locale: 'zh-CN' });
+  try {
+    await context.route(evalResultsUrl, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(legacy) }),
+    );
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/zh-cn/`);
+    await browserExpect(page.locator('#eval-live')).toBeVisible();
+    await page.locator('#eval-details summary').click();
+    await browserExpect(page.locator('#eval-case-rows tr').nth(1)).toContainText('录制回放');
+    expect(await page.locator('#eval-details').innerText()).not.toContain('fauxProvider');
   } finally {
     await context.close();
   }

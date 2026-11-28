@@ -68,6 +68,7 @@ function makeRecord({ date = '2026-11-27T05:00:00.000Z', sha = 'a'.repeat(40) } 
         caseId: 'lane-one',
         kind: 'lane',
         repeat: 0,
+        ranModel: 'swe-2-high',
         scores: { 'lane.completed': 1 },
         traceId: 'trace-secret',
         traceUrl: 'https://mac-mini.tailac09a9.ts.net/project/cairn/traces/trace-secret',
@@ -125,12 +126,13 @@ test('builds official snapshot with per-kind counts', (t) => {
     failed: 1,
     incomplete: 0,
     trials: 2,
-    model: 'fauxProvider replay',
+    model: 'Recorded replay',
   });
   const lane = payload.cases.find((row) => row.caseId === 'lane-one');
-  assert.equal(lane.model, 'Devin CLI · model not recorded');
+  assert.equal(lane.model, 'Devin CLI · swe-2-high');
   const canary = payload.cases.find((row) => row.caseId === 'canary-one');
   assert.equal(canary.status, 'incomplete');
+  assert.equal(canary.model, 'Recorded replay');
   const serialized = JSON.stringify(payload);
   for (const forbidden of [
     'trace-secret',
@@ -140,9 +142,27 @@ test('builds official snapshot with per-kind counts', (t) => {
     'private comment',
     'quota details',
     'https://',
+    'fauxProvider',
+    'model not recorded',
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
+
+  const noItemModel = makeRecord();
+  delete noItemModel.items[0].ranModel;
+  const fromEnv = buildPublicResults(noItemModel, {
+    repoDir: repo,
+    env: { DEVIN_MODEL: 'claude-sonnet-4.6' },
+  });
+  assert.equal(
+    fromEnv.payload.cases.find((row) => row.caseId === 'lane-one').model,
+    'Devin CLI · claude-sonnet-4.6',
+  );
+  const unsetModel = buildPublicResults(noItemModel, { repoDir: repo, env: {} });
+  assert.equal(
+    unsetModel.payload.cases.find((row) => row.caseId === 'lane-one').model,
+    'Devin CLI',
+  );
 });
 
 test('validates allowlisted payload before writing', (t) => {

@@ -68,9 +68,12 @@ function readPublicEvalSpec(repoDir) {
   return { suite, expectedTotal, publicTasks, taskIdsByKind };
 }
 
-function modelForKind(kind) {
-  if (kind !== 'lane') return 'fauxProvider replay';
-  return 'Devin CLI · model not recorded';
+function modelForCase(kind, models, env) {
+  if (kind !== 'lane') return 'Recorded replay';
+  const unique = [...models].filter(Boolean);
+  if (unique.length > 0) return `Devin CLI · ${unique.join(', ')}`;
+  const configured = typeof env?.DEVIN_MODEL === 'string' ? env.DEVIN_MODEL.trim() : '';
+  return configured ? `Devin CLI · ${configured}` : 'Devin CLI';
 }
 
 function emptyKindCounts() {
@@ -169,7 +172,7 @@ function assertSafePayload(payload) {
   }
 }
 
-export function buildPublicResults(record, { repoDir } = {}) {
+export function buildPublicResults(record, { repoDir, env = process.env } = {}) {
   const { suite, expectedTotal, publicTasks, taskIdsByKind } = readPublicEvalSpec(repoDir);
   const items = Array.isArray(record?.items) ? record.items : [];
   if (record?.evalExitCode !== 0 || items.length === 0 || items.length !== expectedTotal) {
@@ -220,7 +223,15 @@ export function buildPublicResults(record, { repoDir } = {}) {
       failed: 0,
       incomplete: 0,
       trials: 0,
+      models: new Set(),
     };
+    const itemModel =
+      typeof item?.ranModel === 'string' && item.ranModel.trim()
+        ? item.ranModel.trim()
+        : typeof item?.model === 'string' && item.model.trim()
+          ? item.model.trim()
+          : '';
+    if (itemModel) bucket.models.add(itemModel);
     bucket.trials += 1;
     byKind[kind].total += 1;
     if (item.incomplete !== undefined) {
@@ -259,7 +270,7 @@ export function buildPublicResults(record, { repoDir } = {}) {
       failed: row.failed,
       incomplete: row.incomplete,
       trials: row.trials,
-      model: modelForKind(row.kind),
+      model: modelForCase(row.kind, row.models, env),
     }));
   const summary = {
     total: items.length,

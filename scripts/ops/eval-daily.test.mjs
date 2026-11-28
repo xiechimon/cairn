@@ -13,6 +13,7 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { evaluate } from '../doc-retired-terms-gate.mjs';
 import { OWNED_PROCESS_CLI, processInfo } from '../owned-process.mjs';
@@ -913,4 +914,40 @@ test('prunes expired files, broken symlinks, and public temp dirs without touchi
   assert.equal(existsSync(expiredFile), false);
   assert.equal(existsSync(keepDir), true);
   assert.throws(() => readFileSync(brokenLink), /ENOENT/);
+});
+
+test('records real lane model from isolated Devin sessions.db into latest.json', async (t) => {
+  const dir = makeTempDir(t);
+  const devinHome = join(dir, 'devin-home');
+  const cliDir = join(devinHome, '.local', 'share', 'devin', 'cli');
+  mkdirSync(cliDir, { recursive: true });
+  const db = new DatabaseSync(join(cliDir, 'sessions.db'));
+  db.exec(
+    'CREATE TABLE sessions (id TEXT PRIMARY KEY, working_directory TEXT NOT NULL, model TEXT NOT NULL, created_at INTEGER NOT NULL)',
+  );
+  const nowSec = Math.floor(Date.now() / 1000) + 1;
+  db.prepare(
+    'INSERT INTO sessions (id, working_directory, model, created_at) VALUES (?, ?, ?, ?)',
+  ).run('s-1', '/tmp/eval-lane-fix-bug-xyz999', 'swe-2-high', nowSec);
+  db.close();
+
+  const lfUrl = await startLangfuseMock(t, 200);
+  const repo = createFakeRepo(join(dir, 'model-repo'));
+  const state = join(dir, 'model-state');
+  const code = await runDailyEval({
+    argv: ['--no-fetch'],
+    env: {
+      EVAL_DAILY_STATE: state,
+      EVAL_DAILY_REPO: repo,
+      EVAL_DAILY_DEVIN_HOME: devinHome,
+      EVAL_DAILY_SKIP_INSTALL: '1',
+      LANGFUSE_BASE_URL: lfUrl,
+      LANGFUSE_PUBLIC_KEY: 'pk-1',
+      LANGFUSE_SECRET_KEY: 'sk-1',
+    },
+    publishImpl: () => ({ state: 'skipped', branch: 'eval-results', reason: 'test' }),
+  });
+  assert.equal(code, 0);
+  const latest = JSON.parse(readFileSync(join(state, 'latest.json'), 'utf8'));
+  assert.equal(latest.items.find((item) => item.caseId === 'fix-bug')?.ranModel, 'swe-2-high');
 });

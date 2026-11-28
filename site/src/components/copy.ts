@@ -46,6 +46,7 @@ export const copy = {
       latestRun: '最新每日评测',
       stale: '这不是今天的最新结果',
       details: '逐题结果',
+      recordedReplay: '录制回放',
       shortKinds: { lane: '真实编码', runtime: '回合回放', canary: '哨兵' },
       table: {
         case: '用例',
@@ -205,6 +206,7 @@ export const copy = {
       latestRun: 'Latest daily eval',
       stale: 'This snapshot may be stale',
       details: 'Per-case results',
+      recordedReplay: 'Recorded replay',
       shortKinds: { lane: 'Real coding', runtime: 'Runtime', canary: 'Canaries' },
       table: {
         case: 'Case',

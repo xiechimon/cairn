@@ -35,6 +35,7 @@ const evalClientCopy = {
   locale: t.htmlLang,
   latestRun: t.proof.latestRun,
   stale: t.proof.stale,
+  recordedReplay: t.proof.recordedReplay,
   shortKinds: t.proof.shortKinds,
   status: t.proof.status,
 };
@@ -228,27 +229,27 @@ const jsonLd = {
                 <span class="proof-stale" id="eval-stale" hidden></span>
               </p>
               <p class="proof-score" id="eval-score"></p>
-              <details class="proof-details" id="eval-details">
-                <summary>{t.proof.details}</summary>
-                <div class="proof-table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{t.proof.table.case}</th>
-                        <th>{t.proof.table.kind}</th>
-                        <th>{t.proof.table.passed}</th>
-                        <th>{t.proof.table.failed}</th>
-                        <th>{t.proof.table.incomplete}</th>
-                        <th>{t.proof.table.status}</th>
-                        <th>{t.proof.table.model}</th>
-                      </tr>
-                    </thead>
-                    <tbody id="eval-case-rows"></tbody>
-                  </table>
-                </div>
-              </details>
             </div>
           </figure>
+          <details class="proof-details" id="eval-details" hidden>
+            <summary>{t.proof.details}</summary>
+            <div class="proof-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t.proof.table.case}</th>
+                    <th>{t.proof.table.kind}</th>
+                    <th>{t.proof.table.passed}</th>
+                    <th>{t.proof.table.failed}</th>
+                    <th>{t.proof.table.incomplete}</th>
+                    <th>{t.proof.table.status}</th>
+                    <th>{t.proof.table.model}</th>
+                  </tr>
+                </thead>
+                <tbody id="eval-case-rows"></tbody>
+              </table>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -499,8 +500,13 @@ const jsonLd = {
       const evalDate = document.getElementById('eval-date');
       const evalStale = document.getElementById('eval-stale');
       const evalScore = document.getElementById('eval-score');
+      const evalDetails = document.getElementById('eval-details');
       const evalRows = document.getElementById('eval-case-rows');
       const evalChart = document.getElementById('eval-history-chart');
+      const formatEvalModel = (raw) =>
+        raw === 'Recorded replay' || raw === 'fauxProvider replay'
+          ? evalClientCopy.recordedReplay
+          : raw;
       const evalKinds = ['lane', 'runtime', 'canary'];
       const validCount = (bucket) =>
         bucket &&
@@ -658,11 +664,12 @@ const jsonLd = {
           badge.textContent = evalClientCopy.status[row.status] ?? row.status;
           statusCell.appendChild(badge);
           tr.appendChild(statusCell);
-          addCell(row.model);
+          addCell(formatEvalModel(row.model));
           evalRows.appendChild(tr);
         }
         evalEmpty.hidden = true;
         evalLive.hidden = false;
+        if (evalDetails) evalDetails.hidden = false;
       };
       if (evalLive && evalEmpty) {
         const controller = new AbortController();
@@ -1013,7 +1020,7 @@ const jsonLd = {
   .proof-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-    gap: 48px;
+    gap: 24px 48px;
     padding: 32px;
     border-radius: var(--radius-panel);
     background: var(--card);
@@ -1102,7 +1109,8 @@ const jsonLd = {
   }
   .proof-empty[hidden],
   .proof-live[hidden],
-  .proof-stale[hidden] {
+  .proof-stale[hidden],
+  .proof-details[hidden] {
     display: none;
   }
   .proof-live {
@@ -1145,7 +1153,10 @@ const jsonLd = {
     stroke: none;
   }
   .proof-details {
-    margin-top: 10px;
+    grid-column: 1 / -1;
+    margin-top: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
   }
   .proof-details summary {
     min-height: 32px;
@@ -1164,10 +1175,19 @@ const jsonLd = {
   }
   .proof-details th,
   .proof-details :global(td) {
-    padding: 6px 8px;
+    padding: 6px 10px;
     border-bottom: 1px solid var(--line);
     text-align: left;
     white-space: nowrap;
+  }
+  .proof-details :global(td:nth-child(3)),
+  .proof-details :global(td:nth-child(4)),
+  .proof-details :global(td:nth-child(5)) {
+    font-variant-numeric: tabular-nums;
+  }
+  .proof-details :global(td:last-child) {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .proof-details th {
     color: var(--ink-3);
