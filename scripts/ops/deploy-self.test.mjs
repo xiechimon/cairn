@@ -112,6 +112,10 @@ void config;
   return git(work, 'rev-parse', 'HEAD');
 }
 
+const MARKER = 'step_require_writer_generation_update';
+const MARKER_SQL = `CREATE TRIGGER ${MARKER} BEFORE UPDATE ON step\nBEGIN SELECT cairn_step_write_generation(); END;\n`;
+const MARKER_FILE = 'apps/server/drizzle/0300_step_marker.sql';
+
 function writeRelease(releases, sha, label) {
   const release = join(releases, `${label}-${sha.slice(0, 12)}`);
   mkdirSync(join(release, 'dist'), { recursive: true });
@@ -237,7 +241,19 @@ process.stdout.write(String(status));
     bin,
     'curl',
     `url="\${@: -1}"
-if [[ "$url" == */api/server/deploy/lease ]]; then exec "${process.execPath}" "${fake}/lease-api.mjs" "$@"; fi
+if [[ "$url" == */api/server/deploy/lease ]]; then
+  [ ! -f "${fake}/lease-dead" ] || { printf 000; exit 0; }
+  exec "${process.execPath}" "${fake}/lease-api.mjs" "$@"
+fi
+if [[ "$url" == */api/server/version ]]; then
+  [ -f "${fake}/up" ] || exit 7
+  auth=""
+  [[ " $* " != *" -K "* ]] || auth="$(cat)"
+  [[ "$auth" == *"Bearer ${OWNER_TOKEN}"* ]] || exit 22
+  commit="$(cat "${fake}/version-commit" 2>/dev/null || head -c 7 "${root}/DEPLOYED_SHA")"
+  printf '{"version":"1","commit":"%s"}' "$commit"
+  exit 0
+fi
 if [ -f "${fake}/up" ]; then
   case "$url" in */app) printf 200 ;; */api/user/me) printf 401 ;; *) printf 404 ;; esac
 else printf 000; fi`,
@@ -254,6 +270,7 @@ if [[ " $* " == *" stop "* ]]; then
   if [[ " $* " == *" cairn-daemon"* ]]; then
     rm -f "${fake}/runner-up"
   else
+    [ ! -f "${fake}/stop-fails" ] || exit 1
     rm -f "${fake}/up"
     sqlite3 "${db}" "pragma wal_checkpoint(truncate);" >/dev/null 2>&1 || true
     rm -f "${db}-shm" "${db}-wal"
@@ -261,6 +278,7 @@ if [[ " $* " == *" stop "* ]]; then
 fi
 if [[ " $* " == *" start "* ]]; then
   if [[ " $* " == *" cairn-daemon"* ]]; then
+    [ ! -f "${fake}/runner-drift" ] || git -C "${runnerCheckout}" checkout -q --detach "$(cat "${fake}/runner-drift")"
     rsha=$(git -C "${runnerCheckout}" rev-parse HEAD 2>/dev/null || true)
     if [ -n "$rsha" ] && [ ! -f "${fake}/runner-broken-$rsha" ]; then
       touch "${fake}/runner-up"
@@ -271,6 +289,8 @@ if [[ " $* " == *" start "* ]]; then
       touch "${fake}/up"
     else rm -f "${fake}/up"; fi
     [ ! -f "${fake}/write-on-start-$sha" ] || sqlite3 "${db}" "insert into step values ('written-after', 'build', 'done', null, null)"
+    printf '%s\\n' "$sha" >> "${fake}/server-starts.log"
+    [ ! -f "${fake}/migrate-on-start-$sha.sql" ] || sqlite3 "${db}" < "${fake}/migrate-on-start-$sha.sql"
   fi
 fi
 exit 0`;
@@ -617,6 +637,503 @@ test('a failed health check keeps a database that received writes after the snap
     assert.equal(sqlite(f.db, "select count(*) from step where id='written-after'"), '1');
   } finally {
     f.close();
+  }
+});
+
+function migrateOnStart(f, target, { accepted = false, backfill = true } = {}) {
+  writeFileSync(join(f.fake, `broken-${target}`), '');
+  writeFileSync(
+    join(f.fake, `migrate-on-start-${target}.sql`),
+    `BEGIN;
+     ${accepted ? "INSERT INTO step VALUES ('accepted-after', 'build', 'done', NULL, NULL);" : ''}
+     ${backfill ? "CREATE TABLE step_quota(stepId TEXT PRIMARY KEY, quotaBlock TEXT); INSERT INTO step_quota VALUES ('sentinel', 'preserved');" : ''}
+     ${MARKER_SQL}
+     COMMIT;`,
+  );
+}
+
+function probeLog(f) {
+  fakeTool(
+    f.bin,
+    'sqlite3',
+    `if [[ "$*" == *"type = 'trigger'"* ]]; then
+  echo probe >> "${f.fake}/probe.log"
+  [ ! -f "${f.fake}/probe-fails" ] || exit 1
+  [ ! -f "${f.fake}/probe-fail-after" ] || [ "$(wc -l < "${f.fake}/probe.log" | tr -d ' ')" -le "$(cat "${f.fake}/probe-fail-after")" ] || exit 1
+fi
+exec /usr/bin/sqlite3 "$@"`,
+  );
+}
+
+async function heldFixture({ accepted = true, ...options } = {}) {
+  const f = await fixture(options);
+  const target = pushTarget(f, 'side-table target', { [MARKER_FILE]: MARKER_SQL });
+  migrateOnStart(f, target, { accepted });
+  probeLog(f);
+  const result = await f.run(DEPLOY, [target]);
+  return { f, target, result };
+}
+
+const starts = (f) => f.log('server-starts.log').trim().split('\n').filter(Boolean);
+const journal = (f) => readFileSync(join(f.state, 'in-progress'), 'utf8');
+const sentinel = (f) => sqlite(f.db, "SELECT quotaBlock FROM step_quota WHERE stepId = 'sentinel'");
+
+test('failed health with fenced step storage does not certify legacy rollback as writable', async () => {
+  const { f, target, result } = await heldFixture({ runner: true });
+  try {
+    assert.equal(sentinel(f), 'preserved');
+    assert.equal(sqlite(f.db, "SELECT count(*) FROM step WHERE id = 'accepted-after'"), '1');
+    assert.deepEqual(starts(f), [target]);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+    assert.equal(record.result, 'repair-required');
+    assert.equal(record.failed, target);
+    assert.match(journal(f), /^phase=repair-required$/m);
+    assert.ok(readlinkSync(f.root).includes(target.slice(0, 12)));
+    assert.equal(git(f.runnerCheckout, 'rev-parse', 'HEAD'), target);
+    assert.ok(!existsSync(join(f.fake, 'runner-up')));
+    const fields = Object.fromEntries(
+      journal(f)
+        .trim()
+        .split('\n')
+        .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
+    );
+    assert.equal(fields.target, target);
+    assert.equal(fields.previous, f.previous);
+    assert.equal(fields.runner_previous, f.previous);
+    assert.equal(fields.release, readlinkSync(f.root));
+    assert.equal(fields.previous_release, realpathSync(f.previousRelease));
+    assert.ok(fields.snapshot.startsWith(f.backups) && existsSync(fields.snapshot));
+    assert.ok(fields.reason.length > 0);
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'draining');
+    assert.ok(!existsSync(join(f.state, 'failed', target)));
+  } finally {
+    f.close();
+  }
+});
+
+test('marked backfill and unknown probe never certify an old writer', async () => {
+  const backfill = await heldFixture({ accepted: false });
+  try {
+    assert.equal(backfill.result.status, 3, backfill.result.stderr + backfill.result.stdout);
+    assert.deepEqual(starts(backfill.f), [backfill.target]);
+    assert.equal(sentinel(backfill.f), 'preserved');
+    assert.match(journal(backfill.f), /^phase=repair-required$/m);
+  } finally {
+    backfill.f.close();
+  }
+  const f = await fixture();
+  try {
+    const target = pushTarget(f, 'unreadable probe');
+    writeFileSync(join(f.fake, `broken-${target}`), '');
+    probeLog(f);
+    writeFileSync(join(f.fake, 'probe-fail-after'), '1');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.deepEqual(starts(f), [target]);
+    assert.match(journal(f), /^phase=repair-required$/m);
+    assert.ok(readlinkSync(f.root).includes(target.slice(0, 12)));
+  } finally {
+    f.close();
+  }
+});
+
+test('marker-aware previous artifacts keep the ordinary comparator rollback', async () => {
+  for (const accepted of [false, true]) {
+    const f = await fixture();
+    try {
+      const target = pushTarget(f, 'side-table target', { [MARKER_FILE]: MARKER_SQL });
+      writeFileSync(join(f.previousRelease, 'drizzle', '0300_step_marker.sql'), MARKER_SQL);
+      migrateOnStart(f, target, { accepted, backfill: false });
+      const result = await f.run(DEPLOY, [target]);
+      assert.equal(result.status, 1, result.stderr + result.stdout);
+      assert.deepEqual(starts(f), [target, f.previous]);
+      const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+      assert.equal(record.result, accepted ? 'rolled-back-code' : 'rolled-back');
+      assert.ok(!existsSync(join(f.state, 'in-progress')));
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('interrupted restore phase resumes the selected snapshot and repair refuses a missing live DB', async () => {
+  for (const phase of ['restoring', 'restored']) {
+    const f = await fixture();
+    try {
+      const target = pushTarget(f, `interrupted-${phase}`);
+      const targetRelease = writeRelease(f.releases, target, 'target');
+      rmSync(f.root, { force: true });
+      symlinkSync(targetRelease, f.root, 'dir');
+      mkdirSync(f.backups, { recursive: true });
+      mkdirSync(f.state, { recursive: true });
+      const snapshot = join(f.backups, `predeploy-${phase}.db`);
+      cpSync(f.db, snapshot);
+      sqlite(f.db, `CREATE TABLE step_quota(stepId TEXT); ${MARKER_SQL}`);
+      if (phase === 'restoring') rmSync(f.db);
+      writeFileSync(
+        join(f.state, 'in-progress'),
+        `phase=${phase}\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nrelease=${targetRelease}\nprevious_release=${realpathSync(f.previousRelease)}\n`,
+      );
+      probeLog(f);
+      const result = await f.run(DEPLOY, ['--recover']);
+      assert.equal(result.status, 1, `${phase}: ${result.stderr}${result.stdout}`);
+      assert.equal(f.log('probe.log'), '');
+      assert.deepEqual(starts(f), [f.previous]);
+      assert.equal(
+        sqlite(f.db, `select count(*) from sqlite_master where name = '${MARKER}'`),
+        phase === 'restoring' ? '0' : '1',
+      );
+      assert.ok(!existsSync(join(f.state, 'in-progress')));
+    } finally {
+      f.close();
+    }
+  }
+
+  const stuck = await fixture();
+  try {
+    const target = pushTarget(stuck, 'stuck stop');
+    const targetRelease = writeRelease(stuck.releases, target, 'target');
+    rmSync(stuck.root, { force: true });
+    symlinkSync(targetRelease, stuck.root, 'dir');
+    mkdirSync(stuck.state, { recursive: true });
+    const snapshot = join(stuck.backups, 'predeploy-stuck.db');
+    mkdirSync(stuck.backups, { recursive: true });
+    cpSync(stuck.db, snapshot);
+    const text = `phase=restoring\ntarget=${target}\nprevious=${stuck.previous}\nsnapshot=${snapshot}\nrelease=${targetRelease}\nprevious_release=${realpathSync(stuck.previousRelease)}\n`;
+    writeFileSync(join(stuck.state, 'in-progress'), text);
+    const owner = '11111111-1111-4111-8111-111111111111';
+    sqlite(
+      stuck.db,
+      `insert into deploy_lease values ('server', '${owner}', 'draining', 4102444800000)`,
+    );
+    writeFileSync(join(stuck.state, 'lease-owner'), `${owner}\n`);
+    writeFileSync(join(stuck.fake, 'stop-fails'), '');
+    const result = await stuck.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.equal(readFileSync(join(stuck.state, 'in-progress'), 'utf8'), text);
+    assert.equal(sqlite(stuck.db, "select status from deploy_lease where id='server'"), 'draining');
+    assert.doesNotMatch(stuck.log('lease-requests.log'), /DELETE/);
+    assert.deepEqual(starts(stuck), []);
+  } finally {
+    stuck.close();
+  }
+
+  const missing = await heldFixture();
+  try {
+    rmSync(missing.f.db);
+    rmSync(`${missing.f.db}-wal`, { force: true });
+    rmSync(`${missing.f.db}-shm`, { force: true });
+    const result = await missing.f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.match(result.stderr, /live database is missing/);
+    assert.ok(!existsSync(missing.f.db));
+    assert.deepEqual(starts(missing.f), [missing.target]);
+    assert.match(journal(missing.f), /^phase=repair-required$/m);
+  } finally {
+    missing.f.close();
+  }
+});
+
+test('watcher rolls forward a held database without waiting for a stale lease', async () => {
+  const { f, target } = await heldFixture({ runner: true });
+  try {
+    sqlite(f.db, "INSERT INTO step VALUES ('stranded', 'build', 'claimed', 'm1', NULL)");
+    const probesBefore = f.log('probe.log');
+    const puts = f.log('lease-requests.log').match(/PUT/g).length;
+    const fix = pushTarget(f, 'compatible fix', { [MARKER_FILE]: MARKER_SQL });
+    const result = await f.run(WATCH, []);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.deepEqual(starts(f), [target, fix]);
+    assert.equal(f.log('lease-requests.log').match(/PUT/g).length, puts);
+    assert.match(f.log('lease-requests.log'), /DELETE owner/);
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+    assert.equal(sentinel(f), 'preserved');
+    assert.equal(sqlite(f.db, "SELECT count(*) FROM step WHERE id = 'accepted-after'"), '1');
+    assert.equal(sqlite(f.db, "SELECT count(*) FROM step WHERE id = 'stranded'"), '1');
+    assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), fix);
+    assert.equal(git(f.runnerCheckout, 'rev-parse', 'HEAD'), fix);
+    assert.ok(existsSync(join(f.fake, 'runner-up')));
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+    const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+    assert.equal(record.result, 'deployed');
+    assert.equal(record.sha, fix);
+    assert.equal(
+      f.log('probe.log').trim().split('\n').length,
+      probesBefore.trim().split('\n').length + 2,
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('held target retries once then waits for a different compatible green build', async () => {
+  const { f, target } = await heldFixture();
+  try {
+    const retry = await f.run(WATCH, []);
+    assert.equal(retry.status, 3, retry.stderr + retry.stdout);
+    assert.deepEqual(starts(f), [target, target]);
+    assert.match(journal(f), /^retried=1$/m);
+    assert.match(journal(f), /^phase=repair-required$/m);
+    assert.ok(existsSync(join(f.state, 'failed', target)));
+    pushTarget(f, 'incompatible', { [MARKER_FILE]: 'select 1;\n' });
+    const waiting = await f.run(WATCH, []);
+    assert.equal(waiting.status, 0, waiting.stderr + waiting.stdout);
+    assert.deepEqual(starts(f), [target, target]);
+    assert.equal(sentinel(f), 'preserved');
+    assert.match(journal(f), /^phase=repair-required$/m);
+    const fix = pushTarget(f, 'compatible', { [MARKER_FILE]: MARKER_SQL });
+    const done = await f.run(WATCH, []);
+    assert.equal(done.status, 0, done.stderr + done.stdout);
+    assert.deepEqual(starts(f), [target, target, fix]);
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  } finally {
+    f.close();
+  }
+});
+
+test('repair holds without probing when a local stop is unconfirmed', async () => {
+  const { f, target } = await heldFixture();
+  try {
+    pushTarget(f, 'compatible', { [MARKER_FILE]: MARKER_SQL });
+    const probes = f.log('probe.log');
+    writeFileSync(join(f.fake, 'stop-fails'), '');
+    const result = await f.run(WATCH, []);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.equal(f.log('probe.log'), probes);
+    assert.deepEqual(starts(f), [target]);
+    assert.match(journal(f), /^phase=repair-required$/m);
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'draining');
+  } finally {
+    f.close();
+  }
+});
+
+test('watcher deploys only marker-aware builds over a marked file and does not deploy on a probe error', async () => {
+  const f = await fixture();
+  try {
+    sqlite(f.db, MARKER_SQL);
+    const compatible = pushTarget(f, 'compatible', { [MARKER_FILE]: MARKER_SQL });
+    pushTarget(f, 'newer incompatible', { [MARKER_FILE]: 'select 1;\n' });
+    const result = await f.run(WATCH, []);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), compatible);
+  } finally {
+    f.close();
+  }
+  const unreadable = await fixture();
+  try {
+    sqlite(unreadable.db, MARKER_SQL);
+    probeLog(unreadable);
+    writeFileSync(join(unreadable.fake, 'probe-fails'), '');
+    pushTarget(unreadable, 'compatible', { [MARKER_FILE]: MARKER_SQL });
+    const newest = pushTarget(unreadable, 'newer incompatible', { [MARKER_FILE]: 'select 1;\n' });
+    const result = await unreadable.run(WATCH, []);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.match(result.stdout, /step marker probe failed/);
+    assert.equal(
+      readFileSync(join(unreadable.root, 'DEPLOYED_SHA'), 'utf8').trim(),
+      unreadable.previous,
+    );
+    assert.equal(serviceLog(unreadable), '');
+    const direct = await unreadable.run(DEPLOY, [newest]);
+    assert.equal(direct.status, 1, direct.stderr + direct.stdout);
+    assert.match(direct.stderr, /step marker .* unreadable/);
+    assert.equal(serviceLog(unreadable), '');
+    assert.ok(!existsSync(join(unreadable.state, 'failed', newest)));
+  } finally {
+    unreadable.close();
+  }
+});
+
+function sealedRelease(f, name, sql) {
+  const dir = join(f.dir, name);
+  mkdirSync(join(dir, 'drizzle'), { recursive: true });
+  if (sql !== null) writeFileSync(join(dir, 'drizzle', '0300_step.sql'), sql);
+  return dir;
+}
+
+test('marker-aware check accepts only an exact trigger creation outside comments and strings', async () => {
+  const f = await fixture();
+  try {
+    const accepted = [
+      MARKER_SQL,
+      `CREATE TRIGGER IF NOT EXISTS "${MARKER}"\n  BEFORE UPDATE ON step BEGIN SELECT 1; END;`,
+      `select 1;--> statement-breakpoint\ncreate trigger ${MARKER}\nbefore delete on step begin select 1; end;`,
+      `/* note */ CREATE TRIGGER \`${MARKER}\` BEFORE INSERT ON step BEGIN SELECT 1; END;`,
+    ];
+    const rejected = [
+      `-- ${MARKER_SQL}`,
+      `/* ${MARKER_SQL} */`,
+      `select 'CREATE TRIGGER ${MARKER} x';`,
+      `CREATE TRIGGER ${MARKER}_v2 BEFORE UPDATE ON step BEGIN SELECT 1; END;`,
+      `CREATE TRIGGER other_${MARKER} BEFORE UPDATE ON step BEGIN SELECT 1; END;`,
+      `CREATE TEMP TRIGGER ${MARKER} BEFORE UPDATE ON step BEGIN SELECT 1; END;`,
+      `DROP TRIGGER ${MARKER};`,
+      `CREATE TRIGGER step_require_writer_generation_delete BEFORE DELETE ON step BEGIN SELECT 1; END;`,
+      '',
+      null,
+    ];
+    for (const [index, sql] of accepted.entries()) {
+      const dir = sealedRelease(f, `accepted-${index}`, sql);
+      assert.equal((await f.run(DEPLOY, ['--marker-aware', dir])).status, 0, sql);
+    }
+    for (const [index, sql] of rejected.entries()) {
+      const dir = sealedRelease(f, `rejected-${index}`, sql);
+      assert.equal((await f.run(DEPLOY, ['--marker-aware', dir])).status, 1, String(sql));
+    }
+  } finally {
+    f.close();
+  }
+});
+
+test('a staged candidate without an exact trigger creation is not eligible to repair or deploy', async () => {
+  const { f, target } = await heldFixture();
+  try {
+    const fake = pushTarget(f, 'commented marker', {
+      [MARKER_FILE]: `-- ${MARKER_SQL}select 1;\n`,
+    });
+    const result = await f.run(WATCH, []);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.deepEqual(starts(f), [target]);
+    assert.ok(existsSync(join(f.state, 'failed', fake)));
+    assert.match(journal(f), /^phase=repair-required$/m);
+  } finally {
+    f.close();
+  }
+  const live = await fixture();
+  try {
+    sqlite(live.db, MARKER_SQL);
+    const comment = pushTarget(live, 'commented marker', {
+      [MARKER_FILE]: `-- ${MARKER_SQL}select 1;\n`,
+    });
+    const result = await live.run(DEPLOY, [comment]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.match(result.stderr, /cannot write the marked step storage/);
+    assert.equal(serviceLog(live), '');
+    assert.ok(existsSync(join(live.state, 'failed', comment)));
+  } finally {
+    live.close();
+  }
+});
+
+test('repair finalization attests the local commit, configured Runner and readable marker', async () => {
+  const scenarios = [
+    ['stale version commit', (f) => writeFileSync(join(f.fake, 'version-commit'), 'deadbee')],
+    ['drifted Runner', (f) => writeFileSync(join(f.fake, 'runner-drift'), f.previous)],
+    [
+      'unreadable marker',
+      (f) =>
+        writeFileSync(
+          join(f.fake, 'probe-fail-after'),
+          String(f.log('probe.log').trim().split('\n').length + 1),
+        ),
+    ],
+  ];
+  for (const [name, arrange] of scenarios) {
+    const { f, target } = await heldFixture({ runner: true });
+    try {
+      arrange(f);
+      const fix = pushTarget(f, 'compatible', { [MARKER_FILE]: MARKER_SQL });
+      const result = await f.run(WATCH, []);
+      assert.equal(result.status, 3, `${name}: ${result.stderr}${result.stdout}`);
+      assert.deepEqual(starts(f), [target, fix], name);
+      assert.ok(existsSync(join(f.state, 'failed', fix)), name);
+      assert.match(journal(f), /^phase=repair-required$/m);
+      assert.equal(
+        JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8')).result,
+        'repair-required',
+        name,
+      );
+      assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'draining');
+      assert.ok(!existsSync(join(f.fake, 'up')), name);
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('watcher recovers an interrupted deploy before the same-SHA exit', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f);
+    const targetRelease = writeRelease(f.releases, target, 'target');
+    rmSync(f.root, { force: true });
+    symlinkSync(targetRelease, f.root, 'dir');
+    mkdirSync(f.state, { recursive: true });
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=switched\ntarget=${target}\nprevious=${f.previous}\nsnapshot=\nrelease=${targetRelease}\nprevious_release=${realpathSync(f.previousRelease)}\n`,
+    );
+    const result = await f.run(WATCH, []);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.deepEqual(starts(f), [target]);
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  } finally {
+    f.close();
+  }
+});
+
+test('switched recovery with an unreachable server stops first and never releases another owner', async () => {
+  const setup = async () => {
+    const f = await fixture();
+    const target = pushTarget(f);
+    const targetRelease = writeRelease(f.releases, target, 'target');
+    rmSync(f.root, { force: true });
+    symlinkSync(targetRelease, f.root, 'dir');
+    mkdirSync(f.state, { recursive: true });
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=switched\ntarget=${target}\nprevious=${f.previous}\nsnapshot=\nrelease=${targetRelease}\nprevious_release=${realpathSync(f.previousRelease)}\n`,
+    );
+    writeFileSync(join(f.fake, 'lease-dead'), '');
+    return { f, target };
+  };
+  const foreign = await setup();
+  try {
+    sqlite(
+      foreign.f.db,
+      "insert into deploy_lease values ('server', 'other-owner', 'draining', 4102444800000)",
+    );
+    const result = await foreign.f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.match(serviceLog(foreign.f), /stop[\s\S]*start/);
+    assert.deepEqual(starts(foreign.f), [foreign.target]);
+    assert.ok(!existsSync(join(foreign.f.state, 'lease-owner')));
+    assert.equal(
+      sqlite(foreign.f.db, "select owner || ':' || status from deploy_lease where id='server'"),
+      'other-owner:draining',
+    );
+  } finally {
+    foreign.f.close();
+  }
+  const owned = await setup();
+  try {
+    const owner = '22222222-2222-4222-8222-222222222222';
+    sqlite(
+      owned.f.db,
+      `insert into deploy_lease values ('server', '${owner}', 'draining', 4102444800000)`,
+    );
+    writeFileSync(join(owned.f.state, 'lease-owner'), `${owner}\n`);
+    const result = await owned.f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.equal(
+      sqlite(owned.f.db, "select status from deploy_lease where id='server'"),
+      'accepting',
+    );
+  } finally {
+    owned.f.close();
+  }
+  const stuck = await setup();
+  try {
+    writeFileSync(join(stuck.f.fake, 'stop-fails'), '');
+    const before = journal(stuck.f);
+    const result = await stuck.f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.equal(journal(stuck.f), before);
+    assert.deepEqual(starts(stuck.f), []);
+  } finally {
+    stuck.f.close();
   }
 });
 

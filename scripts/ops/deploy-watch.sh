@@ -5,6 +5,7 @@ umask 077
 BUILD_CHECKOUT="${CAIRN_DEPLOY_BUILD_CHECKOUT:-${CAIRN_CHECKOUT:-$HOME/deploy-build}}"
 APP_ROOT="${CAIRN_DEPLOY_APP_ROOT:-$HOME/cairn-server}"
 STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
+DB="${CAIRN_DATA_DIR:-$HOME/.cairn/server}/server.db"
 REPO="${CAIRN_REPO:-xiechimon/cairn}"
 REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"
 SCAN_COMMITS="${CAIRN_DEPLOY_SCAN_COMMITS:-50}"
@@ -73,6 +74,12 @@ check_lag() {
   touch "$STATE/alarms/$head"
 }
 
+if [ -e "$STATE/in-progress" ]; then
+  log "recovering an interrupted deploy"
+  CAIRN_DEPLOY_RUNNING_COPY= bash "$OPS_DIR/deploy-self.sh" --recover
+  exit $?
+fi
+
 git -C "$BUILD_CHECKOUT" fetch -q --tags --force origin main
 if [ ! -e "$STATE/lock" ]; then
   git -C "$BUILD_CHECKOUT" checkout -q --detach origin/main >/dev/null 2>&1 || true
@@ -88,14 +95,25 @@ check_lag || true
 if [ "$deployed" = "$(git -C "$BUILD_CHECKOUT" rev-parse origin/main)" ]; then
   exit 0
 fi
-if [ -e "$STATE/in-progress" ]; then
-  log "recovering an interrupted deploy"
-  CAIRN_DEPLOY_RUNNING_COPY= bash "$OPS_DIR/deploy-self.sh" --recover
-  exit $?
-fi
 if [ -e "$STATE/hold" ]; then
   log "holding: $(head -n1 "$STATE/hold")"
   exit 0
+fi
+
+marker_required=0
+probe_sql="select count(*) from sqlite_master where type = 'trigger' and name = 'step_require_writer_generation_update'"
+if [ -e "$DB-shm" ] || [ -e "$DB-wal" ]; then
+  live_marker="$(sqlite3 -readonly "$DB" "$probe_sql" 2>&1)" || live_marker=error
+else
+  live_marker="$(sqlite3 "file:$DB?immutable=1" "$probe_sql" 2>&1)" || live_marker=error
+fi
+if [ "$live_marker" = error ] || { [ "$live_marker" != 0 ] && [ "$live_marker" != 1 ]; }; then
+  log "step marker probe failed: $live_marker; not deploying"
+  exit 0
+fi
+if [ "$live_marker" = 1 ] && ! bash "$OPS_DIR/deploy-self.sh" --marker-aware "$APP_ROOT"; then
+  marker_required=1
+  log "live step storage is marked but the active release cannot write it; deploying only marker-aware builds"
 fi
 
 range="$deployed..origin/main"
@@ -106,6 +124,7 @@ required_csv="${REQUIRED_CHECKS// /,}"
 target=""
 while read -r sha; do
   [ ! -e "$STATE/failed/$sha" ] || continue
+  [ "$marker_required" = 0 ] || git -C "$BUILD_CHECKOUT" grep -qiF step_require_writer_generation_update "$sha" -- 'apps/server/drizzle/*.sql' || continue
   if node "$OPS_DIR/github-ci-evidence.mjs" --repo "$REPO" --sha "$sha" --required "$required_csv" --state "$STATE" >/dev/null 2>&1; then
     target="$sha"
     break

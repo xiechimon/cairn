@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { DesktopUpdate, HostRollbackNotice } from '@cairn/shared';
 import type { ResidentHealthProbe } from './resident-host.js';
 import {
@@ -11,6 +11,14 @@ import {
   stagedBundleExists,
 } from './update-core.js';
 import { pidAlive } from './update-lock.js';
+import {
+  artifactSupportsStepMarker,
+  completeHoldPins,
+  confirmStop,
+  finishRepair,
+  holdRepair,
+  stopThenDecide,
+} from './update-repair.js';
 import { removeFolder, removeStagingFolders } from './update-staging.js';
 import {
   type InstalledUpdate,
@@ -44,6 +52,7 @@ export type BackgroundOutcome =
   | 'rolled-back'
   | 'rolled-back-code'
   | 'rollback-failed'
+  | 'repair-held'
   | 'failed';
 
 export interface BackgroundDeps {
@@ -158,7 +167,15 @@ async function runHeadlessProbation(
   statePath: string,
   installed: InstalledUpdate,
   previousPid: number | null,
-): Promise<'confirmed' | 'rolled-back' | 'rolled-back-code' | 'rollback-failed'> {
+): Promise<
+  | 'confirmed'
+  | 'unconfirmed'
+  | 'lock-busy'
+  | 'rolled-back'
+  | 'rolled-back-code'
+  | 'rollback-failed'
+  | 'repair-held'
+> {
   const probe = deps.probeHealth;
   if (probe === undefined) return 'confirmed';
   const now = deps.now ?? Date.now;
@@ -178,8 +195,15 @@ async function runHeadlessProbation(
       consecutiveFailures = 0;
       if (healthySince === null) healthySince = now();
       if (now() - healthySince >= probationMs) {
-        const current = readUpdateState(statePath);
-        writeUpdateState(statePath, { ...current, installed: null });
+        const repaired = await finishRepair(statePath, deps.bundle, installed.attemptId, deps.lock);
+        if (repaired === 'stale') {
+          deps.log(`${installed.version} is not the replacement the held repair is waiting for`);
+          return 'unconfirmed';
+        }
+        if (repaired === 'none') {
+          const current = readUpdateState(statePath);
+          writeUpdateState(statePath, { ...current, installed: null });
+        }
         await removeFolder(previousAppPath(deps.bundle)).catch((error) => {
           console.debug('cairn: recoverable operation failed', error);
         });
@@ -203,19 +227,29 @@ async function runHeadlessProbation(
 
   deps.log(`rolling back ${installed.version} to ${installed.previousVersion}: ${failureReason}`);
   const at = now();
-  let stopped = true;
-  if (deps.stopResident !== undefined) {
-    try {
-      stopped = await deps.stopResident();
-    } catch (error) {
-      stopped = false;
-      deps.log(
-        `rollback stop resident failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  const decision = await stopThenDecide({
+    stop: deps.stopResident,
+    held: readUpdateState(statePath).repair != null,
+    cairnHome: join(deps.userData, 'home'),
+    previousApp: installed.previousApp,
+    log: deps.log,
+  });
+  if (!decision.proceed) {
+    const held = await holdRepair({
+      statePath,
+      bundle: deps.bundle,
+      installed,
+      reason: failureReason,
+      at,
+      lock: deps.lock,
+    });
+    if (held === 'busy') return 'lock-busy';
+    if (held === 'stale') return 'unconfirmed';
+    deps.log(`holding ${installed.version}: no previous app was activated`);
+    return decision.stopped ? 'repair-held' : 'rollback-failed';
   }
   const hasWrites =
-    stopped && installed.dbSnapshot != null && deps.hasDomainWrites !== undefined
+    installed.dbSnapshot != null && deps.hasDomainWrites !== undefined
       ? await deps.hasDomainWrites(installed.dbSnapshot)
       : false;
   let bundleRestored = false;
@@ -232,10 +266,9 @@ async function runHeadlessProbation(
     );
   }
 
-  let dbRestored = stopped;
+  let dbRestored = true;
   if (
     bundleRestored &&
-    stopped &&
     !hasWrites &&
     installed.dbSnapshot != null &&
     deps.restoreDb !== undefined
@@ -272,7 +305,7 @@ async function runHeadlessProbation(
     failureReason,
     deps.logPath ?? statePath,
     at,
-    bundleRestored && stopped && restoredHealthy && !hasWrites,
+    bundleRestored && restoredHealthy && !hasWrites,
   );
   deps.onRollback?.(notice);
   if (!bundleRestored || !dbRestored || !restoredHealthy) return 'rollback-failed';
@@ -294,7 +327,7 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
       }
       if (deps.probeHealth !== undefined) {
         let leaseHeld = false;
-        if (deps.acquireLease !== undefined) {
+        if (state.repair == null && deps.acquireLease !== undefined) {
           leaseHeld = await deps.acquireLease();
           if (!leaseHeld) {
             deps.log(`holding rollback check for ${version}: could not acquire deploy lease`);
@@ -302,7 +335,26 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
           }
         }
         try {
-          return await runHeadlessProbation(deps, statePath, state.installed, null);
+          if (state.repair == null) {
+            return await runHeadlessProbation(deps, statePath, state.installed, null);
+          }
+          const release = await deps.lock();
+          if (release === null) return 'lock-busy';
+          let resumed: InstalledUpdate;
+          try {
+            const current = readUpdateState(statePath);
+            if (
+              current.installed?.attemptId !== state.installed.attemptId ||
+              current.repair?.attemptId !== state.repair.attemptId
+            ) {
+              return 'unconfirmed';
+            }
+            resumed = { ...state.installed, guardOwner: 'background-agent', guardPid: process.pid };
+            writeUpdateState(statePath, { ...current, installed: resumed });
+          } finally {
+            release();
+          }
+          return await runHeadlessProbation(deps, statePath, resumed, null);
         } finally {
           if (leaseHeld) await deps.releaseLease?.();
         }
@@ -316,6 +368,7 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
     deps.log(note);
     writeUpdateState(statePath, { ...readUpdateState(statePath), knownVersion: version });
   }
+  const repair = state.repair ?? null;
   let staged: StagedUpdate | null = null;
   let leaseHeld = false;
   try {
@@ -337,8 +390,14 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
       }
       writeUpdateState(statePath, { ...readUpdateState(statePath), staged });
     }
+    if (repair !== null && !(await artifactSupportsStepMarker(staged.app))) {
+      deps.log(
+        `holding ${staged.version}: it cannot write the step storage a failed update changed`,
+      );
+      return 'repair-held';
+    }
     await deps.verify(staged);
-    if (deps.acquireLease !== undefined) {
+    if (repair === null && deps.acquireLease !== undefined) {
       leaseHeld = await deps.acquireLease();
       if (!leaseHeld) {
         deps.log(`holding ${staged.version}: could not acquire deploy lease`);
@@ -347,7 +406,7 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
     }
     let busy = false;
     try {
-      busy = await deps.residentBusy();
+      busy = repair === null && (await deps.residentBusy());
     } catch (error) {
       deps.log(
         `holding ${staged.version}: resident busy probe failed (${error instanceof Error ? error.message : String(error)})`,
@@ -359,12 +418,23 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
       return 'resident-busy';
     }
     const previousHealth = deps.probeHealth !== undefined ? await deps.probeHealth() : null;
-    const dbSnapshot = deps.snapshotDb !== undefined ? await deps.snapshotDb(version) : null;
+    const dbSnapshot =
+      repair === null && deps.snapshotDb !== undefined ? await deps.snapshotDb(version) : null;
     const release = await deps.lock();
     if (release === null) return 'lock-busy';
     let installedRecord: InstalledUpdate;
     try {
       if (deps.appRunning()) return 'app-running';
+      if (repair !== null) {
+        if (readUpdateState(statePath).repair?.attemptId !== repair.attemptId) {
+          return 'repair-held';
+        }
+        await completeHoldPins(deps.bundle, repair);
+        if (!(await confirmStop(deps.stopResident, deps.log))) {
+          deps.log(`holding ${staged.version}: the resident server did not confirm it stopped`);
+          return 'repair-held';
+        }
+      }
       const installed = await deps.swap(staged, version);
       installedRecord = {
         ...installed,

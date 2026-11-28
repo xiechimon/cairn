@@ -27,6 +27,7 @@ import { finishQuit } from '../src/quit-steps.js';
 import { hasDomainWritesSinceSnapshot, snapshotResidentDb } from '../src/resident-host.js';
 import { swapInStaged, verifyStaged } from '../src/update-core.js';
 import { acquireUpdateLock, updateLockPath } from '../src/update-lock.js';
+import { createsStepMarker } from '../src/update-repair.js';
 import { STAGING_PREFIX } from '../src/update-staging.js';
 import {
   emptyUpdateState,
@@ -35,7 +36,7 @@ import {
   updateStatePath,
   writeUpdateState,
 } from '../src/update-state.js';
-import { readBundleVersion } from '../src/update-swap.js';
+import { PREVIOUS_DIR, readBundleVersion } from '../src/update-swap.js';
 import { buildUpdaterPlist, ensureUpdaterAgent } from '../src/updater-agent.js';
 
 const roots: string[] = [];
@@ -291,6 +292,33 @@ describe('a download Cairn already has when it opens', () => {
     expect(verdict).toBe('relaunch');
     expect(await readBundleVersion(bundle)).toBe('1.1.0');
     expect(readUpdateState(updateStatePath(userData)).installed?.version).toBe('1.1.0');
+  });
+
+  test('is left to the background updater while a failed update is held', async () => {
+    const { bundle, userData } = mac('1.1.0');
+    const staged = await stageFake(bundle, '1.2.0', '1.1.0');
+    const repair = {
+      attemptId: 'a',
+      failedVersion: '1.1.0',
+      previousVersion: '1.0.0',
+      pinnedApp: join(dirname(bundle), '.cairn-previous', 'held-a', 'Cairn.app'),
+      pinnedSnapshot: null,
+      reason: 'failed',
+      at: 1,
+      replacement: null,
+    };
+    writeUpdateState(updateStatePath(userData), { ...emptyUpdateState(), staged, repair });
+    const verdict = await settleBundleAtLaunch({
+      bundle,
+      userData,
+      runningVersion: '1.1.0',
+      settled: false,
+      verify: async () => 'accepted',
+      log: () => {},
+    });
+    expect(verdict).toBe('continue');
+    expect(await readBundleVersion(bundle)).toBe('1.1.0');
+    expect(readUpdateState(updateStatePath(userData)).installed).toBeNull();
   });
 
   test('a download signed by someone else is dropped and the old version opens', async () => {
@@ -637,6 +665,274 @@ describe('headless resident probation, lease drain, DB snapshot, and rollback', 
     expect(readUpdateState(updateStatePath(userData)).blocked?.version).toBe('1.1.0');
   });
 
+  test('does not re-activate an old bundle as writable when a failed update fenced the step store', async () => {
+    const { bundle, userData } = mac();
+    const cairnHome = join(userData, 'home');
+    const serverDir = join(cairnHome, 'server');
+    mkdirSync(serverDir, { recursive: true });
+    const dbPath = join(serverDir, 'server.db');
+    const sqlite = (sql: string) =>
+      execFileSync('/usr/bin/sqlite3', [dbPath, sql], { encoding: 'utf8' }).trim();
+    sqlite('CREATE TABLE step(id TEXT PRIMARY KEY, note TEXT);');
+    const started: string[] = [];
+    let clock = 100_000;
+    const w = world(bundle, userData);
+    w.deps.snapshotDb = (version) => snapshotResidentDb(cairnHome, version, clock);
+    w.deps.hasDomainWrites = (path) => hasDomainWritesSinceSnapshot(cairnHome, path);
+    w.deps.stopResident = async () => true;
+    w.deps.restartResident = async () => {
+      const version = (await readBundleVersion(bundle)) ?? '';
+      started.push(version);
+      if (version === '1.1.0') {
+        sqlite(`BEGIN;
+          INSERT INTO step VALUES ('accepted-after', 'preserved');
+          CREATE TRIGGER step_require_writer_generation_update BEFORE UPDATE ON step
+          BEGIN SELECT cairn_step_write_generation(); END;
+          COMMIT;`);
+      }
+    };
+    w.deps.probeHealth = async () => ({
+      ok: started.at(-1) !== '1.1.0',
+      version: started.at(-1) ?? '1.0.0',
+      pid: started.at(-1) === '1.1.0' ? 222 : 111,
+      busy: false,
+    });
+    w.deps.now = () => clock;
+    w.deps.sleep = async (ms) => {
+      clock += ms;
+    };
+
+    const outcome = await runBackgroundUpdate(w.deps);
+    expect(sqlite('SELECT id FROM step;')).toBe('accepted-after');
+    expect(started).toEqual(['1.1.0']);
+    expect(outcome).not.toBe('rolled-back-code');
+    expect(readUpdateState(updateStatePath(userData)).notice).toBeNull();
+  });
+
+  function fencedStepStore(previousSupportsMarker = false) {
+    const { bundle, userData } = mac();
+    if (previousSupportsMarker) markerAware(bundle);
+    const cairnHome = join(userData, 'home');
+    const serverDir = join(cairnHome, 'server');
+    mkdirSync(serverDir, { recursive: true });
+    const sqlite = (sql: string) =>
+      execFileSync('/usr/bin/sqlite3', [join(serverDir, 'server.db'), sql], {
+        encoding: 'utf8',
+      }).trim();
+    sqlite('CREATE TABLE step(id TEXT PRIMARY KEY, note TEXT);');
+    const started: string[] = [];
+    const clock = { now: 100_000 };
+    const w = world(bundle, userData);
+    w.deps.snapshotDb = (version) => snapshotResidentDb(cairnHome, version, clock.now);
+    w.deps.hasDomainWrites = (path) => hasDomainWritesSinceSnapshot(cairnHome, path);
+    w.deps.stopResident = async () => true;
+    w.deps.restartResident = async () => {
+      const version = (await readBundleVersion(bundle)) ?? '';
+      started.push(version);
+      if (version === '1.1.0') {
+        sqlite(`BEGIN;
+          INSERT INTO step VALUES ('accepted-after', 'preserved');
+          CREATE TRIGGER step_require_writer_generation_update BEFORE UPDATE ON step
+          BEGIN SELECT cairn_step_write_generation(); END;
+          COMMIT;`);
+      }
+    };
+    w.deps.probeHealth = async () => ({
+      ok: started.at(-1) !== '1.1.0',
+      version: started.at(-1) ?? '1.0.0',
+      pid: started.length + 100,
+      busy: false,
+    });
+    w.deps.now = () => clock.now;
+    w.deps.sleep = async (ms) => {
+      clock.now += ms;
+    };
+    return { bundle, userData, w, started, sqlite, heldRoot: join(dirname(bundle), PREVIOUS_DIR) };
+  }
+
+  const markerAware = (app: string): void => {
+    mkdirSync(join(app, 'Contents', 'Resources', 'server', 'drizzle'), { recursive: true });
+    writeFileSync(
+      join(app, 'Contents', 'Resources', 'server', 'drizzle', '0099_step.sql'),
+      'CREATE TRIGGER step_require_writer_generation_update BEFORE UPDATE ON step BEGIN SELECT 1; END;',
+    );
+  };
+
+  test('holds the failed candidate and pins the original bundle and snapshot after a fenced step store', async () => {
+    const { bundle, userData, w, started, sqlite, heldRoot } = fencedStepStore();
+    expect(await runBackgroundUpdate(w.deps)).toBe('repair-held');
+    expect(started).toEqual(['1.1.0']);
+    expect(sqlite('SELECT id FROM step;')).toBe('accepted-after');
+    expect(await readBundleVersion(bundle)).toBe('1.1.0');
+    const state = readUpdateState(updateStatePath(userData));
+    expect(state.installed).toBeNull();
+    expect(state.notice).toBeNull();
+    expect(state.blocked?.version).toBe('1.1.0');
+    const repair = state.repair;
+    expect(repair).toMatchObject({ failedVersion: '1.1.0', previousVersion: '1.0.0' });
+    expect(repair?.pinnedApp).toBe(join(heldRoot, `held-${repair?.attemptId}`, 'Cairn.app'));
+    expect(await readBundleVersion(repair?.pinnedApp ?? '')).toBe('1.0.0');
+    expect(existsSync(join(heldRoot, 'Cairn.app'))).toBe(false);
+    expect(existsSync(repair?.pinnedSnapshot ?? '')).toBe(true);
+  });
+
+  test('an unconfirmed stop touches neither bundle and holds', async () => {
+    const { bundle, userData, w, started } = fencedStepStore(true);
+    let restored = 0;
+    w.deps.stopResident = async () => false;
+    w.deps.restoreBundle = async () => {
+      restored += 1;
+      return '';
+    };
+    expect(await runBackgroundUpdate(w.deps)).toBe('rollback-failed');
+    expect(restored).toBe(0);
+    expect(started).toEqual(['1.1.0']);
+    expect(await readBundleVersion(bundle)).toBe('1.1.0');
+    const state = readUpdateState(updateStatePath(userData));
+    expect(state.repair?.failedVersion).toBe('1.1.0');
+    expect(state.notice).toBeNull();
+  });
+
+  test('still rolls the code back when the previous bundle can write the fenced step store', async () => {
+    const { bundle, userData, w, started } = fencedStepStore(true);
+    expect(await runBackgroundUpdate(w.deps)).toBe('rolled-back-code');
+    expect(started).toEqual(['1.1.0', '1.0.0']);
+    expect(await readBundleVersion(bundle)).toBe('1.0.0');
+    const state = readUpdateState(updateStatePath(userData));
+    expect(state.repair ?? null).toBeNull();
+    expect(state.notice?.restoredVersion).toBe('1.0.0');
+  });
+
+  describe('forward recovery from a held update', () => {
+    async function heldWorld() {
+      const fixture = fencedStepStore();
+      expect(await runBackgroundUpdate(fixture.w.deps)).toBe('repair-held');
+      const { w, bundle, userData } = fixture;
+      const calls = { lease: 0, busy: 0 };
+      w.deps.acquireLease = async () => {
+        calls.lease += 1;
+        return false;
+      };
+      w.deps.residentBusy = async () => {
+        calls.busy += 1;
+        return true;
+      };
+      w.deps.stage = async (update, from) => {
+        const staged = await stageFake(bundle, update.version, from);
+        if (update.version === '1.2.0') markerAware(staged.app);
+        return staged;
+      };
+      w.release.offered = '1.2.0';
+      w.deps.probeHealth = async () => ({
+        ok: true,
+        version: fixture.started.at(-1) ?? null,
+        pid: fixture.started.length + 100,
+        busy: false,
+      });
+      return { ...fixture, calls, state: () => readUpdateState(updateStatePath(userData)) };
+    }
+
+    test('held update retries the next compatible signed build without stale busy', async () => {
+      const held = await heldWorld();
+      const { w, bundle, started, sqlite, calls, state } = held;
+      const pinned = state().repair?.pinnedApp ?? '';
+      expect(await runBackgroundUpdate(w.deps)).toBe('confirmed');
+      expect(calls).toEqual({ lease: 0, busy: 0 });
+      expect(started).toEqual(['1.1.0', '1.2.0']);
+      expect(await readBundleVersion(bundle)).toBe('1.2.0');
+      expect(sqlite('SELECT id FROM step;')).toBe('accepted-after');
+      expect(state().repair ?? null).toBeNull();
+      expect(state().installed).toBeNull();
+      expect(existsSync(pinned)).toBe(false);
+    });
+
+    test('keeps the hold, the pins and the candidate when the next build is not compatible or the stop is unconfirmed', async () => {
+      const held = await heldWorld();
+      const { w, bundle, started, state } = held;
+      const pinned = state().repair?.pinnedApp ?? '';
+      w.deps.stage = async (update, from) => stageFake(bundle, update.version, from);
+      expect(await runBackgroundUpdate(w.deps)).toBe('repair-held');
+      expect(await readBundleVersion(bundle)).toBe('1.1.0');
+      w.deps.stage = async (update, from) => {
+        const staged = await stageFake(bundle, update.version, from);
+        markerAware(staged.app);
+        return staged;
+      };
+      w.release.offered = '1.3.0';
+      w.deps.stopResident = async () => false;
+      expect(await runBackgroundUpdate(w.deps)).toBe('repair-held');
+      expect(await readBundleVersion(bundle)).toBe('1.1.0');
+      expect(started).toEqual(['1.1.0']);
+      expect(state().repair?.pinnedApp).toBe(pinned);
+      expect(await readBundleVersion(pinned)).toBe('1.0.0');
+    });
+
+    test('a failed replacement keeps the hold and pins without a restored notice', async () => {
+      const held = await heldWorld();
+      const { w, bundle, started, state } = held;
+      const pinned = state().repair?.pinnedApp ?? '';
+      w.deps.probeHealth = async () => ({ ok: false, version: null, pid: null, busy: false });
+      w.deps.probationDeadlineMs = 10_000;
+      expect(await runBackgroundUpdate(w.deps)).toBe('repair-held');
+      expect(started).toEqual(['1.1.0', '1.2.0']);
+      expect(await readBundleVersion(bundle)).toBe('1.2.0');
+      expect(state().notice).toBeNull();
+      expect(state().repair?.pinnedApp).toBe(pinned);
+      expect(await readBundleVersion(pinned)).toBe('1.0.0');
+    });
+
+    test('a failed replacement confirms the stop again instead of assuming it', async () => {
+      const held = await heldWorld();
+      const { w, bundle, state } = held;
+      let stops = 0;
+      w.deps.stopResident = async () => {
+        stops += 1;
+        return stops === 1;
+      };
+      w.deps.probeHealth = async () => ({ ok: false, version: null, pid: null, busy: false });
+      w.deps.probationDeadlineMs = 10_000;
+      expect(await runBackgroundUpdate(w.deps)).toBe('rollback-failed');
+      expect(stops).toBe(2);
+      expect(await readBundleVersion(bundle)).toBe('1.2.0');
+      expect(state().repair?.replacement).toBeNull();
+      expect(state().notice).toBeNull();
+    });
+
+    test("late probation cannot release another attempt's repair", async () => {
+      const { bundle, userData, w, heldRoot } = fencedStepStore();
+      writeBundle(bundle, '1.2.0');
+      const pinnedApp = join(heldRoot, 'held-first', 'Cairn.app');
+      writeBundle(pinnedApp, '1.0.0');
+      writeUpdateState(updateStatePath(userData), {
+        ...emptyUpdateState(),
+        knownVersion: '1.2.0',
+        installed: {
+          version: '1.2.0',
+          previousVersion: '1.1.0',
+          previousApp: join(heldRoot, 'Cairn.app'),
+          at: 1,
+          attemptId: 'late',
+        },
+        repair: {
+          attemptId: 'first',
+          failedVersion: '1.1.0',
+          previousVersion: '1.0.0',
+          pinnedApp,
+          pinnedSnapshot: null,
+          reason: 'failed',
+          at: 1,
+          replacement: { version: '1.2.0', attemptId: 'current' },
+        },
+      });
+      w.deps.probeHealth = async () => ({ ok: true, version: '1.2.0', pid: 999, busy: false });
+      expect(await runBackgroundUpdate(w.deps)).toBe('unconfirmed');
+      const state = readUpdateState(updateStatePath(userData));
+      expect(state.repair?.replacement?.attemptId).toBe('current');
+      expect(state.installed?.attemptId).toBe('late');
+      expect(await readBundleVersion(pinnedApp)).toBe('1.0.0');
+    });
+  });
+
   test('reports rollback-failed without looping when restored old code also fails to boot', async () => {
     const { bundle, root, userData } = mac('1.0.0');
     const snapshotFile = join(root, 'preupdate-1.0.0.db');
@@ -813,5 +1109,31 @@ describe('headless resident probation, lease drain, DB snapshot, and rollback', 
     const wDesktopOnly = world(b4, u4);
     expect(wDesktopOnly.deps.probeHealth).toBeUndefined();
     expect(await runBackgroundUpdate(wDesktopOnly.deps)).toBe('installed');
+  });
+});
+
+describe('the step marker in a bundled migration', () => {
+  const create = 'CREATE TRIGGER step_require_writer_generation_update BEFORE UPDATE ON step';
+  test.each([
+    create,
+    `CREATE TABLE t(x);\n--> statement-breakpoint\n${create} BEGIN SELECT 1; END;`,
+    'CREATE TRIGGER IF NOT EXISTS "step_require_writer_generation_update"\nBEFORE UPDATE ON step',
+    'create temp trigger main.[step_require_writer_generation_update] before update on step',
+  ])('is recognised in %s', (sql) => {
+    expect(createsStepMarker(sql)).toBe(true);
+  });
+
+  test.each([
+    'CREATE TRIGGER step_require_writer_generation_update_v2 BEFORE UPDATE ON step',
+    'CREATE TRIGGER step_require_writer_generation_updated BEFORE UPDATE ON step',
+    'CREATE TRIGGER other_step_require_writer_generation_update BEFORE UPDATE ON step',
+    `-- ${create}`,
+    `/* ${create} */ SELECT 1;`,
+    `SELECT '${create}';`,
+    `CREATE TABLE t(x); -- ${create}`,
+    'DROP TRIGGER step_require_writer_generation_update;',
+    'CREATE TRIGGER step_require_writer_generation_update',
+  ])('is not recognised in %s', (sql) => {
+    expect(createsStepMarker(sql)).toBe(false);
   });
 });

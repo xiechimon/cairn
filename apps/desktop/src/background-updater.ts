@@ -202,7 +202,7 @@ async function main(): Promise<void> {
     writeStatus('up-to-date', null, null, null);
   } else if (outcome === 'rolled-back' || outcome === 'rolled-back-code') {
     writeStatus('idle', null, null, 'blocked');
-  } else if (outcome === 'rollback-failed') {
+  } else if (outcome === 'rollback-failed' || outcome === 'repair-held') {
     writeStatus('failed', null, null, 'failed');
   } else if (outcome === 'current') {
     writeStatus('up-to-date', null, null, request === null ? null : 'no-release');

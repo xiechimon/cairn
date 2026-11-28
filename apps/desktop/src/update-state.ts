@@ -39,12 +39,29 @@ export interface UpdateNotice {
   at: number;
 }
 
+export interface RepairReplacement {
+  version: string;
+  attemptId: string;
+}
+
+export interface RepairHold {
+  attemptId: string;
+  failedVersion: string;
+  previousVersion: string;
+  pinnedApp: string;
+  pinnedSnapshot: string | null;
+  reason: string;
+  at: number;
+  replacement: RepairReplacement | null;
+}
+
 export interface UpdateState {
   staged: StagedUpdate | null;
   installed: InstalledUpdate | null;
   blocked: BlockedUpdate | null;
   notice: UpdateNotice | null;
   knownVersion: string | null;
+  repair?: RepairHold | null;
 }
 
 export function updateStatePath(userData: string): string {
@@ -144,7 +161,37 @@ export function parseUpdateState(text: string): UpdateState {
       : null,
   );
   const knownVersion = isText(rows.knownVersion) ? rows.knownVersion : null;
-  return { staged, installed, blocked, notice, knownVersion };
+  const repair = field<RepairHold>(rows.repair, (row) =>
+    isText(row.attemptId) &&
+    isText(row.failedVersion) &&
+    isText(row.previousVersion) &&
+    isText(row.pinnedApp) &&
+    isText(row.reason) &&
+    isTime(row.at)
+      ? {
+          attemptId: row.attemptId,
+          failedVersion: row.failedVersion,
+          previousVersion: row.previousVersion,
+          pinnedApp: row.pinnedApp,
+          pinnedSnapshot: isText(row.pinnedSnapshot) ? row.pinnedSnapshot : null,
+          reason: row.reason,
+          at: row.at,
+          replacement: field<RepairReplacement>(row.replacement, (found) =>
+            isText(found.version) && isText(found.attemptId)
+              ? { version: found.version, attemptId: found.attemptId }
+              : null,
+          ),
+        }
+      : null,
+  );
+  return {
+    staged,
+    installed,
+    blocked,
+    notice,
+    knownVersion,
+    ...(repair === null ? {} : { repair }),
+  };
 }
 
 export function readUpdateState(path: string): UpdateState {

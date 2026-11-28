@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants, createWriteStream, existsSync } from 'node:fs';
 import { access, mkdtemp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -152,7 +152,6 @@ export async function verifyStaged(
       `the staged app is version ${version ?? 'unknown'}, not ${staged.version}`,
     );
   }
-  await removeFolder(previousAppPath(bundle));
 }
 
 export async function swapInStaged(
@@ -161,9 +160,11 @@ export async function swapInStaged(
   runningVersion: string,
   now: () => number = Date.now,
 ): Promise<InstalledUpdate> {
+  const previousApp = previousAppPath(bundle);
+  await removeFolder(previousApp);
   await applyStagedUpdate({
     bundle,
-    previousApp: previousAppPath(bundle),
+    previousApp,
     stagedApp: staged.app,
   });
   return {
@@ -175,7 +176,17 @@ export async function swapInStaged(
 }
 
 export function afterSwap(state: UpdateState, installed: InstalledUpdate): UpdateState {
-  return { ...state, staged: null, installed, knownVersion: installed.version };
+  if (state.repair == null) {
+    return { ...state, staged: null, installed, knownVersion: installed.version };
+  }
+  const attemptId = installed.attemptId ?? randomUUID();
+  return {
+    ...state,
+    staged: null,
+    installed: { ...installed, attemptId },
+    knownVersion: installed.version,
+    repair: { ...state.repair, replacement: { version: installed.version, attemptId } },
+  };
 }
 
 export async function folderWritable(bundle: string): Promise<boolean> {

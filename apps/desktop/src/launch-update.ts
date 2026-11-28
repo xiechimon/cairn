@@ -41,6 +41,7 @@ export async function settleBundleAtLaunch(context: LaunchContext): Promise<Laun
     if (
       staged !== null &&
       state.installed === null &&
+      state.repair == null &&
       stagedBundleExists(staged) &&
       (await folderWritable(bundle))
     ) {
@@ -62,6 +63,9 @@ export async function settleBundleAtLaunch(context: LaunchContext): Promise<Laun
     }
   }
   const state = readUpdateState(statePath);
+  if (state.repair != null && stagedFor(state, runningVersion) !== null) {
+    log('left the downloaded update to the background updater while a failed update is held');
+  }
   const note = outsideUpdaterNote(state, runningVersion);
   if (note !== null) log(note);
   if (state.knownVersion !== runningVersion) {

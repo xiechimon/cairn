@@ -159,6 +159,7 @@ import {
   probeResidentServer,
   readServerOwner,
   resolveResidentAtBoot,
+  stopResidentHost,
   uninstallResidentHost,
   waitForResidentExit,
   waitForResidentServer,
@@ -204,6 +205,7 @@ import {
 import { installDesktopUpdate } from './update-ipc.js';
 import { acquireUpdateLock, pidAlive, updateLockPath } from './update-lock.js';
 import { appendUpdateLog, updateLogPath } from './update-log.js';
+import { finishRepair, holdRepair, stopThenDecide } from './update-repair.js';
 import { removeFolder, removeFolderAfterExit } from './update-staging.js';
 import {
   readUpdateState,
@@ -1923,6 +1925,21 @@ function takeRollbackNotice(userData: string): UpdateNotice | null {
   return notice;
 }
 
+async function stopLocalServer(): Promise<boolean> {
+  const running = server;
+  if (running !== null) {
+    await stopServer(running);
+    if (running.exitCode === null) return false;
+    if (server === running) server = null;
+    clearServerOwner(cairnHome(), process.pid);
+    return true;
+  }
+  const owner = readServerOwner(cairnHome());
+  if (owner === null || !pidAlive(owner.pid) || owner.pid === process.pid) return true;
+  if (owner.managedBy !== 'launchd') return false;
+  return stopResidentHost({ homeDir: homedir(), cairnHome: cairnHome() });
+}
+
 function armVersionGuard(userData: string): VersionGuard | null {
   const statePath = updateStatePath(userData);
   const state = readUpdateState(statePath);
@@ -1938,9 +1955,11 @@ function armVersionGuard(userData: string): VersionGuard | null {
   }
   if (installed === null || installed.version !== app.getVersion()) {
     if (installed !== null) writeUpdateState(statePath, { ...state, installed: null });
-    void removeFolder(previousAppPath(bundle)).catch((error) => {
-      console.debug('cairn: recoverable operation failed', error);
-    });
+    if (state.repair == null) {
+      void removeFolder(previousAppPath(bundle)).catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
+    }
     return null;
   }
   writeUpdateState(statePath, {
@@ -1961,6 +1980,32 @@ function armVersionGuard(userData: string): VersionGuard | null {
     rolling = true;
     const previousApp = previousAppPath(bundle);
     try {
+      const decision = await stopThenDecide({
+        stop: stopLocalServer,
+        held: readUpdateState(statePath).repair != null,
+        cairnHome: cairnHome(),
+        previousApp,
+        log: (line) => appendUpdateLog(userData, line),
+      });
+      if (!decision.proceed) {
+        const held = await holdRepair({
+          statePath,
+          bundle,
+          installed,
+          reason,
+          at: Date.now(),
+          lock: () => acquireUpdateLock(updateLockPath(userData), 'app', 15_000),
+        });
+        if (held === 'busy') throw new Error('another Cairn update is being installed');
+        appendUpdateLog(
+          userData,
+          `held ${installed.version}: ${reason} No previous app was activated.`,
+        );
+        const copy = couldNotStartCopy(await windowLocale(), reason);
+        dialog.showErrorBox(copy.title, copy.detail);
+        app.exit(1);
+        return 'rollback';
+      }
       if ((await readBundleVersion(previousApp)) !== installed.previousVersion) {
         throw new Error(
           `${previousApp} is not the copy of ${installed.previousVersion} Cairn kept`,
@@ -2002,8 +2047,17 @@ function armVersionGuard(userData: string): VersionGuard | null {
     return 'rollback';
   };
   const confirm = async (): Promise<GuardAction> => {
+    const repaired = await finishRepair(statePath, bundle, installed.attemptId, () =>
+      acquireUpdateLock(updateLockPath(userData), 'app', 15_000),
+    );
+    if (repaired === 'stale') {
+      appendUpdateLog(userData, `${installed.version} is not the replacement the repair awaits`);
+      return 'confirm';
+    }
     appendUpdateLog(userData, `${installed.version} started and stayed healthy`);
-    writeUpdateState(statePath, { ...readUpdateState(statePath), installed: null });
+    if (repaired === 'none') {
+      writeUpdateState(statePath, { ...readUpdateState(statePath), installed: null });
+    }
     await removeFolder(previousAppPath(bundle)).catch((error) => {
       console.debug('cairn: recoverable operation failed', error);
     });
@@ -2115,9 +2169,9 @@ async function settleLaunch(userData: string): Promise<LaunchVerdict> {
   return verdict;
 }
 
-function keepUpdaterAgent(userData: string): void {
-  if (!IS_MAC || !app.isPackaged) return;
-  void updateBlocker(runningBundle())
+function keepUpdaterAgent(userData: string): Promise<void> {
+  if (!IS_MAC || !app.isPackaged) return Promise.resolve();
+  return updateBlocker(runningBundle())
     .then(async (blocker) => {
       if (blocker !== null) return;
       const result = await ensureUpdaterAgent({
@@ -2195,6 +2249,26 @@ async function boot(): Promise<void> {
         desktopCairnHome: cairnHome(),
         homeDir: homedir(),
       });
+
+    const heldRepair = readUpdateState(updateStatePath(userData)).repair ?? null;
+    if (
+      activeConn.kind === 'local' &&
+      heldRepair !== null &&
+      heldRepair.replacement === null &&
+      (app.getVersion() === heldRepair.failedVersion ||
+        app.getVersion() === readUpdateState(updateStatePath(userData)).blocked?.version)
+    ) {
+      appendUpdateLog(
+        userData,
+        `not starting a local server from ${app.getVersion()} while its failed update is held`,
+      );
+      await keepUpdaterAgent(userData);
+      quitting = true;
+      const copy = couldNotStartCopy(await windowLocale(), heldRepair.reason);
+      dialog.showErrorBox(copy.title, copy.detail);
+      app.exit(1);
+      return;
+    }
 
     if (activeConn.kind === 'remote') {
       activeRemoteHostName = activeConn.name;
@@ -2581,8 +2655,10 @@ async function boot(): Promise<void> {
     watchIdleUpdate(activeRunnerHome);
     const restore = takeRelaunchWindow();
     if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);
-    if (server === null) confirmAfterBoot(guard);
-    keepUpdaterAgent(userData);
+    if (server === null && readUpdateState(updateStatePath(userData)).repair == null) {
+      confirmAfterBoot(guard);
+    }
+    void keepUpdaterAgent(userData);
   } catch (error) {
     const reason = messageOf(error);
     if (guard !== null) {

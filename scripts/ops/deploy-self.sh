@@ -9,6 +9,30 @@ USAGE
   exit 2
 }
 
+marker_aware_check() {
+  node -e '
+const fs = require("node:fs");
+const path = require("node:path");
+const dir = path.join(process.argv[1] || "", "drizzle");
+let sql = "";
+try {
+  for (const name of fs.readdirSync(dir).filter((n) => n.endsWith(".sql")).sort()) {
+    sql += fs.readFileSync(path.join(dir, name), "utf8") + "\n";
+  }
+} catch {
+  process.exit(1);
+}
+sql = sql.replace(/\/\*[\s\S]*?\*\/|--[^\n]*|\x27(?:[^\x27]|\x27\x27)*\x27/g, " ");
+const creates = /(?:^|[\s;])create\s+trigger\s+(?:if\s+not\s+exists\s+)?["`\[]?step_require_writer_generation_update["`\]]?(?=[\s;]|$)/i;
+process.exit(creates.test(sql) ? 0 : 1);
+' "$1"
+}
+
+if [ "${1:-}" = --marker-aware ]; then
+  marker_aware_check "${2:-}"
+  exit $?
+fi
+
 [ $# -eq 1 ] || usage
 RECOVER_ONLY=0
 TARGET="$1"
@@ -82,6 +106,18 @@ if [ -s "$STATE/lease-owner" ]; then
 fi
 RUNNER_PREVIOUS=""
 RUNNER_CHECKOUT_DIRTY=0
+LEASE_FROZEN=0
+STOP_FIRST=0
+JOURNAL_PHASE=repair-required
+REASON=""
+REPAIR_RETRIED=0
+HELD_TARGET=""
+HELD_RELEASE=""
+CANDIDATE=""
+CANDIDATE_RELEASE=""
+MARKER_STATE=error
+SCAN_COMMITS="${CAIRN_DEPLOY_SCAN_COMMITS:-50}"
+STEP_MARKER=step_require_writer_generation_update
 
 sqlite_ro() {
   local path="$1" sql="$2"
@@ -102,17 +138,22 @@ owner_token() {
     sed -E "s/[[:space:]]+$//; s/^\"(.*)\"$/\\1/; s/^'(.*)'$/\\1/"
 }
 
-lease_request() {
+auth_config() {
   local token
   token="$(owner_token)"
   token="${token//\\/\\\\}"
   token="${token//\"/\\\"}"
-  { [ -z "$token" ] || printf 'header = "Authorization: Bearer %s"\n' "$token"; } |
+  [ -z "$token" ] || printf 'header = "Authorization: Bearer %s"\n' "$token"
+}
+
+lease_request() {
+  auth_config |
     curl -sS --noproxy '*' --max-time 10 -K - -o "$STATE/lease-response" -w '%{http_code}' \
       -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
 }
 
 release_lease() {
+  [ "$LEASE_FROZEN" = 0 ] || return 0
   [ -n "$LEASE_OWNER" ] || return 0
   [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || return 1
   lease_request -X DELETE --data-binary "{\"owner\":\"$LEASE_OWNER\"}" >/dev/null 2>&1 || true
@@ -286,8 +327,9 @@ restore_app_link() {
 }
 
 set_in_progress() {
-  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nrelease=%s\nprevious_release=%s\nrunner_previous=%s\n' \
-    "$1" "$TARGET" "$PREVIOUS" "${2:-}" "${3:-}" "${4:-}" "${RUNNER_PREVIOUS:-}" >"$IN_PROGRESS.tmp"
+  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nrelease=%s\nprevious_release=%s\nrunner_previous=%s\nreason=%s\nretried=%s\ncandidate=%s\ncandidate_release=%s\n' \
+    "$1" "${HELD_TARGET:-$TARGET}" "$PREVIOUS" "${2:-}" "${3:-}" "${4:-}" "${RUNNER_PREVIOUS:-}" \
+    "$REASON" "$REPAIR_RETRIED" "$CANDIDATE" "$CANDIDATE_RELEASE" >"$IN_PROGRESS.tmp"
   mv "$IN_PROGRESS.tmp" "$IN_PROGRESS"
 }
 
@@ -327,14 +369,20 @@ active_work_count() {
 }
 
 acquire_lease() {
-  [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(node -e 'process.stdout.write(crypto.randomUUID())')"
+  local status fresh=0
+  [ -n "$LEASE_OWNER" ] || { LEASE_OWNER="$(node -e 'process.stdout.write(crypto.randomUUID())')"; fresh=1; }
   printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
-  local status
   status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
   case "$status" in
     200) ;;
     404) refuse "server lacks the deployment lease endpoint" ;;
-    000 | '') refuse "no response to the deployment lease request" ;;
+    000 | '')
+      if [ "${ALLOW_DEAD_HTTP:-0}" = 1 ]; then
+        if [ "$fresh" = 1 ]; then LEASE_OWNER=""; rm -f "$STATE/lease-owner"; fi
+        return 1
+      fi
+      refuse "no response to the deployment lease request"
+      ;;
     *) refuse "deployment lease request answered HTTP $status" ;;
   esac
 }
@@ -392,6 +440,7 @@ rehearse_migrations() {
 
 stage_release() {
   RELEASE_DIR="$RELEASES/$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
+  [ ! -e "$RELEASE_DIR" ] || RELEASE_DIR="$RELEASE_DIR-$$"
   node "$OPS_DIR/stage-server-artifact.mjs" "$BUILD_CHECKOUT" "$RELEASE_DIR" "$TARGET" || return 1
   local sidecar
   for sidecar in "$PREVIOUS_RELEASE"/tsnet-sidecar*; do
@@ -510,8 +559,49 @@ critical() {
   exit "$EXIT_ROLLBACK_UNHEALTHY"
 }
 
+marker_state() {
+  local count
+  [ -s "$DB" ] || { echo error; return 0; }
+  count="$(sqlite_ro "$DB" "select count(*) from sqlite_master where type = 'trigger' and name = '$STEP_MARKER'" 2>/dev/null)" ||
+    { echo error; return 0; }
+  case "$count" in 0) echo absent ;; 1) echo present ;; *) echo error ;; esac
+}
+
+artifact_marker_aware() {
+  marker_aware_check "$1"
+}
+
+previous_may_open_live_db() {
+  MARKER_STATE="$(marker_state)"
+  case "$MARKER_STATE" in
+    absent) return 0 ;;
+    present) artifact_marker_aware "$PREVIOUS_RELEASE" ;;
+    *) return 1 ;;
+  esac
+}
+
+hold_repair() {
+  LEASE_FROZEN=1
+  REASON="${1//$'\n'/ }"
+  set_in_progress "$JOURNAL_PHASE" "${SNAPSHOT:-}" "${HELD_RELEASE:-${RELEASE_DIR:-}}" "${PREVIOUS_RELEASE:-}"
+  write_record "${HELD_TARGET:-$TARGET}" "$PREVIOUS" repair-required "${HELD_TARGET:-$TARGET}" "${SNAPSHOT:-}" || true
+  echo "CRITICAL: $REASON; step storage kept, old code not started" >&2
+  exit "$EXIT_ROLLBACK_UNHEALTHY"
+}
+
+freeze_unconfirmed() {
+  LEASE_FROZEN=1
+  echo "CRITICAL: $1" >&2
+  exit "$EXIT_ROLLBACK_UNHEALTHY"
+}
+
 restart_previous() {
   log "restarting $PREVIOUS: $1"
+  if [ "$STOP_FIRST" = 1 ]; then
+    runner_stop || hold_repair "could not stop the runner before restarting $PREVIOUS"
+    service_stop || hold_repair "could not stop the server before restarting $PREVIOUS"
+    previous_may_open_live_db || hold_repair "step storage is marked and $PREVIOUS may not write it; $1"
+  fi
   restore_app_link || true
   if [ -n "$RUNNER_CHECKOUT" ] && [ -n "$RUNNER_PREVIOUS" ]; then
     restore_runner_checkout "$RUNNER_PREVIOUS" || true
@@ -527,9 +617,10 @@ restart_previous() {
 roll_back() {
   local reason="$1" failed_dir
   log "rolling back to $PREVIOUS: $reason"
+  runner_stop || hold_repair "could not stop the runner to roll back $TARGET"
+  service_stop || hold_repair "could not stop the server to roll back $TARGET"
+  previous_may_open_live_db || hold_repair "step storage is marked and $PREVIOUS may not write it; $reason"
   mark_failed "$TARGET" "$reason"
-  runner_stop || critical "could not stop runner to roll back $TARGET"
-  service_stop || critical "could not stop services to roll back $TARGET"
   restore_app_link || critical "could not point the application path at $PREVIOUS_RELEASE"
   restore_runner_checkout "$RUNNER_PREVIOUS" || critical "could not restore runner checkout to $RUNNER_PREVIOUS"
   if writes_after_snapshot "$SNAPSHOT"; then
@@ -574,6 +665,10 @@ recover_interrupted() {
       release) release="$value" ;;
       previous_release) previous_release="$value" ;;
       runner_previous) runner_prev="$value" ;;
+      reason) REASON="$value" ;;
+      retried) REPAIR_RETRIED="$value" ;;
+      candidate) CANDIDATE="$value" ;;
+      candidate_release) CANDIDATE_RELEASE="$value" ;;
     esac
   done <"$IN_PROGRESS"
   SNAPSHOT="$snapshot"
@@ -581,6 +676,9 @@ recover_interrupted() {
   PREVIOUS_RELEASE="$previous_release"
   RUNNER_PREVIOUS="${runner_prev:-$PREVIOUS}"
   log "recovering an interrupted deploy of $TARGET (phase $phase)"
+  case "$phase" in
+    repair-required | repairing) JOURNAL_PHASE="$phase"; repair_forward ;;
+  esac
   if [ "$phase" = building ]; then
     if [ -n "$RUNNER_CHECKOUT" ] && [ -n "$RUNNER_PREVIOUS" ]; then
       restore_runner_checkout "$RUNNER_PREVIOUS" || true
@@ -588,10 +686,13 @@ recover_interrupted() {
     clear_in_progress
     return 0
   fi
-  acquire_lease
+  if [ "$phase" != restoring ] && [ "$phase" != restored ] && ! ALLOW_DEAD_HTTP=1 acquire_lease; then
+    runner_stop || freeze_unconfirmed "could not confirm the runner stopped with the server unreachable"
+    service_stop || freeze_unconfirmed "could not confirm the server stopped while it was unreachable"
+  fi
   if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
-    runner_stop || critical "could not stop runner during recovery"
-    service_stop || critical "could not stop services during recovery"
+    runner_stop || freeze_unconfirmed "could not confirm the runner stopped during recovery"
+    service_stop || freeze_unconfirmed "could not confirm the server stopped during recovery"
     restore_app_link || critical "could not restore the previous application path"
     restore_runner_checkout "$RUNNER_PREVIOUS" || critical "could not restore runner checkout during recovery"
     if [ "$phase" = restoring ]; then
@@ -613,7 +714,103 @@ recover_interrupted() {
     [ -s "$SNAPSHOT" ] && roll_back "interrupted deploy was unhealthy"
   fi
   [ -s "$SNAPSHOT" ] && roll_back "interrupted deploy had no healthy target"
+  STOP_FIRST=1
   restart_previous "interrupted deploy had no snapshot"
+}
+
+build_candidate() {
+  check_out_target && install_dependencies_in "$BUILD_CHECKOUT" && rehearse_migrations && build_target && stage_release && prepare_runner
+}
+
+select_repair_candidate() {
+  local sha required_csv="${REQUIRED_CHECKS// /,}"
+  git -C "$BUILD_CHECKOUT" fetch -q --tags --force origin main || return 1
+  while read -r sha; do
+    [ ! -e "$STATE/failed/$sha" ] || continue
+    [ "$sha" != "$HELD_TARGET" ] || [ "$REPAIR_RETRIED" = 0 ] || continue
+    git -C "$BUILD_CHECKOUT" grep -qiF "$STEP_MARKER" "$sha" -- 'apps/server/drizzle/*.sql' || continue
+    node "$OPS_DIR/github-ci-evidence.mjs" --repo "$REPO" --sha "$sha" --required "$required_csv" --state "$STATE" >/dev/null 2>&1 || continue
+    CANDIDATE="$sha"
+    [ "$sha" != "$HELD_TARGET" ] || REPAIR_RETRIED=1
+    return 0
+  done < <(git -C "$BUILD_CHECKOUT" rev-list --first-parent --max-count "$SCAN_COMMITS" origin/main)
+  return 1
+}
+
+repair_failed() {
+  mark_failed "$CANDIDATE" "$1"
+  CANDIDATE=""
+  CANDIDATE_RELEASE=""
+  JOURNAL_PHASE=repair-required
+  hold_repair "$1"
+}
+
+local_version_commit() {
+  health_url_is_loopback || return 1
+  auth_config |
+    curl -fsS --noproxy '*' --max-time 10 -K - -H "Origin: $HEALTH_URL" "$HEALTH_URL/api/server/version" |
+    sed -nE 's/.*"commit"[[:space:]]*:[[:space:]]*"([0-9a-f]{7,40})".*/\1/p'
+}
+
+repair_attested() {
+  local commit
+  commit="$(local_version_commit)" || return 1
+  [ -n "$commit" ] && [[ "$CANDIDATE" == "$commit"* ]] || return 1
+  [ -z "$RUNNER_CHECKOUT" ] || [ "$(git -C "$RUNNER_CHECKOUT" rev-parse HEAD 2>/dev/null)" = "$CANDIDATE" ] || return 1
+  [ "$(marker_state)" = present ]
+}
+
+repair_succeeded() {
+  LEASE_FROZEN=0
+  RUNNER_CHECKOUT_DIRTY=0
+  RELEASE_DIR="$CANDIDATE_RELEASE"
+  TARGET="$CANDIDATE"
+  write_record "$CANDIDATE" "$HELD_TARGET" deployed "" "${SNAPSHOT:-}" || hold_repair "could not release the frozen lease after repair"
+  clear_in_progress
+  prune_old
+  log "rolled forward to $CANDIDATE after $HELD_TARGET held the step storage"
+  exit 0
+}
+
+repair_forward() {
+  LEASE_FROZEN=1
+  HELD_TARGET="$TARGET"
+  HELD_RELEASE="$RELEASE_DIR"
+  [ -s "$DB" ] || hold_repair "live database is missing; refusing to start an empty one"
+  if [ "$JOURNAL_PHASE" = repairing ] && [ -n "$CANDIDATE_RELEASE" ] &&
+    [ "$(real_path "$APP_ROOT" 2>/dev/null || echo missing)" = "$(real_path "$CANDIDATE_RELEASE" 2>/dev/null || echo none)" ] &&
+    [ "$(probe /app)" = 200 ] && server_healthy && runner_healthy && repair_attested; then
+    repair_succeeded
+  fi
+  runner_stop || hold_repair "could not confirm the runner stopped"
+  service_stop || hold_repair "could not confirm the server stopped"
+  if previous_may_open_live_db; then
+    LEASE_FROZEN=0
+    roll_back "${REASON:-held deploy of $TARGET}"
+  fi
+  [ "$MARKER_STATE" = present ] || hold_repair "the step marker on the live database is unreadable"
+  if [ "$JOURNAL_PHASE" = repairing ] && [ -f "$CANDIDATE_RELEASE/DEPLOYED_SHA" ] && artifact_marker_aware "$CANDIDATE_RELEASE"; then
+    RELEASE_DIR="$CANDIDATE_RELEASE"
+  else
+    CANDIDATE=""
+    if ! select_repair_candidate; then
+      log "holding $TARGET: waiting for a different compatible green build"
+      exit 0
+    fi
+    TARGET="$CANDIDATE"
+    build_candidate && artifact_marker_aware "$RELEASE_DIR" || repair_failed "candidate $CANDIDATE could not be built with the step marker"
+    CANDIDATE_RELEASE="$RELEASE_DIR"
+    JOURNAL_PHASE=repairing
+    set_in_progress repairing "${SNAPSHOT:-}" "$HELD_RELEASE" "$PREVIOUS_RELEASE"
+  fi
+  TARGET="$CANDIDATE"
+  atomic_link "$CANDIDATE_RELEASE" || repair_failed "could not point the application path at $CANDIDATE"
+  if service_start && server_healthy && runner_start && runner_healthy && repair_attested; then
+    repair_succeeded
+  fi
+  runner_stop || true
+  service_stop || true
+  repair_failed "candidate $CANDIDATE did not attest its commit, Runner and step marker"
 }
 
 [[ "$COORDINATOR_WAIT_SECONDS" =~ ^[0-9]+$ ]] || refuse "coordinator wait must be a nonnegative integer"
@@ -645,10 +842,22 @@ evidence_error="$(node "$OPS_DIR/github-ci-evidence.mjs" --repo "$REPO" --sha "$
 prepare_previous_release
 log "building $TARGET"
 set_in_progress building
-if ! check_out_target || ! install_dependencies_in "$BUILD_CHECKOUT" || ! rehearse_migrations || ! build_target || ! stage_release || ! prepare_runner; then
+if ! build_candidate; then
   mark_failed "$TARGET" "install, build, runner prepare, or migration rehearsal failed"
   clear_in_progress
   echo "install, build, runner prepare, or migration rehearsal failed for $TARGET; running services untouched" >&2
+  exit 1
+fi
+live_marker="$(marker_state)"
+if [ "$live_marker" = error ]; then
+  clear_in_progress
+  echo "the step marker on the live database is unreadable; running services untouched" >&2
+  exit 1
+fi
+if [ "$live_marker" = present ] && ! artifact_marker_aware "$RELEASE_DIR"; then
+  mark_failed "$TARGET" "the live database is marked and the staged artifact cannot write it"
+  clear_in_progress
+  echo "$TARGET cannot write the marked step storage; running services untouched" >&2
   exit 1
 fi
 clear_in_progress

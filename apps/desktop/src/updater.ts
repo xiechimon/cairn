@@ -229,6 +229,14 @@ export function createUpdater(
       return;
     }
     if (current.status === 'restarting') return;
+    if (state.repair != null) {
+      if (when === 'foreground') {
+        const message = 'a held update is waiting for the background updater';
+        set({ status: 'error', message });
+        throw new Error(message);
+      }
+      return;
+    }
     if (process.platform === 'win32') {
       try {
         if (!existsSync(staged.app)) {
