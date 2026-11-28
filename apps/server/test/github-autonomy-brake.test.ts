@@ -17,7 +17,6 @@ import {
 } from '../src/services/github-autonomy-brake.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { recentRecoveryTarget } from '../src/services/github-recovery.js';
-import { newGateReadCache } from '../src/services/merge-gate/github-facts.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, req } from './helpers.js';
 
@@ -315,7 +314,7 @@ test('marker pause creates the label and issue once, and never closes a marker',
   ]);
 });
 test('an open marker is cached for 60 seconds, scoped by repository, and failures fail closed', async () => {
-  const cache = newGateReadCache();
+  const cache = new Map();
   let count = 0;
   const fetchImpl: typeof fetch = async () => {
     count++;
@@ -390,7 +389,7 @@ test('marker lookup paginates past labelled pull requests', async () => {
       }) as typeof fetch,
       'token',
       'owner/repo',
-      newGateReadCache(),
+      new Map(),
       0,
     ),
   ).toBe(true);

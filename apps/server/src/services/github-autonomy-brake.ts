@@ -9,7 +9,6 @@ import { newRecordId } from '../lib/ids.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
 import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
-import type { GateReadCache } from './merge-gate/github-facts.js';
 
 export function brakeRequest(
   fetchImpl: FetchLike,
@@ -273,10 +272,10 @@ export async function readGithubAutonomyPause(
   fetchImpl: FetchLike,
   token: string,
   repo: string,
-  cache?: GateReadCache,
+  cache?: Map<string, { at: number; paused: boolean }>,
   now = Date.now(),
 ): Promise<boolean> {
-  const cached = cache?.autonomyPause.get(repo);
+  const cached = cache?.get(repo);
   if (cached !== undefined && now >= cached.at && now - cached.at < 60_000) return cached.paused;
   let paused = true;
   try {
@@ -284,6 +283,6 @@ export async function readGithubAutonomyPause(
   } catch {
     return true;
   }
-  cache?.autonomyPause.set(repo, { at: now, paused });
+  cache?.set(repo, { at: now, paused });
   return paused;
 }

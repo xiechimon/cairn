@@ -37,16 +37,13 @@ export interface RawEvent {
 }
 
 export interface GateAnswers {
-  pull: (n: number, o: { etag: string | null }) => GateRaw;
   branch: (name: string, o: { etag: string | null }) => GateRaw;
   rules: (name: string, o: { page: number; perPage: number; etag: string | null }) => GateRaw;
-  compare: (base: string, head: string, o: { page: number; perPage: number }) => GateRaw;
   checkRuns: (sha: string, o: { page: number; perPage: number; etag: string | null }) => GateRaw;
   combinedStatus: (
     sha: string,
     o: { page: number; perPage: number; etag: string | null },
   ) => GateRaw;
-  contents: (path: string, ref: string) => GateRaw;
 }
 
 interface GithubFakeOptions {
@@ -365,13 +362,10 @@ export function githubFake(repo: string, options: GithubFakeOptions = {}) {
     }
   };
   const port: GateGithubPort = {
-    pull: (n, o) => call('pull', [n, o], () => options.gate?.pull(n, o) ?? MISSING_GATE_ANSWER),
     branch: (name, o) =>
       call('branch', [name, o], () => options.gate?.branch(name, o) ?? MISSING_GATE_ANSWER),
     branchRules: (name, o) =>
       call('rules', [name, o], () => options.gate?.rules(name, o) ?? MISSING_GATE_ANSWER),
-    compare: (b, h, o) =>
-      call('compare', [b, h, o], () => options.gate?.compare(b, h, o) ?? MISSING_GATE_ANSWER),
     checkRuns: (sha, o) =>
       call('checkRuns', [sha, o], () => options.gate?.checkRuns(sha, o) ?? MISSING_GATE_ANSWER),
     combinedStatus: (sha, o) =>
@@ -380,9 +374,6 @@ export function githubFake(repo: string, options: GithubFakeOptions = {}) {
         [sha, o],
         () => options.gate?.combinedStatus(sha, o) ?? MISSING_GATE_ANSWER,
       ),
-    contents: (path, ref) =>
-      call('contents', [path, ref], () => options.gate?.contents(path, ref) ?? MISSING_GATE_ANSWER),
-    createStatus: () => Promise.reject(new Error('the shell never writes')),
   };
 
   return {

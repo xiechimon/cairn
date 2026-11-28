@@ -1,6 +1,6 @@
 # Server backup and recovery (#1151, #2163)
 
-The server's SQLite database is the source of truth for todos, threads and review records, the attachments directory holds the files those records point to, and `repos/` holds the only copy of every hosted project's git repository. Built-in daily backups on Mac hosts are managed by `apps/server/src/services/backup-service.ts`, while `scripts/ops/backup-server-db.sh` remains the supported standalone CLI for off-site copies (RPO 1 hour). This page is the runbook for that CLI script, the receiver on dmit, recovery, and the reference Linux systemd setup from the former `omarchy` host (torn down 2026-11-18).
+The server's SQLite database is the source of truth for todos, threads and review records, the attachments directory holds the files those records point to, and `repos/` holds the only copy of every hosted project's git repository. Built-in daily backups on Mac hosts are managed by `apps/server/src/services/backup-service.ts`, while `scripts/ops/backup-server-db.sh` remains the supported standalone CLI for off-site copies (RPO 1 hour). This page is the runbook for that CLI script, the receiver on dmit, and recovery.
 
 What is not in the backup:
 
@@ -39,46 +39,9 @@ The self-test runs the script against a real rrsync receiver started through a f
 PATH=/opt/homebrew/opt/rsync/bin:$PATH node --test scripts/ops/backup-server-db.test.mjs
 ```
 
-## Reference Linux systemd setup (retired omarchy host)
+## Scheduling off-site backups
 
-Status: the `omarchy` host this setup ran on was torn down on 2026-11-18; Mac hosts use the server's built-in backup service instead. Kept as reference for Linux systemd deployments.
-
-The server ran on omarchy as user `ian` with no `CAIRN_HOME`, so its data lived in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `repos/`, `secretbox.key`) and its skills in `~/.cairn/skills`. The host wrapper `~/.cairn/tools/backup/db-backup.sh` derives both paths from `CAIRN_HOME` the way the server does. Local backups go to `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/`, `skills/` and `repos/`. The wrapper takes `CAIRN_BACKUP_REMOTE` as an SSH host and appends `:db/`, `:repos/` and the other paths itself, so the value is `dmit-backup` with no trailing colon; `dmit-backup:` turns each destination into `dmit-backup::db/`, which rsync reads as daemon mode on port 873 and fails with `getaddrinfo: dmit-backup 873`.
-
-`~/.config/systemd/user/cairn-db-backup.service`:
-
-```ini
-[Unit]
-Description=Cairn server DB and attachments backup
-Documentation=https://github.com/xiechimon/cairn/blob/main/docs/ops-db-backup.md
-
-[Service]
-Type=oneshot
-UMask=0077
-Nice=10
-StandardOutput=append:%h/.local/state/cairn-db-backup.log
-StandardError=append:%h/.local/state/cairn-db-backup.log
-Environment=CAIRN_BACKUP_REMOTE=dmit-backup
-ExecStart=%h/.cairn/tools/backup/db-backup.sh
-ExecStopPost=%h/.cairn/tools/backup/record-backup-status.sh --status %h/.cairn/server/backup-status.json
-TimeoutStartSec=30min
-```
-
-`~/.config/systemd/user/cairn-db-backup.timer`:
-
-```ini
-[Unit]
-Description=Hourly cairn server DB and attachments backup
-
-[Timer]
-OnCalendar=hourly
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-```
-
-Enable with `systemctl --user daemon-reload && systemctl --user enable --now cairn-db-backup.timer`. `Persistent=true` runs a missed hour right after boot. Output goes to `~/.local/state/cairn-db-backup.log` instead of the journal on Linux hosts where the user journal stops recording.
+If you need off-site copies, schedule the standalone CLI on the server host with its local scheduler. Use the running server's actual data paths (`CAIRN_HOME` defaults to `~/.cairn`), explicit output directories, and an rsync destination such as `dmit-backup:backup-root`. Keep the local output private and separate from the server data directory. Run hourly for a one-hour recovery point, and check the exit status after the first scheduled run.
 
 ### Path to dmit
 
@@ -133,23 +96,17 @@ Room, historical measurement on the retired `omarchy` host on 2026-10-29: a DB c
 
 A stopped or failing backup shows up as a warning banner above the home page and the board. It sits in the banner slot rather than the daily brief because the brief only renders once the home chat has messages from an earlier day. Every run records its result, and the server reads that record:
 
-- The backup unit runs `scripts/ops/record-backup-status.sh --status <server data dir>/backup-status.json` as `ExecStopPost=`. systemd runs it after every run, including failures and timeout kills, and passes the run's result in `SERVICE_RESULT` / `EXIT_STATUS`. The script atomically writes the host, the run time, the result and the last successful run time; a failed run keeps the previous success time.
+- For an operator-managed systemd job, run `scripts/ops/record-backup-status.sh --status <server data dir>/backup-status.json` as `ExecStopPost=`. systemd runs it after every run, including failures and timeout kills, and passes the run's result in `SERVICE_RESULT` / `EXIT_STATUS`. The script atomically writes the host, the run time, the result and the last successful run time; a failed run keeps the previous success time.
 - The status file sits next to `server.db`, in the data dir of the server it describes. A server that moves with its data dir brings a status that then goes stale, and a backup of a leftover DB copy writes its status next to that copy, not next to the live one.
 - The server serves the record at `GET /api/server/backup`. The banner appears when the latest run failed (at once, naming the systemd result), when the last success is older than 2 hours (the timer stopped or the machine is down), or when the status file cannot be read. A data dir without a status file has never recorded a backup, and no banner appears there. The web reads the record on load and every 5 minutes.
 
-Add the line to the backup service from the "Scheduling" section:
-
-```ini
-ExecStopPost=%h/cairn/scripts/ops/record-backup-status.sh --status %h/.cairn/server/backup-status.json
-```
-
-Check: after the next run, `cat <server data dir>/backup-status.json` shows `"lastRunResult":"success"`. When using the Linux systemd setup, install `record-backup-status.sh` beside `~/.cairn/tools/backup/db-backup.sh`.
+After the next successful run, check that `<server data dir>/backup-status.json` shows `"lastRunResult":"success"`.
 
 ## Recovery
 
 The push key on the sender is write-only, so a restore never uses it. Take the newest local backup copy if it survived, otherwise from dmit as root (from the Mac: `scp dmit:/home/cairnbak/cairn-backups/db/<newest>.db.gz .`).
 
-1. Stop writes: `systemctl --user stop cairn-server.service` and `systemctl --user stop cairn-db-backup.timer`.
+1. Stop the Cairn server using the service manager or Compose project that started it. Pause any scheduled standalone backup so it cannot copy a partially restored data directory.
 2. `gunzip` the copy and check it: `sqlite3 server.db 'PRAGMA integrity_check;'` must print `ok`.
 3. Rename the old `~/.cairn/server/server.db` (and its `-wal` / `-shm` files) aside as a record, then move the restored file into place.
 4. Restore attachments: `rsync -a --exclude=step-sessions <backup>/attachments/ ~/.cairn/server/attachments/` from `~/backups/cairn-server/attachments/`, or as root from `/home/cairnbak/cairn-backups/attachments/` on dmit. For each step in `<backup>/attachments/step-sessions/`, copy its newest version (highest `<mtime>`; on a tie, the longer transcript) back to `step-sessions/<step>.jsonl`. Files without a version in the name come from before #2163 and are the oldest.
@@ -167,7 +124,7 @@ The push key on the sender is write-only, so a restore never uses it. Take the n
 
    For a `<name>.empty`, run `git init --bare "$dir"` instead of the clone and skip `remote remove`; the other three lines are the same.
 7. If `secretbox.key` is gone too, put back ian's own copy (mode 600). Without the matching key, stored secrets cannot be decrypted.
-8. `systemctl --user start cairn-server.service`, open the web UI and check that recent todos are there, check that the daemons reconnect, then start the backup timer again.
+8. Restart Cairn. Open the web UI, check that recent tasks are present and Runners reconnect, then resume scheduled backups.
 
 ## Drill discipline
 
@@ -177,9 +134,8 @@ Drills always run on a copy, never on the running server: fetch a backup, `gunzi
 
 When a backup fails or does not run on time, look in this order:
 
-1. `tail -n 30 ~/.local/state/cairn-db-backup.log`. A good run ends with `backup done`; a failed run prints `FAIL <step>`.
-2. `systemctl --user status cairn-db-backup.service` for the last result and exit code, and `systemctl --user --failed` to see whether the unit is failed. If `journalctl --user -u` is empty on a Linux host, try `journalctl _SYSTEMD_USER_UNIT=cairn-db-backup.service`.
-3. If nothing ran, `systemctl --user list-timers cairn-db-backup.timer` shows whether the timer is enabled and when it fires next.
+1. Check the status file beside `server.db` and the backup job's output. A successful standalone run ends with `backup done`; a failed run prints `FAIL <step>`.
+2. If nothing ran, check whether your scheduler is enabled and when it last ran the backup job.
 
 For a failed push:
 

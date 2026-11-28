@@ -1,11 +1,11 @@
 ---
 name: verify-merge-gate
-description: TLA+ model checking (TLC, one command ~75 seconds) of cairn's merge gate and local landing. Use when changing mergeReadiness's verdict binding (headSha / patchDigest), the independent-review head rule, planGateStatusWrite, apiMergeGate / mergeThroughGithub (the REST merge and its `sha` pin), applyMergeLanding, decideLocalMerge, landLocalMerge, or localMergeAuthorizationRefusal / localMergeRecheckAuthorization; judge whether a change makes "a merge landing on a patch no verdict judged", "a stale verdict satisfying the gate", or "a local landing without the re-checks" better or worse.
+description: TLA+ model checking for Cairn's local landing, plus a historical model of the retired verdict gate. Use when changing applyMergeLanding, decideLocalMerge, landLocalMerge, localMergeAuthorizationRefusal or localMergeRecheckAuthorization.
 ---
 
 # verify-merge-gate
 
-Two decisions can put code on a default branch: the gate merges a GitHub PR (`mergeThroughGithub`, a REST merge pinned to a commit) and a machine lands a local project (`landLocalMerge`, or `applyMergeLanding` for hosted projects). `mergeReadiness` and `decideLocalMerge` specify the verdict decisions. Between a decision and a landing the head can move or another verdict can arrive. Unit tests cover the orderings their author wrote; these models walk all orderings within a bounded range.
+Cairn pins GitHub PR merges to the checkpoint SHA and checks the requirements at that head. Local landing uses `decideLocalMerge` and then rechecks before committing. The local model walks bounded interleavings of that live path; the verdict model is a historical experiment, not a check of today's GitHub merge policy.
 
 Models: `model/MergeGate.tla` (GitHub merge path), `model/LocalLanding.tla` (local landing), `model/RepeatedVerdict.tla` (repeated-verdict regression) and `model/ReviewHeadCausality.tla` (review-head causality). One configuration per property: `model/P*.cfg`. Expected results: `expected.txt`. The action-to-code correspondence lives only in this file.
 
@@ -57,7 +57,7 @@ Each negative control drops exactly the guard its property names, and its counte
 
 Checked against the code on 2026-11-16. The full write-ups, including the reasoning, are in `evidence/findings.md`, a snapshot taken when each was found. Numbers follow that file; F3 and F5 are no longer true and are omitted here.
 
-- **F1 (P4, live gap)**: `mergeThroughGithub` through `apiMergeGate` (`build-github-merge.ts`) merges with the checkpoint pin alone (`pull.headSha === checkpoint`, `sha: checkpoint`). Neither it nor `build-merge-request.ts` references `mergeReadiness` or any verdict, so the digest is not re-derived at merge time. No code calls `mergeReadiness` any more: the run entry that used to call it is deleted and the verdict settlement retired with `bce9ba43a`, so the GitHub path never consults a verdict (F3). The other blockers the model assumes satisfied are read-side inputs only. The P4 counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
+- **F1 (P4, historical model)**: `mergeThroughGithub` merges with a checkpoint SHA pin and GitHub required checks, not a Cairn verdict or digest. The modeled `Evaluate`, `BaseMoveInteracting`, merge sequence illustrates why a patch-based system would need to re-derive its digest.
 - **F2 (P1H, model-only)**: dropping only the review-head equality still yields a counterexample, so the head check is load-bearing on its own. In the code both conditions are one conjunction in the same filter.
 - **F4 (local path, wired)**: `enqueueLocalMerge` (`local-merge.ts`) judges through `localGateFacts`; `landLocalMerge` (`apps/daemon/src/local-merge.ts`) calls `decideLocalMerge` before building the candidate and again before landing, then runs the `authorize` round-trip (`localMergeRecheck` in `step-local-merge.ts` -> `POST /api/machine/local-merge-recheck/:stepId` -> `localMergeRecheckAuthorization`) and lands through `landGitSquash`, which updates the ref with `git update-ref --stdin`. The earlier audit recorded that the update carries the expected old value, so the fast-forward check and the update are one step; this was not re-audited.
 - **F6 (hosted landing, not covered by P3)**: `applyMergeLanding` (`machine-merge-landing.ts`, hosted projects) awaits `isAncestor`, then several checks, then a separate `updateBranchRef`, so an intervening advance can be overwritten. The reproduction is `evidence/local-landing-race.json`. See F6 before using this model to accept a change to that path.
@@ -78,12 +78,12 @@ The server is single-process with synchronous SQLite writes, so code between two
 
 `MergeGate.tla`:
 
-- `RecordVerdict(k, outcome, head)`: a verdict row bound to `(head, dgst)`. The write side was retired with the settlement in `bce9ba43a`: nothing writes verdict rows today, and `mergeReadiness` has no production caller, so on the GitHub path the set stays empty. The retired reader kept only verdicts whose `patchDigest` equalled the evaluated digest, and required `headSha === head` for the independent review. An earlier block was never overwritten by a later pass.
+- `RecordVerdict(k, outcome, head)`: model-only; adds a verdict bound to `(head, dgst)`. Nothing writes these verdicts on today's GitHub merge path.
 - `PushCode`: head and digest both move; earlier verdicts stay in the table but no longer match.
 - `PushEvidence`: an evidence-only commit moves the head but not the digest, which is why the review-head rule needs its own binding.
 - `UpdateBranch`: the PR branch takes the moved base, getting a fresh head and clearing the stored evaluation. The branch does not need to be synced for readiness — the `pr-behind-base` blocker was retired with `requireUpToDate` (#5337).
 - `BaseMoveBenign` / `BaseMoveInteracting`: the default branch moves; the compare base changes, so the recomputed digest can change while the PR head stays put. A stored gate status is not rewritten by a base move.
-- `Evaluate`: `mergeReadiness` computing which digests the gate accepted. Its other blockers (required checks, evidence links, the recording requirement, rounds, availability) are per-read predicates assumed satisfied. The status write that used to publish this onto `readiness.headSha` was retired with the settlement (`bce9ba43a`); the model folds it into `ReadyAt`.
+- `Evaluate`: model-only; collects eligible digests in `ReadyAt`. There is no current status write or verdict evaluator.
 - `ExecuteMergeGithub`: `mergeThroughGithub` with its `sha: checkpoint` pin. `MergeRechecksDigest` says whether this action also re-derives the digest; on this path the code does not (F1).
 
 `LocalLanding.tla`:
@@ -127,7 +127,6 @@ Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mer
   apps/server/src/services/merge-gate/github-facts.ts
   apps/server/src/services/merge-gate/github-port.ts
   apps/server/src/services/merge-gate/paths.ts
-  apps/server/src/services/merge-gate/evidence-link.ts
   apps/server/src/services/merge-gate/model-identity.ts
   apps/server/src/services/merge-gate/model-roster-data.ts
   apps/server/src/services/merge-gate-github.ts

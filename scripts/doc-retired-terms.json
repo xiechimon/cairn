@@ -145,10 +145,34 @@
       "reason": "the omarchy host lane scripts are deleted; lanes and heavy slots live in docs/ops/worktrees-and-ports.md and mini-test"
     },
     {
+      "id": "omarchy-unit-templates",
+      "pattern": "scripts/ops/systemd/cairn-(?:daemon\\.service|server\\.service|self-deploy\\.(?:service|timer))|\\bcairn-(?:daemon-orb\\.service|db-backup\\.(?:service|timer))\\b",
+      "canary": "cairn-daemon-orb.service",
+      "reason": "the Omarchy unit templates are gone; use the current server installation and backup runbooks"
+    },
+    {
+      "id": "omarchy-backup-wrapper",
+      "pattern": "\\.cairn/tools/backup/db-backup\\.sh",
+      "canary": "~/.cairn/tools/backup/db-backup.sh",
+      "reason": "use the server's built-in backup or scripts/ops/backup-server-db.sh directly"
+    },
+    {
+      "id": "single-candidate-promote-cli",
+      "pattern": "\\bnode\\s+(?:\\./)?scripts/ops/promote-queue\\.mjs(?:\\s|`|$)",
+      "canary": "node scripts/ops/promote-queue.mjs",
+      "reason": "the old promotion CLI is gone; the file is an imported helper module, and push-queue is the landing CLI"
+    },
+    {
       "id": "build-merge-verdict-hook",
       "pattern": "\\bmergeVerdict\\b",
       "canary": "BuildDeps.mergeVerdict",
       "reason": "the unwired build dependency was removed; the retired merge-gate verdict settlement has no read-side hook on a build"
+    },
+    {
+      "id": "merge-gate-verdict-evaluator",
+      "pattern": "\\b(?:mergeReadiness|readGateGithubFacts|qualifyingEvidenceLinks|correctionDoneCheck)\\b|merge-gate/evidence-link\\.ts",
+      "canary": "mergeReadiness(build)",
+      "reason": "the verdict evaluator and its private inputs were removed; GitHub merges still enforce required checks at the pinned head"
     },
     {
       "id": "run-turn-list",
@@ -216,6 +240,9 @@
     "base-ui-theme-spec": {},
     "retired-design-rule-skills": {},
     "hygiene-draft-release-deletion": {},
+    "merge-gate-verdict-evaluator": {
+      ".claude/skills/verify-merge-gate/evidence/findings.md": 5
+    },
     "run-turn-list": {},
     "machine-rotate-token-ui": {}
   }

@@ -13,7 +13,7 @@ export async function assertMergeRequiredChecks(
   head: string,
 ): Promise<void> {
   const port = githubGateReadPort(fetchImpl, token, repo.owner, repo.repo, 10_000);
-  const checks = await readRequiredChecksAt(port, repo, branch, head);
+  const checks = await readRequiredChecksAt(port, branch, head);
   const blockers: string[] = [];
   requiredChecksReadiness(head, checks, (code, ...detail) => {
     if (code === 'required-checks-none') return;

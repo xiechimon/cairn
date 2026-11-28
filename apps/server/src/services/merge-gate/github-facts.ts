@@ -1,204 +1,31 @@
-import {
-  MERGE_GATE_STATUS_CONTEXT,
-  RECORDING_EXTENSION,
-  RECORDING_MAX_BYTES,
-} from '@cairn/shared/merge-gate';
-import { compareFilesFromResponse } from './digest.js';
-import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
 import { RULESETS_NOT_ON_PLAN } from './github-rules.js';
-import {
-  type GateCheckRun,
-  type GateCompareCommit,
-  type GateInputs,
-  isFullSha,
-} from './readiness.js';
+import { type GateCheckRun, isFullSha, type RequiredChecks } from './readiness.js';
 
 const PER_PAGE = 100;
-const COMPARE_PAGES = 10;
 const RUN_PAGES = 10;
 const STATUS_PAGES = 5;
-const EVIDENCE_PROBES = 5;
-const DIRECTORY_CAP = 1000;
-
-export interface GateReadRequest {
-  evidenceStore?: GateInputs['evidenceStore'];
-  owner: string;
-  repo: string;
-  prNumber: number;
-  ticketRef: string;
-  now: number;
-}
-
-export interface GateReadCache {
-  autonomyPause: Map<string, { at: number; paused: boolean }>;
-  bodies: Map<string, { etag: string; body: unknown }>;
-  present: Set<string>;
-}
-
-const READ_CACHE_LIMIT = 500;
-
-function evictOldest<K>(collection: {
-  size: number;
-  keys(): IterableIterator<K>;
-  delete(key: K): boolean;
-}): void {
-  while (collection.size > READ_CACHE_LIMIT) {
-    const oldest = collection.keys().next().value;
-    if (oldest === undefined) return;
-    collection.delete(oldest);
-  }
-}
-
-class BoundedMap<K, V> extends Map<K, V> {
-  override set(key: K, value: V): this {
-    this.delete(key);
-    super.set(key, value);
-    evictOldest(this);
-    return this;
-  }
-}
-
-class BoundedSet<T> extends Set<T> {
-  override add(value: T): this {
-    this.delete(value);
-    super.add(value);
-    evictOldest(this);
-    return this;
-  }
-}
-
-export const newGateReadCache = (): GateReadCache => ({
-  bodies: new BoundedMap(),
-  present: new BoundedSet(),
-  autonomyPause: new BoundedMap(),
-});
-
-export interface GateEvidencePresence {
-  sha: string;
-  path: string;
-  present: boolean | null;
-}
-
-export interface GateGithubFacts {
-  pr: GateInputs['pr'];
-  defaultBranch: string | null;
-  checks: GateInputs['checks'];
-  compare: GateInputs['compare'];
-  evidence: GateEvidencePresence[];
-  ownStatus: { state: string; description: string | null } | null | 'unreadable';
-  rateLimited: { retryAt: number | null } | null;
-  notes: string[];
-}
-
-export interface GateCompareRead {
-  compare: GateInputs['compare'];
-  failure: GateRawFailure | null;
-}
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isCount = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const isId = (v: unknown): v is number => Number.isSafeInteger(v);
-const isSha = (v: unknown): v is string => typeof v === 'string' && isFullSha(v);
 
 interface Reader {
   port: GateGithubPort;
-  cache: GateReadCache;
-  now: number;
-  limited: { retryAt: number | null } | null;
   failure: GateRawFailure | null;
 }
 
-type Read = { ok: true; body: unknown } | { ok: false; status: number | null };
-
-async function send(r: Reader, request: () => Promise<GateRaw>): Promise<GateRaw | null> {
-  if (r.limited !== null) return null;
-  let res: GateRaw;
+async function readBody(r: Reader, request: () => Promise<GateRaw>): Promise<unknown> {
+  if (r.failure?.kind === 'rate-limited') return null;
+  let result: GateRaw;
   try {
-    res = await request();
+    result = await request();
   } catch {
-    res = { kind: 'failed', failure: { kind: 'network' } };
+    result = { kind: 'failed', failure: { kind: 'network' } };
   }
-  if (res.kind === 'failed') {
-    r.failure = res.failure;
-    if (res.failure.kind === 'rate-limited') {
-      const after = res.failure.retryAfterSeconds;
-      r.limited = { retryAt: after !== null ? r.now + after * 1000 : res.failure.resetAt };
-    }
-  }
-  return res;
-}
-
-async function readBody(
-  r: Reader,
-  key: string | null,
-  reuse: (body: unknown) => boolean,
-  request: (etag: string | null) => Promise<GateRaw>,
-): Promise<Read> {
-  const cached = key === null ? undefined : r.cache.bodies.get(key);
-  const etag = cached !== undefined && reuse(cached.body) ? cached.etag : null;
-  const res = await send(r, () => request(etag));
-  if (res === null) return { ok: false, status: null };
-  if (res.kind === 'not-modified') {
-    return etag !== null && cached !== undefined
-      ? { ok: true, body: cached.body }
-      : { ok: false, status: null };
-  }
-  if (res.kind === 'failed') {
-    return { ok: false, status: res.failure.kind === 'status' ? res.failure.status : null };
-  }
-  if (key !== null) {
-    if (res.etag !== null) r.cache.bodies.set(key, { etag: res.etag, body: res.body });
-    else r.cache.bodies.delete(key);
-  }
-  return { ok: true, body: res.body };
-}
-
-const always = () => true;
-
-function projectPull(
-  body: unknown,
-  req: GateReadRequest,
-): { pr: NonNullable<GateInputs['pr']>; defaultBranch: string | null } | string {
-  if (!isObj(body)) return 'pull request response is not an object';
-  if (body.number !== req.prNumber) return `pull request response is not #${req.prNumber}`;
-  const { head, base } = body;
-  if (body.state !== 'open' && body.state !== 'closed') return 'pull request state unreadable';
-  if (typeof body.merged !== 'boolean' || typeof body.draft !== 'boolean') {
-    return 'pull request merged/draft unreadable';
-  }
-  if (!isCount(body.changed_files)) return 'pull request changed_files unreadable';
-  if (!isObj(head) || typeof head.sha !== 'string' || typeof head.ref !== 'string') {
-    return 'pull request head unreadable';
-  }
-  if (head.repo !== null && !(isObj(head.repo) && typeof head.repo.full_name === 'string')) {
-    return 'pull request head repository unreadable';
-  }
-  if (!isObj(base) || typeof base.ref !== 'string' || !isObj(base.repo)) {
-    return 'pull request base unreadable';
-  }
-  const baseName = base.repo.full_name;
-  if (typeof baseName !== 'string') return 'pull request base repository unreadable';
-  if (baseName.toLowerCase() !== `${req.owner}/${req.repo}`.toLowerCase()) {
-    return 'pull request base repository is not the project repository';
-  }
-  if (body.body !== null && typeof body.body !== 'string') return 'pull request body unreadable';
-  return {
-    pr: {
-      state: body.state,
-      merged: body.merged,
-      draft: body.draft,
-      mergeableState: typeof body.mergeable_state === 'string' ? body.mergeable_state : null,
-      headSha: head.sha,
-      baseRef: base.ref,
-      baseRepoFullName: baseName,
-      headRepoFullName: isObj(head.repo) ? (head.repo.full_name as string) : null,
-      body: body.body ?? '',
-      changedFiles: body.changed_files,
-    },
-    defaultBranch: typeof base.repo.default_branch === 'string' ? base.repo.default_branch : null,
-  };
+  if (result.kind === 'failed') r.failure = result.failure;
+  return result.kind === 'ok' ? result.body : null;
 }
 
 interface Binding {
@@ -211,42 +38,32 @@ const binding = (context: unknown, appId: unknown): Binding | null =>
     ? { context, appId: appId ?? null }
     : null;
 
-function projectBranch(body: unknown): { tip: string | null; classic: Binding[] | null } {
-  if (!isObj(body)) return { tip: null, classic: null };
-  const tip = isObj(body.commit) && isSha(body.commit.sha) ? body.commit.sha : null;
-  if (body.protected === false) return { tip, classic: [] };
-  if (body.protected !== true || !isObj(body.protection)) return { tip, classic: null };
+function classicBindings(body: unknown): Binding[] | null {
+  if (!isObj(body)) return null;
+  if (body.protected === false) return [];
+  if (body.protected !== true || !isObj(body.protection)) return null;
   const rsc = body.protection.required_status_checks;
-  if (rsc == null) return { tip, classic: [] };
-  if (!isObj(rsc)) return { tip, classic: null };
-  if (rsc.enforcement_level === 'off') return { tip, classic: [] };
+  if (rsc == null) return [];
+  if (!isObj(rsc)) return null;
+  if (rsc.enforcement_level === 'off') return [];
   const list: unknown[] | null = Array.isArray(rsc.checks)
     ? rsc.checks.map((c) => (isObj(c) ? binding(c.context, c.app_id) : null))
     : Array.isArray(rsc.contexts)
       ? rsc.contexts.map((c) => binding(c, null))
       : null;
-  if (list === null || list.some((b) => b === null)) return { tip, classic: null };
-  return { tip, classic: list as Binding[] };
+  if (list === null || list.some((b) => b === null)) return null;
+  return list as Binding[];
 }
 
-async function readRules(
-  r: Reader,
-  req: Pick<GateReadRequest, 'owner' | 'repo'>,
-  branch: string,
-  allowUnsupportedRulesets = false,
-): Promise<Binding[] | null> {
+async function readRules(r: Reader, branch: string): Promise<Binding[] | null> {
   const out: Binding[] = [];
   for (let page = 1; ; page += 1) {
-    const got = await readBody(
-      r,
-      page === 1 ? `rules:${req.owner}/${req.repo}:${branch}`.toLowerCase() : null,
-      (b) => Array.isArray(b) && b.length < PER_PAGE,
-      (etag) => r.port.branchRules(branch, { page, perPage: PER_PAGE, etag }),
+    const body = await readBody(r, () =>
+      r.port.branchRules(branch, { page, perPage: PER_PAGE, etag: null }),
     );
-    if (!got.ok) {
+    if (body === null) {
       const failure = r.failure;
       if (
-        allowUnsupportedRulesets &&
         page === 1 &&
         failure?.kind === 'status' &&
         (failure.status === 404 ||
@@ -256,8 +73,8 @@ async function readRules(
       }
       return null;
     }
-    if (!Array.isArray(got.body)) return null;
-    for (const rule of got.body as unknown[]) {
+    if (!Array.isArray(body)) return null;
+    for (const rule of body as unknown[]) {
       if (!isObj(rule) || typeof rule.type !== 'string') return null;
       if (rule.type !== 'required_status_checks') continue;
       const list = isObj(rule.parameters) ? rule.parameters.required_status_checks : undefined;
@@ -268,71 +85,8 @@ async function readRules(
         out.push(b);
       }
     }
-    if (got.body.length < PER_PAGE) return out;
+    if (body.length < PER_PAGE) return out;
   }
-}
-
-function commitsOf(v: unknown): GateCompareCommit[] | null {
-  if (!Array.isArray(v)) return null;
-  const out: GateCompareCommit[] = [];
-  for (const c of v as unknown[]) {
-    if (!isObj(c) || typeof c.sha !== 'string' || !Array.isArray(c.parents)) return null;
-    const parents: string[] = [];
-    for (const p of c.parents as unknown[]) {
-      if (!isObj(p) || typeof p.sha !== 'string') return null;
-      parents.push(p.sha);
-    }
-    out.push({ sha: c.sha, parents });
-  }
-  return out;
-}
-
-async function readCompare(r: Reader, baseSha: string, headSha: string): Promise<GateCompareRead> {
-  r.failure = null;
-  const unreadable = (): GateCompareRead => ({
-    compare: 'unreadable',
-    failure: r.failure,
-  });
-  const malformed: GateCompareRead = { compare: 'malformed', failure: null };
-  if (!isSha(baseSha) || !isSha(headSha)) return unreadable();
-  const page = (n: number) =>
-    readBody(r, null, always, () =>
-      r.port.compare(baseSha, headSha, { page: n, perPage: PER_PAGE }),
-    );
-  const first = await page(1);
-  if (!first.ok) return unreadable();
-  const body = first.body;
-  if (!isObj(body)) return malformed;
-  const files = compareFilesFromResponse(body);
-  const total = body.total_commits;
-  const commits = commitsOf(body.commits);
-  if (files === null || !isCount(total) || commits === null) return malformed;
-  for (let n = 2; commits.length < total && n <= COMPARE_PAGES; n += 1) {
-    const next = await page(n);
-    if (!next.ok) return unreadable();
-    if (!isObj(next.body)) return malformed;
-    if (next.body.total_commits !== total) return unreadable();
-    const more = commitsOf(next.body.commits);
-    if (more === null) return malformed;
-    if (more.length === 0) break;
-    commits.push(...more);
-  }
-  return {
-    compare: { headSha, files, commits, totalCommits: total },
-    failure: null,
-  };
-}
-
-export function readCompareAt(
-  port: GateGithubPort,
-  baseSha: string,
-  headSha: string,
-): Promise<GateCompareRead> {
-  return readCompare(
-    { port, cache: newGateReadCache(), now: 0, limited: null, failure: null },
-    baseSha,
-    headSha,
-  );
 }
 
 interface RunRow {
@@ -359,7 +113,6 @@ function runOf(v: unknown): RunRow | null {
 interface StatusRow {
   context: string;
   state: string;
-  description: string | null;
   at: number;
 }
 
@@ -369,34 +122,27 @@ function statusOf(v: unknown): StatusRow | null {
   const at = typeof v.updated_at === 'string' ? Date.parse(v.updated_at) : Number.NaN;
   if (typeof context !== 'string' || typeof state !== 'string' || !Number.isFinite(at)) return null;
   if (!(description === null || typeof description === 'string')) return null;
-  return { context, state, description, at };
+  return { context, state, at };
 }
 
 async function readPaged<T>(
   r: Reader,
-  key: string,
   maxPages: number,
   field: string,
   parse: (v: unknown) => T | null,
-  request: (page: number, etag: string | null) => Promise<GateRaw>,
+  request: (page: number) => Promise<GateRaw>,
   accept: (first: Obj, page: Obj) => boolean,
 ): Promise<{ rows: T[]; complete: boolean; first: Obj } | null> {
   const rows: T[] = [];
   let first: Obj | null = null;
   for (let page = 1; page <= maxPages; page += 1) {
-    const got = await readBody(
-      r,
-      page === 1 ? key : null,
-      (b) =>
-        isObj(b) && Array.isArray(b[field]) && (b[field] as unknown[]).length === b.total_count,
-      (etag) => request(page, etag),
-    );
-    if (!got.ok || !isObj(got.body) || !isCount(got.body.total_count)) return null;
-    const list = got.body[field];
+    const body = await readBody(r, () => request(page));
+    if (!isObj(body) || !isCount(body.total_count)) return null;
+    const list = body[field];
     if (!Array.isArray(list)) return null;
-    first ??= got.body;
-    if (!accept(first, got.body)) return null;
-    if (got.body.total_count !== first.total_count) break;
+    first ??= body;
+    if (!accept(first, body)) return null;
+    if (body.total_count !== first.total_count) break;
     for (const v of list as unknown[]) {
       const row = parse(v);
       if (row === null) return null;
@@ -442,220 +188,42 @@ function pickStatuses(rows: StatusRow[]): StatusRow[] {
   return [...latest.values()];
 }
 
-type Listing = { kind: 'list'; entries: unknown[] } | { kind: 'absent' } | { kind: 'unknown' };
-
-async function listDirectory(r: Reader, dir: string, sha: string): Promise<Listing> {
-  const res = await send(r, () => r.port.contents(dir, sha));
-  if (res === null || res.kind === 'not-modified') return { kind: 'unknown' };
-  if (res.kind === 'failed') {
-    return res.failure.kind === 'status' && res.failure.status === 404
-      ? { kind: 'absent' }
-      : { kind: 'unknown' };
-  }
-  return Array.isArray(res.body) ? { kind: 'list', entries: res.body } : { kind: 'unknown' };
-}
-
-function presentIn(listing: Listing, name: string, path: string): boolean | null {
-  if (listing.kind === 'absent') return false;
-  if (listing.kind === 'unknown') return null;
-  const found = listing.entries.some(
-    (e) => isObj(e) && e.type === 'file' && e.name === name && e.path === path,
-  );
-  if (found) {
-    if (RECORDING_EXTENSION.test(path)) {
-      const entry = listing.entries.find(
-        (e) => isObj(e) && e.type === 'file' && e.name === name && e.path === path,
-      );
-      return (
-        isObj(entry) && isCount(entry.size) && entry.size > 0 && entry.size <= RECORDING_MAX_BYTES
-      );
-    }
-    return true;
-  }
-  return listing.entries.length >= DIRECTORY_CAP ? null : false;
-}
-
-async function probeEvidence(
-  r: Reader,
-  req: GateReadRequest,
-  pr: NonNullable<GateInputs['pr']>,
-  compare: Exclude<GateInputs['compare'], string>,
-): Promise<GateEvidencePresence[]> {
-  const links = qualifyingEvidenceLinks(
-    pr.body,
-    { owner: req.owner, repo: req.repo, ticketRef: req.ticketRef },
-    compare,
-  );
-  const out: GateEvidencePresence[] = [];
-  const listings = new Map<string, Listing>();
-  const repoKey = `${req.owner}/${req.repo}`.toLowerCase();
-  const recordingRequired = compare.files.some((f) => f.recordingRequired);
-  for (const { sha, path } of links) {
-    const memo = `${repoKey}@${sha}:${path}`;
-    if (!RECORDING_EXTENSION.test(path) && r.cache.present.has(memo)) {
-      out.push({ sha, path, present: true });
-      if (!recordingRequired) break;
-      continue;
-    }
-    const slash = path.lastIndexOf('/');
-    const dir = path.slice(0, slash);
-    const dirKey = `${sha}:${dir}`;
-    let listing = listings.get(dirKey);
-    if (listing === undefined) {
-      if (listings.size >= EVIDENCE_PROBES) {
-        out.push({ sha, path, present: null });
-        continue;
-      }
-      listing = await listDirectory(r, dir, sha);
-      listings.set(dirKey, listing);
-    }
-    const present = presentIn(listing, path.slice(slash + 1), path);
-    out.push({ sha, path, present });
-    if (present === true) {
-      if (!RECORDING_EXTENSION.test(path)) r.cache.present.add(memo);
-      if (!recordingRequired || RECORDING_EXTENSION.test(path)) break;
-    }
-  }
-  return out;
-}
-
-async function readCheckState(
-  r: Reader,
-  repoKey: string,
+export async function readRequiredChecksAt(
+  port: GateGithubPort,
+  branchName: string,
   head: string,
-  bindings: Binding[],
-  required: string[] | null,
-): Promise<Pick<GateGithubFacts, 'checks' | 'ownStatus'>> {
-  let checks: GateInputs['checks'] = null;
-  let ownStatus: GateGithubFacts['ownStatus'] = 'unreadable';
+): Promise<RequiredChecks | null> {
+  if (!isFullSha(head)) return null;
+  const r: Reader = { port, failure: null };
+  const branch = await readBody(r, () => port.branch(branchName, { etag: null }));
+  const classic = classicBindings(branch);
+  const rules = classic === null ? null : await readRules(r, branchName);
+  const bindings = [...(classic ?? []), ...(rules ?? [])];
+  const required =
+    classic === null || rules === null ? null : [...new Set(bindings.map((b) => b.context))];
   const runs = await readPaged(
     r,
-    `runs:${repoKey}@${head}`,
     RUN_PAGES,
     'check_runs',
     runOf,
-    (page, etag) => r.port.checkRuns(head, { filter: 'latest', page, perPage: PER_PAGE, etag }),
+    (page) => port.checkRuns(head, { filter: 'latest', page, perPage: PER_PAGE, etag: null }),
     () => true,
   );
   const statuses = await readPaged(
     r,
-    `status:${repoKey}@${head}`,
     STATUS_PAGES,
     'statuses',
     statusOf,
-    (page, etag) => r.port.combinedStatus(head, { page, perPage: PER_PAGE, etag }),
+    (page) => port.combinedStatus(head, { page, perPage: PER_PAGE, etag: null }),
     (first, page) => typeof page.sha === 'string' && page.sha === first.sha,
   );
-  if (statuses !== null) {
-    const picked = pickStatuses(statuses.rows);
-    const own = picked.find((s) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT);
-    ownStatus = !statuses.complete
-      ? 'unreadable'
-      : own === undefined
-        ? null
-        : { state: own.state, description: own.description };
-    if (runs !== null) {
-      checks = {
-        headSha: head,
-        statusSha: statuses.first.sha as string,
-        required,
-        runs: pickRuns(runs.rows, bindings),
-        statuses: picked.map((s) => ({ context: s.context, state: s.state })),
-        complete: runs.complete && statuses.complete,
-      };
-    }
-  }
-  return { checks, ownStatus };
-}
-
-export async function readRequiredChecksAt(
-  port: GateGithubPort,
-  req: Pick<GateReadRequest, 'owner' | 'repo'>,
-  branchName: string,
-  head: string,
-): Promise<GateInputs['checks']> {
-  const r: Reader = { port, cache: newGateReadCache(), now: 0, limited: null, failure: null };
-  if (!isSha(head)) return null;
-  const branch = await readBody(r, null, always, () => port.branch(branchName, { etag: null }));
-  const classic = branch.ok ? projectBranch(branch.body).classic : null;
-  const rules = classic === null ? null : await readRules(r, req, branchName, true);
-  const bindings = [...(classic ?? []), ...(rules ?? [])];
-  const required =
-    classic === null || rules === null ? null : [...new Set(bindings.map((b) => b.context))];
-  return (
-    await readCheckState(r, `${req.owner}/${req.repo}`.toLowerCase(), head, bindings, required)
-  ).checks;
-}
-
-export async function readGateGithubFacts(
-  port: GateGithubPort,
-  req: GateReadRequest,
-  cache: GateReadCache,
-): Promise<GateGithubFacts> {
-  const r: Reader = { port, cache, now: req.now, limited: null, failure: null };
-  const facts: GateGithubFacts = {
-    pr: null,
-    defaultBranch: null,
-    checks: null,
-    compare: 'unreadable',
-    evidence: [],
-    ownStatus: 'unreadable',
-    rateLimited: null,
-    notes: [],
+  if (runs === null || statuses === null) return null;
+  return {
+    headSha: head,
+    statusSha: statuses.first.sha as string,
+    required,
+    runs: pickRuns(runs.rows, bindings),
+    statuses: pickStatuses(statuses.rows).map((s) => ({ context: s.context, state: s.state })),
+    complete: runs.complete && statuses.complete,
   };
-  const repoKey = `${req.owner}/${req.repo}`.toLowerCase();
-  const done = () => ({ ...facts, rateLimited: r.limited });
-
-  const pull = await readBody(r, `pull:${repoKey}#${req.prNumber}`, always, (etag) =>
-    port.pull(req.prNumber, { etag }),
-  );
-  if (!pull.ok) {
-    facts.notes.push('pull request unreadable');
-    return done();
-  }
-  const projected = projectPull(pull.body, req);
-  if (typeof projected === 'string') {
-    facts.notes.push(projected);
-    return done();
-  }
-  const pr = projected.pr;
-  facts.pr = pr;
-  facts.defaultBranch = projected.defaultBranch;
-  if (!isSha(pr.headSha)) {
-    facts.notes.push('pull request head SHA is not 40 lowercase hex; nothing read at the head');
-    return done();
-  }
-  const head = pr.headSha;
-
-  const branch = await readBody(r, `branch:${repoKey}:${pr.baseRef}`, always, (etag) =>
-    port.branch(pr.baseRef, { etag }),
-  );
-  const projectedBranch = branch.ok ? projectBranch(branch.body) : { tip: null, classic: null };
-  let bindings: Binding[] = [];
-  let required: string[] | null = null;
-  if (projectedBranch.classic !== null) {
-    const rules = await readRules(r, req, pr.baseRef);
-    if (rules !== null) {
-      bindings = [...projectedBranch.classic, ...rules];
-      required = [...new Set(bindings.map((b) => b.context))];
-    }
-  }
-  if (required === null) facts.notes.push('required checks unreadable');
-
-  if (projectedBranch.tip === null) {
-    facts.notes.push('base branch tip unreadable; compare not read');
-  } else {
-    const c = await readCompare(r, projectedBranch.tip, head);
-    facts.compare = c.compare;
-  }
-
-  Object.assign(facts, await readCheckState(r, repoKey, head, bindings, required));
-  if (facts.checks === null) facts.notes.push('checks unreadable');
-
-  if (typeof facts.compare !== 'string') {
-    if (req.evidenceStore === 'repository' || req.evidenceStore === undefined) {
-      facts.evidence = await probeEvidence(r, req, pr, facts.compare);
-    }
-  }
-  return done();
 }

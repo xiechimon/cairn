@@ -1,28 +1,12 @@
-import { type CompareFile, MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { compareFilesFromResponse } from '../src/services/merge-gate/digest.js';
-import {
-  type GateGithubFacts,
-  type GateReadCache,
-  newGateReadCache,
-  readCompareAt,
-  readGateGithubFacts,
-} from '../src/services/merge-gate/github-facts.js';
-import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
-import { mergeReadiness } from '../src/services/merge-gate/readiness.js';
+import { readRequiredChecksAt } from '../src/services/merge-gate/github-facts.js';
+import type { GateRaw } from '../src/services/merge-gate/github-port.js';
 import { type GateAnswers, githubFake } from './fakes/github.js';
-import pastMotion from './fixtures/1783-motion-pr.json' with { type: 'json' };
 
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
-const EARLIER = 'e'.repeat(40);
-const MAIN = 'f'.repeat(40);
 const OTHER = '9'.repeat(40);
 const APP = 15368;
-const REQ = { owner: 'xiechimon', repo: 'cairn', prNumber: 7, ticketRef: '1404', now: 1_000_000 };
-const SHOT = 'docs/verify/1404/shot.png';
-const link = (sha: string, path = SHOT) =>
-  `https://raw.githubusercontent.com/xiechimon/cairn/${sha}/${path}`;
 
 const ok = (body: unknown, etag: string | null = null): GateRaw => ({
   kind: 'ok',
@@ -36,21 +20,6 @@ const fail = (failure: Extract<GateRaw, { kind: 'failed' }>['failure']): GateRaw
   failure,
 });
 const NOT_FOUND = fail({ kind: 'status', status: 404, message: 'Not Found' });
-
-function prBody(over: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    number: 7,
-    state: 'open',
-    merged: false,
-    draft: false,
-    mergeable_state: 'clean',
-    changed_files: 3,
-    body: `evidence: ${link(HEAD)}`,
-    head: { sha: HEAD, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/cairn' } },
-    base: { ref: 'main', repo: { full_name: 'xiechimon/cairn', default_branch: 'main' } },
-    ...over,
-  };
-}
 
 function branchBody(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -72,24 +41,6 @@ function branchBody(over: Record<string, unknown> = {}): Record<string, unknown>
   };
 }
 
-const ghFile = (filename: string, over: Record<string, unknown> = {}) => ({
-  sha: '1'.repeat(40),
-  filename,
-  status: 'modified',
-  additions: 2,
-  deletions: 1,
-  changes: 3,
-  patch: '@@ -1 +1 @@\n-a\n+b',
-  ...over,
-});
-const FILES = [
-  ghFile('apps/server/src/x.ts'),
-  ghFile('apps/server/test/x.test.ts'),
-  ghFile(SHOT, { status: 'added', additions: 0, deletions: 0, changes: 0, patch: undefined }),
-];
-const chain = (...shas: string[]) =>
-  shas.map((sha, k) => ({ sha, parents: [{ sha: k === 0 ? BASE : (shas[k - 1] as string) }] }));
-
 const run = (name: string, over: Record<string, unknown> = {}) => ({
   id: 100,
   name,
@@ -110,18 +61,6 @@ const status = (context: string, state: string, over: Record<string, unknown> = 
 const slice = <T>(list: T[], o: { page: number; perPage: number }) =>
   list.slice((o.page - 1) * o.perPage, o.page * o.perPage);
 
-const comparePages =
-  (commits: unknown[], files: unknown[] = FILES, extra: Record<string, unknown> = {}) =>
-  (_b: string, _h: string, o: { page: number; perPage: number }): GateRaw =>
-    ok({
-      status: 'ahead',
-      ahead_by: commits.length,
-      behind_by: 0,
-      total_commits: commits.length,
-      commits: slice(commits, o),
-      ...(o.page === 1 ? { files } : {}),
-      ...extra,
-    });
 const runPages =
   (runs: unknown[], total = runs.length) =>
   (_s: string, o: { page: number; perPage: number }): GateRaw =>
@@ -130,423 +69,21 @@ const statusPages =
   (statuses: unknown[], sha = HEAD, total = statuses.length) =>
   (_s: string, o: { page: number; perPage: number }): GateRaw =>
     ok({ sha, state: 'pending', total_count: total, statuses: slice(statuses, o) });
-const listing = (...names: Array<string | { name: string; type: string }>) =>
-  ok(
-    names.map((n) => {
-      const e = typeof n === 'string' ? { name: n, type: 'file' } : n;
-      return { ...e, path: `docs/verify/1404/${e.name}`, sha: '2'.repeat(40), size: 10 };
-    }),
-  );
 
-const gateDefaults: GateAnswers = {
-  pull: () => ok(prBody(), '"pr1"'),
-  branch: () => ok(branchBody(), '"br1"'),
-  rules: () => ok([], '"ru1"'),
-  compare: comparePages(chain(EARLIER, HEAD)),
+const defaults: GateAnswers = {
+  branch: () => ok(branchBody()),
+  rules: () => ok([]),
   checkRuns: runPages([run('check', { id: 1 }), run('pr-evidence', { id: 2 })]),
   combinedStatus: statusPages([]),
-  contents: (path, ref) =>
-    path === 'docs/verify/1404' && ref === HEAD ? listing('shot.png') : NOT_FOUND,
-};
-const fakeGithub = (over: Partial<GateAnswers> = {}) =>
-  githubFake('xiechimon/cairn', { gate: { ...gateDefaults, ...over } });
-
-const read = (
-  over: Partial<GateAnswers> = {},
-  cache: GateReadCache = newGateReadCache(),
-  req = REQ,
-): Promise<GateGithubFacts & { log: Array<[string, ...unknown[]]>; maxInFlight: number }> => {
-  const g = fakeGithub(over);
-  return readGateGithubFacts(g.port, req, cache).then((facts) => ({
-    ...facts,
-    log: g.log,
-    maxInFlight: g.maxInFlight(),
-  }));
-};
-const names = (log: Array<[string, ...unknown[]]>) => log.map(([n]) => n);
-
-const GREEN_PR = {
-  state: 'open',
-  merged: false,
-  draft: false,
-  mergeableState: 'clean',
-  headSha: HEAD,
-  baseRef: 'main',
-  baseRepoFullName: 'xiechimon/cairn',
-  headRepoFullName: 'xiechimon/cairn',
-  body: `evidence: ${link(HEAD)}`,
-  changedFiles: 3,
 };
 
-describe('readGateGithubFacts: the honest read', () => {
-  test('every input read at the PR head, in order, one request at a time', async () => {
-    const f = await read();
-    expect(f.pr).toEqual(GREEN_PR);
-    expect(f.defaultBranch).toBe('main');
-    expect(f.compare).toEqual({
-      headSha: HEAD,
-      files: compareFilesFromResponse({ files: FILES }) as CompareFile[],
-      commits: [
-        { sha: EARLIER, parents: [BASE] },
-        { sha: HEAD, parents: [EARLIER] },
-      ],
-      totalCommits: 2,
-    });
-    expect(f.checks).toEqual({
-      headSha: HEAD,
-      statusSha: HEAD,
-      required: ['check', 'pr-evidence'],
-      runs: [
-        { name: 'check', headSha: HEAD, status: 'completed', conclusion: 'success' },
-        { name: 'pr-evidence', headSha: HEAD, status: 'completed', conclusion: 'success' },
-      ],
-      statuses: [],
-      complete: true,
-    });
-    expect(f.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-    expect(f.ownStatus).toBeNull();
-    expect(f.rateLimited).toBeNull();
-    expect(f.log).toEqual([
-      ['pull', 7, { etag: null }],
-      ['branch', 'main', { etag: null }],
-      ['rules', 'main', { page: 1, perPage: 100, etag: null }],
-      ['compare', BASE, HEAD, { page: 1, perPage: 100 }],
-      ['checkRuns', HEAD, { filter: 'latest', page: 1, perPage: 100, etag: null }],
-      ['combinedStatus', HEAD, { page: 1, perPage: 100, etag: null }],
-      ['contents', 'docs/verify/1404', HEAD],
-    ]);
-    expect(f.maxInFlight).toBe(1);
-  });
-});
+async function read(over: Partial<GateAnswers> = {}) {
+  const g = githubFake('xiechimon/cairn', { gate: { ...defaults, ...over } });
+  const checks = await readRequiredChecksAt(g.port, 'main', HEAD);
+  return { checks, log: g.log };
+}
 
-describe('readGateGithubFacts: the PR (F1 to F5)', () => {
-  test('F1 a response for another PR or another base repository is not used', async () => {
-    for (const body of [
-      prBody({ number: 8 }),
-      prBody({
-        base: { ref: 'main', repo: { full_name: 'other/cairn', default_branch: 'main' } },
-      }),
-      prBody({
-        base: { ref: 'main', repo: { full_name: 'xiechimon/cairn2', default_branch: 'main' } },
-      }),
-    ]) {
-      const f = await read({ pull: () => ok(body) });
-      expect(f.pr).toBeNull();
-      expect(f.compare).toBe('unreadable');
-      expect(f.checks).toBeNull();
-      expect(f.evidence).toEqual([]);
-      expect(names(f.log)).toEqual(['pull']);
-      expect(f.notes.join(' ')).toMatch(/pull request/);
-    }
-    const f = await read({
-      pull: () =>
-        ok(
-          prBody({
-            base: { ref: 'main', repo: { full_name: 'XieChimon/Cairn', default_branch: 'main' } },
-          }),
-        ),
-    });
-    expect(f.pr?.baseRepoFullName).toBe('XieChimon/Cairn');
-  });
-
-  test('F2 a missing or wrongly typed field makes the PR unreadable, never a default', async () => {
-    const without = (key: string) => {
-      const b = prBody();
-      delete b[key];
-      return b;
-    };
-    const bodies: unknown[] = [
-      null,
-      [],
-      'text',
-      without('state'),
-      prBody({ state: 'merged' }),
-      without('merged'),
-      prBody({ merged: 'false' }),
-      without('draft'),
-      prBody({ draft: null }),
-      without('changed_files'),
-      prBody({ changed_files: -1 }),
-      prBody({ changed_files: 1.5 }),
-      prBody({ head: null }),
-      prBody({ head: { ref: 'x', repo: { full_name: 'xiechimon/cairn' } } }),
-      prBody({ head: { sha: HEAD, repo: { full_name: 'xiechimon/cairn' } } }),
-      prBody({ head: { sha: HEAD, ref: 'x', repo: { full_name: 7 } } }),
-      prBody({ base: { repo: { full_name: 'xiechimon/cairn' } } }),
-      prBody({ base: { ref: 'main', repo: null } }),
-      prBody({ base: { ref: 'main', repo: {} } }),
-      prBody({ body: 7 }),
-      without('number'),
-    ];
-    for (const body of bodies) {
-      const f = await read({ pull: () => ok(body) });
-      expect(f.pr, JSON.stringify(body)).toBeNull();
-      expect(names(f.log)).toEqual(['pull']);
-    }
-  });
-
-  test('F3 null body is empty text; a deleted head repository is null; mergeable_state and default branch may be absent', async () => {
-    const f = await read({
-      pull: () =>
-        ok(
-          prBody({
-            body: null,
-            head: { sha: HEAD, ref: 'x', repo: null },
-            mergeable_state: undefined,
-            base: { ref: 'main', repo: { full_name: 'xiechimon/cairn' } },
-          }),
-        ),
-    });
-    expect(f.pr).toMatchObject({ body: '', headRepoFullName: null, mergeableState: null });
-    expect(f.defaultBranch).toBeNull();
-    for (const ms of [7, null, '']) {
-      const g = await read({ pull: () => ok(prBody({ mergeable_state: ms })) });
-      expect(g.pr?.mergeableState, String(ms)).toBe(ms === '' ? '' : null);
-    }
-  });
-
-  test('F4 the PR read is conditional on the cached etag and a 304 re-projects the cached body', async () => {
-    const cache = newGateReadCache();
-    const first = fakeGithub();
-    await readGateGithubFacts(first.port, REQ, cache);
-    expect(first.log[0]).toEqual(['pull', 7, { etag: null }]);
-    const key = [...cache.bodies.keys()].find((k) => k.startsWith('pull:')) as string;
-    const entry = cache.bodies.get(key) as { etag: string; body: Record<string, unknown> };
-    cache.bodies.set(key, { etag: entry.etag, body: { ...entry.body, draft: true } });
-    const second = fakeGithub({ pull: () => ({ kind: 'not-modified' }) });
-    const f = await readGateGithubFacts(second.port, REQ, cache);
-    expect(second.log[0]).toEqual(['pull', 7, { etag: '"pr1"' }]);
-    expect(f.pr?.draft).toBe(true);
-    const c2 = newGateReadCache();
-    await read({ pull: () => ok(prBody(), null) }, c2);
-    const third = fakeGithub();
-    await readGateGithubFacts(third.port, REQ, c2);
-    expect(third.log[0]).toEqual(['pull', 7, { etag: null }]);
-    const c3 = newGateReadCache();
-    await read({}, c3);
-    await read({ pull: () => ok(prBody(), null) }, c3);
-    const fourth = fakeGithub();
-    await readGateGithubFacts(fourth.port, REQ, c3);
-    expect(fourth.log[0]).toEqual(['pull', 7, { etag: null }]);
-    const runs = Array.from({ length: 150 }, (_, k) => run(`job ${k}`, { id: k + 1 }));
-    const c4 = newGateReadCache();
-    await read({ checkRuns: runPages(runs) }, c4);
-    const partial = await read({ checkRuns: () => ({ kind: 'not-modified' }) }, c4);
-    expect(partial.log.find(([n]) => n === 'checkRuns')).toEqual([
-      'checkRuns',
-      HEAD,
-      { filter: 'latest', page: 1, perPage: 100, etag: null },
-    ]);
-    expect(partial.checks).toBeNull();
-    const g = await read({ pull: () => ({ kind: 'not-modified' }) });
-    expect(g.pr).toBeNull();
-  });
-
-  test('F5 a malformed head SHA reads nothing at the head', async () => {
-    for (const sha of ['A'.repeat(40), 'abc1234', 'main', '']) {
-      const f = await read({
-        pull: () => ok(prBody({ head: { sha, ref: 'x', repo: { full_name: 'xiechimon/cairn' } } })),
-      });
-      expect(f.pr?.headSha).toBe(sha);
-      expect(names(f.log)).toEqual(['pull']);
-      expect(f.compare).toBe('unreadable');
-      expect(f.checks).toBeNull();
-      expect(f.ownStatus).toBe('unreadable');
-    }
-    const g = await read({ pull: () => NOT_FOUND });
-    expect(g.pr).toBeNull();
-    expect(names(g.log)).toEqual(['pull']);
-  });
-});
-
-describe('readGateGithubFacts: conditional reads across a push (F19, pr-gate run 1 on #1525)', () => {
-  test('F19 the check-runs and status ETags of the old head are never sent for the new head', async () => {
-    const NEWER = 'd'.repeat(40);
-    const cache = newGateReadCache();
-    await read(
-      {
-        checkRuns: (_s, o) =>
-          ({ ...runPages([run('check', { id: 1 })])(_s, o), etag: '"runs-head"' }) as GateRaw,
-        combinedStatus: (_s, o) =>
-          ({ ...statusPages([])(_s, o), etag: '"status-head"' }) as GateRaw,
-      },
-      cache,
-    );
-    const pushed = (sha: string) =>
-      read(
-        {
-          pull: () =>
-            ok(
-              prBody({
-                head: { sha, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/cairn' } },
-              }),
-            ),
-          compare: comparePages(chain(EARLIER, sha)),
-          checkRuns: runPages([run('check', { id: 2, head_sha: sha })]),
-          combinedStatus: statusPages([], sha),
-        },
-        cache,
-      );
-    const after = await pushed(NEWER);
-    expect(after.log.filter(([n]) => n === 'checkRuns' || n === 'combinedStatus')).toEqual([
-      ['checkRuns', NEWER, { filter: 'latest', page: 1, perPage: 100, etag: null }],
-      ['combinedStatus', NEWER, { page: 1, perPage: 100, etag: null }],
-    ]);
-    const back = await pushed(HEAD);
-    expect(back.log.filter(([n]) => n === 'checkRuns' || n === 'combinedStatus')).toEqual([
-      ['checkRuns', HEAD, { filter: 'latest', page: 1, perPage: 100, etag: '"runs-head"' }],
-      ['combinedStatus', HEAD, { page: 1, perPage: 100, etag: '"status-head"' }],
-    ]);
-  });
-});
-
-describe('readGateGithubFacts: base branch, compare and required checks (F6 to F11)', () => {
-  test('F6 no readable base tip: compare unreadable, never requested by branch name', async () => {
-    for (const branch of [
-      () => NOT_FOUND,
-      () => ok(branchBody({ commit: { sha: 'main' } })),
-      () => ok(branchBody({ commit: null })),
-      () => ok('not an object'),
-    ]) {
-      const f = await read({ branch });
-      expect(f.compare).toBe('unreadable');
-      expect(names(f.log)).not.toContain('compare');
-      expect(f.notes).toContain('base branch tip unreadable; compare not read');
-      expect(f.checks?.headSha).toBe(HEAD);
-    }
-  });
-
-  test('F7 every compare page by the same two SHAs; files from page 1 only; readCompareAt reads at the SHAs given', async () => {
-    const commits = chain(
-      ...Array.from({ length: 150 }, (_, k) =>
-        k === 149 ? HEAD : k.toString(16).padStart(40, '0'),
-      ),
-    );
-    const f = await read({ compare: comparePages(commits) });
-    expect(f.log.filter(([n]) => n === 'compare')).toEqual([
-      ['compare', BASE, HEAD, { page: 1, perPage: 100 }],
-      ['compare', BASE, HEAD, { page: 2, perPage: 100 }],
-    ]);
-    const c = f.compare as Exclude<GateGithubFacts['compare'], string>;
-    expect(c.files).toHaveLength(3);
-    expect(c.commits).toHaveLength(150);
-    expect(c.totalCommits).toBe(150);
-    const g = await read({
-      compare: (b, h, o) =>
-        ok({ ...(comparePages(commits)(b, h, o) as { body: object }).body, files: FILES }),
-    });
-    expect((g.compare as { files: unknown[] }).files).toHaveLength(3);
-    const p = fakeGithub();
-    const r = await readCompareAt(p.port, BASE, OTHER);
-    expect(p.log).toEqual([['compare', BASE, OTHER, { page: 1, perPage: 100 }]]);
-    expect(r.compare).toMatchObject({ headSha: OTHER, totalCommits: 2 });
-    expect(r.failure).toBeNull();
-    const failed = await readCompareAt(fakeGithub({ compare: () => NOT_FOUND }).port, BASE, OTHER);
-    expect(failed).toEqual({
-      compare: 'unreadable',
-      failure: { kind: 'status', status: 404, message: 'Not Found' },
-    });
-  });
-
-  test('F8 total_commits, commits and files: malformed values never pass', async () => {
-    const page1 = (extra: Record<string, unknown>) =>
-      comparePages(chain(EARLIER, HEAD), FILES, extra);
-    for (const total of [1.5, -1, '2', null, Number.NaN]) {
-      const f = await read({ compare: page1({ total_commits: total }) });
-      expect(f.compare, String(total)).toBe('malformed');
-    }
-    const f1 = await read({
-      compare: (b, h, o) => {
-        const r = page1({})(b, h, o) as { body: Record<string, unknown> };
-        return ok({ ...r.body, total_commits: undefined });
-      },
-    });
-    expect(f1.compare).toBe('malformed');
-    for (const commits of [
-      [{ sha: HEAD }],
-      [{ sha: HEAD, parents: [BASE] }],
-      [{ parents: [{ sha: BASE }] }],
-      [{ sha: 7, parents: [] }],
-      [{ sha: HEAD, parents: [{}] }],
-      [{ sha: HEAD, parents: [{ sha: 7 }] }],
-      'x',
-    ]) {
-      const f = await read({
-        compare: () => ok({ total_commits: 1, behind_by: 0, commits, files: FILES }),
-      });
-      expect(f.compare, JSON.stringify(commits)).toBe('malformed');
-    }
-    const badFile = await read({
-      compare: comparePages(chain(EARLIER, HEAD), [ghFile('x', { status: 'weird' })]),
-    });
-    expect(badFile.compare).toBe('malformed');
-    const commits = chain(
-      ...Array.from({ length: 120 }, (_, k) => k.toString(16).padStart(40, '0')),
-    );
-    const drift = await read({
-      compare: (b, h, o) => {
-        const r = comparePages(commits)(b, h, o) as { body: Record<string, unknown> };
-        return ok({ ...r.body, total_commits: o.page === 1 ? 120 : 121 });
-      },
-    });
-    expect(drift.compare).toBe('unreadable');
-  });
-
-  test('F9 paging: all pages, as read; stop at an empty page or the 10-page cap; one failed page is unreadable', async () => {
-    const many = (n: number) =>
-      chain(...Array.from({ length: n }, (_, k) => k.toString(16).padStart(40, '0')));
-    const dup = [...many(100), ...many(100).slice(0, 20)];
-    const d = await read({
-      compare: (_b, _h, o) =>
-        ok({
-          total_commits: 120,
-          behind_by: 0,
-          commits: slice(dup, o),
-          ...(o.page === 1 ? { files: FILES } : {}),
-        }),
-    });
-    expect((d.compare as { commits: unknown[] }).commits).toHaveLength(120);
-    const short = await read({
-      compare: (_b, _h, o) =>
-        ok({
-          total_commits: 150,
-          behind_by: 0,
-          commits: o.page === 1 ? slice(many(150), o) : [],
-          ...(o.page === 1 ? { files: FILES } : {}),
-        }),
-    });
-    expect((short.compare as { commits: unknown[]; totalCommits: number }).commits).toHaveLength(
-      100,
-    );
-    expect(short.log.filter(([n]) => n === 'compare')).toHaveLength(2);
-    const big = await read({ compare: comparePages(many(2000)) });
-    expect(big.log.filter(([n]) => n === 'compare')).toHaveLength(10);
-    expect((big.compare as { commits: unknown[] }).commits).toHaveLength(1000);
-    for (const failure of [NOT_FOUND, fail({ kind: 'timeout' }), fail({ kind: 'not-json' })]) {
-      const f = await read({
-        compare: (b, h, o) => (o.page === 2 ? failure : comparePages(many(150))(b, h, o)),
-      });
-      expect(f.compare).toBe('unreadable');
-    }
-    expect((await read({ compare: () => NOT_FOUND })).compare).toBe('unreadable');
-  });
-
-  test('F10 a push between page reads is passed as read', async () => {
-    const first = chain(...Array.from({ length: 100 }, (_, k) => k.toString(16).padStart(40, '0')));
-    const other = chain(OTHER, HEAD);
-    const f = await read({
-      compare: (_b, _h, o) =>
-        ok({
-          total_commits: 102,
-          behind_by: 0,
-          commits: o.page === 1 ? first : other,
-          ...(o.page === 1 ? { files: FILES } : {}),
-        }),
-    });
-    const c = f.compare as { commits: Array<{ sha: string }> };
-    expect(c.commits.map((x) => x.sha)).toEqual([...first.map((x) => x.sha), OTHER, HEAD]);
-  });
-
+describe('required check discovery', () => {
   test('F11 the required list: branch protection plus rulesets, null when either cannot be read', async () => {
     const required = async (over: Partial<GateAnswers>) => (await read(over)).checks?.required;
     expect(await required({})).toEqual(['check', 'pr-evidence']);
@@ -626,7 +163,10 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     ]) {
       expect(await required({ rules: () => ok(bad) }), JSON.stringify(bad)).toBeNull();
     }
-    expect(await required({ rules: () => NOT_FOUND })).toBeNull();
+    expect(await required({ rules: () => NOT_FOUND })).toEqual(['check', 'pr-evidence']);
+    expect(
+      await required({ rules: () => fail({ kind: 'status', status: 500, message: null }) }),
+    ).toBeNull();
     const full = Array.from({ length: 100 }, () => ({ type: 'deletion' }));
     const two = await read({ rules: (_n, o) => ok(o.page === 1 ? full : [rules[2]]) });
     expect(two.checks?.required).toEqual(['check', 'pr-evidence', 'lint']);
@@ -637,7 +177,7 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
   });
 });
 
-describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
+describe('required checks at the head (F12 to F15)', () => {
   test('F12 runs and the combined status by the head SHA; their SHAs come from the responses', async () => {
     const f = await read({
       checkRuns: runPages([run('check', { id: 1, head_sha: OTHER })]),
@@ -729,7 +269,7 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     expect(h.checks?.runs.map((r) => r.conclusion)).toEqual(['failure', 'success']);
   });
 
-  test('F15 malformed entries, case-insensitive contexts, the own status', async () => {
+  test('F15 malformed entries and case-insensitive status contexts', async () => {
     for (const bad of [
       run('x', { head_sha: undefined }),
       run('x', { id: 'one' }),
@@ -751,7 +291,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     ]) {
       const f = await read({ combinedStatus: statusPages([bad]) });
       expect(f.checks, JSON.stringify(bad)).toBeNull();
-      expect(f.ownStatus).toBe('unreadable');
     }
     const f = await read({
       combinedStatus: statusPages([
@@ -767,285 +306,23 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
       { context: 'TIE', state: 'pending' },
       { context: 'Cairn/Merge-Gate', state: 'pending' },
     ]);
-    expect(f.ownStatus).toEqual({ state: 'pending', description: 'waiting' });
-    const none = await read();
-    expect(none.ownStatus).toBeNull();
     const partial = await read({ combinedStatus: statusPages([status('ci', 'success')], HEAD, 2) });
     expect(partial.checks?.complete).toBe(false);
-    expect(partial.ownStatus).toBe('unreadable');
     const unreadable = await read({ combinedStatus: () => NOT_FOUND });
     expect(unreadable.checks).toBeNull();
-    expect(unreadable.ownStatus).toBe('unreadable');
-    expect(MERGE_GATE_STATUS_CONTEXT).toBe('cairn/merge-gate');
   });
 });
 
-describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
-  test('F16 only qualifying links are probed, at their own commit; stop at the first present; at most 5 probes', async () => {
-    const early = await read({
-      pull: () => ok(prBody({ body: `evidence: ${link(EARLIER)}` })),
-      contents: (_path, ref) => (ref === EARLIER ? listing('other.png') : listing('shot.png')),
-    });
-    expect(early.evidence).toEqual([{ sha: EARLIER, path: SHOT, present: false }]);
-    expect(early.log.filter(([n]) => n === 'contents')).toEqual([
-      ['contents', 'docs/verify/1404', EARLIER],
-    ]);
-    const none = await read({
-      pull: () =>
-        ok(prBody({ body: `${link(MAIN)} ${link(HEAD, 'docs/verify/1404/untouched.png')}` })),
-    });
-    expect(none.evidence).toEqual([]);
-    expect(names(none.log)).not.toContain('contents');
-    const both = await read({ pull: () => ok(prBody({ body: `${link(HEAD)} ${link(EARLIER)}` })) });
-    expect(both.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-    const files = [
-      ...FILES,
-      ...Array.from({ length: 8 }, (_, k) =>
-        ghFile(`docs/verify/1404/s${k}/f.png`, { status: 'added' }),
-      ),
-    ];
-    const body = Array.from({ length: 8 }, (_, k) =>
-      link(HEAD, `docs/verify/1404/s${k}/f.png`),
-    ).join(' ');
-    const capped = await read({
-      pull: () => ok(prBody({ body, changed_files: files.length })),
-      compare: comparePages(chain(EARLIER, HEAD), files),
-      contents: () => listing('nothing.png'),
-    });
-    expect(capped.log.filter(([n]) => n === 'contents')).toHaveLength(5);
-    expect(capped.evidence.map((e) => e.present)).toEqual([
-      false,
-      false,
-      false,
-      false,
-      false,
-      null,
-      null,
-      null,
-    ]);
-    const shared = await read({
-      pull: () =>
-        ok(
-          prBody({
-            body: `${link(HEAD, 'docs/verify/1404/a.png')} ${link(HEAD, 'docs/verify/1404/b.png')}`,
-          }),
-        ),
-      compare: comparePages(chain(EARLIER, HEAD), [
-        ...FILES,
-        ghFile('docs/verify/1404/a.png'),
-        ghFile('docs/verify/1404/b.png'),
-      ]),
-      contents: () => listing('b.png'),
-    });
-    expect(shared.log.filter(([n]) => n === 'contents')).toHaveLength(1);
-    expect(shared.evidence).toEqual([
-      { sha: HEAD, path: 'docs/verify/1404/a.png', present: false },
-      { sha: HEAD, path: 'docs/verify/1404/b.png', present: true },
-    ]);
+test('stops further reads after a rate limit and fails closed on a thrown request', async () => {
+  const limited = await read({
+    rules: () => fail({ kind: 'rate-limited', status: 403, resetAt: null, retryAfterSeconds: 60 }),
   });
-
-  test('F17 what a probe answer means; present is remembered for the commit, absent is not', async () => {
-    const probe = async (contents: GateAnswers['contents']) => (await read({ contents })).evidence;
-    expect(await probe(() => NOT_FOUND)).toEqual([{ sha: HEAD, path: SHOT, present: false }]);
-    for (const failure of [
-      fail({ kind: 'status', status: 500, message: null }),
-      fail({ kind: 'timeout' }),
-      fail({ kind: 'network' }),
-      fail({ kind: 'status', status: 403, message: null }),
-    ]) {
-      expect(await probe(() => failure)).toEqual([{ sha: HEAD, path: SHOT, present: null }]);
-    }
-    expect(await probe(() => ok({ type: 'file', name: 'shot.png' }))).toEqual([
-      { sha: HEAD, path: SHOT, present: null },
-    ]);
-    expect(await probe(() => listing({ name: 'shot.png', type: 'dir' }))).toEqual([
-      { sha: HEAD, path: SHOT, present: false },
-    ]);
-    expect(await probe(() => listing({ name: 'shot.png', type: 'symlink' }))).toEqual([
-      { sha: HEAD, path: SHOT, present: false },
-    ]);
-    expect(await probe(() => listing({ name: 'shot.png', type: 'submodule' }))).toEqual([
-      { sha: HEAD, path: SHOT, present: false },
-    ]);
-    expect(
-      await probe(() =>
-        ok([{ name: 'shot.png', type: 'file', path: 'docs/verify/1404/other/shot.png' }]),
-      ),
-    ).toEqual([{ sha: HEAD, path: SHOT, present: false }]);
-    const thousand = Array.from({ length: 1000 }, (_, k) => `f${k}.png`);
-    expect(await probe(() => listing(...thousand))).toEqual([
-      { sha: HEAD, path: SHOT, present: null },
-    ]);
-    expect(await probe(() => listing(...thousand.slice(1), 'shot.png'))).toEqual([
-      { sha: HEAD, path: SHOT, present: true },
-    ]);
-    const cache = newGateReadCache();
-    await read({}, cache);
-    const again = await read({ contents: () => NOT_FOUND }, cache);
-    expect(names(again.log)).not.toContain('contents');
-    expect(again.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-    const c2 = newGateReadCache();
-    await read({ contents: () => NOT_FOUND }, c2);
-    const later = await read({}, c2);
-    expect(later.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
+  expect(limited.checks).toBeNull();
+  expect(limited.log.map(([name]) => name)).toEqual(['branch', 'rules']);
+  const thrown = await read({
+    checkRuns: () => {
+      throw new Error('transport failed');
+    },
   });
-});
-
-describe('readGateGithubFacts: rate limits, throws, concurrency (F18)', () => {
-  test('F18 a rate-limited read stops the evaluation; retryAt prefers retry-after', async () => {
-    const limited = (retryAfterSeconds: number | null, resetAt: number | null) =>
-      fail({ kind: 'rate-limited', status: 403, resetAt, retryAfterSeconds });
-    const f = await read({ branch: () => limited(30, 9_999_999) });
-    expect(names(f.log)).toEqual(['pull', 'branch']);
-    expect(f.rateLimited).toEqual({ retryAt: REQ.now + 30_000 });
-    expect(f.compare).toBe('unreadable');
-    expect(f.checks).toBeNull();
-    expect(f.ownStatus).toBe('unreadable');
-    expect((await read({ pull: () => limited(null, 5_000_000) })).rateLimited).toEqual({
-      retryAt: 5_000_000,
-    });
-    expect((await read({ checkRuns: () => limited(null, null) })).rateLimited).toEqual({
-      retryAt: null,
-    });
-    const c = await read({ contents: () => limited(10, null) });
-    expect(c.rateLimited).toEqual({ retryAt: REQ.now + 10_000 });
-    expect(c.evidence).toEqual([{ sha: HEAD, path: SHOT, present: null }]);
-  });
-
-  test('F18 a port that throws is a failed read, never a throw out of the shell', async () => {
-    const g = fakeGithub();
-    const throwing: GateGithubPort = {
-      ...g.port,
-      checkRuns: () => Promise.reject(new TypeError('boom')),
-      compare: () => {
-        throw new Error('sync');
-      },
-    };
-    const f = await readGateGithubFacts(throwing, REQ, newGateReadCache());
-    expect(f.checks).toBeNull();
-    expect(f.compare).toBe('unreadable');
-    expect(f.pr).toEqual(GREEN_PR);
-  });
-});
-
-describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate run 1 on #1525, suggestion 3)', () => {
-  test('300 files on page 1 and changed_files 301: compare-truncated, a human blocker, no digest', async () => {
-    const files = Array.from({ length: 300 }, (_, k) => ghFile(`apps/server/src/f${k}.ts`));
-    const f = await read({
-      pull: () => ok(prBody({ changed_files: 301 })),
-      compare: comparePages(chain(EARLIER, HEAD), files),
-    });
-    expect((f.compare as { files: unknown[] }).files).toHaveLength(300);
-    expect(f.pr?.changedFiles).toBe(301);
-    const r = mergeReadiness({
-      policy: { autonomyPaused: false, dailyCapReached: false },
-      build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
-      repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
-      ticketRef: REQ.ticketRef,
-      issueNumber: 1404,
-      pr: f.pr,
-      checks: f.checks,
-      compare: f.compare,
-      evidence: f.evidence,
-      verdicts: [],
-      round: null,
-      availability: { reviewerPerspectives: ['correctness'], verifier: true, decider: true },
-    });
-    expect(r.ready).toBe(false);
-    expect(r.patchDigest).toBeNull();
-    expect(r.blockers.find((b) => b.code === 'compare-truncated')).toMatchObject({
-      class: 'human',
-      detail: ['truncated'],
-    });
-  });
-});
-
-describe('recording facts (#1783)', () => {
-  test('past PR #1356 requires recording while copy-only and removed motion do not', () => {
-    const project = (patch: string, filename = 'apps/web/src/board/card.tsx') =>
-      compareFilesFromResponse({ files: [ghFile(filename, { patch })] })?.[0];
-    expect(compareFilesFromResponse({ files: [pastMotion.file] })?.[0]?.recordingRequired).toBe(
-      true,
-    );
-    expect(project('+<p>New copy</p>')?.recordingRequired).not.toBe(true);
-    expect(project('-transition: opacity 200ms;\n+color: red;')?.recordingRequired).not.toBe(true);
-    for (const line of [
-      'transition: opacity 200ms',
-      '@keyframes appear {}',
-      'animation: appear',
-      'motion.div',
-      'onDragStart={drag}',
-      'onMouseEnter={show}',
-      'onPointerEnter={show}',
-    ]) {
-      expect(project(`+${line}`)?.recordingRequired).toBe(true);
-    }
-    expect(
-      project('+--spring-duration: 100ms;', 'apps/web/src/styles/motion.css')?.recordingRequired,
-    ).toBe(true);
-    expect(project('+transition: x', 'apps/server/src/x.ts')?.recordingRequired).not.toBe(true);
-  });
-
-  test('a screenshot first does not hide recording presence or its size, including cached reads', async () => {
-    const video = 'docs/verify/1404/demo.webm';
-    const cache = newGateReadCache();
-    const readMotion = (size: number) =>
-      read(
-        {
-          pull: () => ok(prBody({ body: `${link(HEAD)} ${link(HEAD, video)}`, changed_files: 3 })),
-          compare: comparePages(chain(EARLIER, HEAD), [
-            ghFile('apps/web/src/card.tsx', { patch: '+transition: opacity 200ms' }),
-            FILES[2],
-            ghFile(video),
-          ]),
-          contents: () =>
-            ok([
-              { name: 'shot.png', path: SHOT, type: 'file', size: 10 },
-              { name: 'demo.webm', path: video, type: 'file', size },
-            ]),
-        },
-        cache,
-      );
-    const first = await readMotion(100);
-    expect(first.evidence).toContainEqual({ sha: HEAD, path: video, present: true });
-    expect((await readMotion(100)).evidence).toContainEqual({
-      sha: HEAD,
-      path: video,
-      present: true,
-    });
-    const large = await readMotion(5 * 1024 * 1024 + 1);
-    expect(large.evidence).toContainEqual({ sha: HEAD, path: video, present: false });
-  });
-});
-
-describe('read cache bound', () => {
-  test('a collection stays at 500 and a later read misses an evicted key', async () => {
-    const cache = newGateReadCache();
-    const pullKey = 'pull:xiechimon/cairn#7';
-    const presentKey = `xiechimon/cairn@${HEAD}:${SHOT}`;
-    const pauseKey = 'xiechimon/cairn';
-    cache.bodies.set(pullKey, { etag: '"stale"', body: prBody({ draft: true }) });
-    cache.present.add(presentKey);
-    cache.autonomyPause.set(pauseKey, { at: 1, paused: true });
-    for (let i = 0; i < 500; i += 1) {
-      cache.bodies.set(`pull:other/repo#${i}`, { etag: `"e${i}"`, body: { i } });
-      cache.present.add(`other/repo@${'c'.repeat(40)}:docs/verify/${i}.png`);
-      cache.autonomyPause.set(`other/${i}`, { at: 1, paused: false });
-    }
-    expect(cache.bodies.size).toBe(500);
-    expect(cache.present.size).toBe(500);
-    expect(cache.autonomyPause.size).toBe(500);
-    expect(cache.bodies.has(pullKey)).toBe(false);
-    expect(cache.present.has(presentKey)).toBe(false);
-    expect(cache.autonomyPause.get(pauseKey)).toBeUndefined();
-    expect(cache.bodies.has('pull:other/repo#499')).toBe(true);
-    expect(cache.present.has(`other/repo@${'c'.repeat(40)}:docs/verify/499.png`)).toBe(true);
-    expect(cache.autonomyPause.get('other/499')?.paused).toBe(false);
-
-    const fetched = await read({}, cache);
-    expect(fetched.log[0]).toEqual(['pull', 7, { etag: null }]);
-    expect(names(fetched.log)).toContain('contents');
-    expect(fetched.pr?.draft).toBe(false);
-    expect(fetched.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-  });
+  expect(thrown.checks).toBeNull();
 });

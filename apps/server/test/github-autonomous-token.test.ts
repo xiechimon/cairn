@@ -14,17 +14,11 @@ import type {
   githubSetPullDraft,
   githubSetReviewHoldLabel,
 } from '../src/lib/github-review-findings.js';
-import {
-  type AppToken,
-  type AutonomousToken,
-  registerAppToken,
-  type UserToken,
-} from '../src/lib/github-token.js';
+import type { AppToken, AutonomousToken, UserToken } from '../src/lib/github-token.js';
 import * as app from '../src/services/github-app-token.js';
 import { autonomousToken, githubReadToken } from '../src/services/github-autonomous-token.js';
 import { pauseTeamGithubRepos } from '../src/services/github-autonomy-brake.js';
 import * as connection from '../src/services/github-connection.js';
-import { githubGatePort } from '../src/services/merge-gate-github.js';
 import { createTodo, flushSelfIssueWrites } from '../src/services/todos.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, deliverCodeStep, req } from './helpers.js';
@@ -64,31 +58,6 @@ test('autonomous resolver prefers App and records only safe fallback context', a
   expect(JSON.stringify(log.mock.calls).includes('fake-user')).toBe(false);
   user.mockResolvedValue(null);
   expect(await autonomousToken(deps, 'team', repo)).toBeNull();
-});
-
-test('status permission failure falls back exactly once, other errors do not', async () => {
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  for (const status of [403, 401, 500]) {
-    const fetch = vi.fn(async (_input: string | URL, _init?: RequestInit) =>
-      Response.json({ message: 'Resource not accessible by integration' }, { status }),
-    );
-    registerAppToken('fake-app' as AppToken, Date.now() + 60000, (inner) => inner);
-    const fallback = vi.fn(async () => 'fake-user' as UserToken);
-    const port = githubGatePort(
-      fetch,
-      'fake-app' as AppToken,
-      repo.owner,
-      repo.repo,
-      1000,
-      fallback,
-    );
-    await port.createStatus('a'.repeat(40), { state: 'success', context: 'test', description: '' });
-    expect(fetch).toHaveBeenCalledTimes(status === 403 ? 2 : 1);
-    expect(fallback).toHaveBeenCalledTimes(status === 403 ? 1 : 0);
-    expect(
-      fetch.mock.calls.map((call) => new Headers(call[1]?.headers).get('authorization')),
-    ).toEqual(status === 403 ? ['Bearer fake-app', 'Bearer fake-user'] : ['Bearer fake-app']);
-  }
 });
 
 test('write signatures reject unbranded strings and merge rejects App identity', () => {
