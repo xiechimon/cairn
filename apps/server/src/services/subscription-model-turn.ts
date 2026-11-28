@@ -33,6 +33,9 @@ export async function runSubscriptionModelTurn(
   authorize: (machineId: string) => boolean,
   signal?: AbortSignal,
 ): Promise<ProviderTestResult> {
+  if (!machines.some((machineId) => hub.connectionId(machineId) !== undefined)) {
+    return modelTurnFailure('network', 'runner-unavailable');
+  }
   claimRateWindow(attempts, db, `${key}:${model}`, 'tests of this model', 30_000);
   const started = performance.now();
   const result = await modelTurnQueue.dispatch(hub, machines, claim, authorize, signal);

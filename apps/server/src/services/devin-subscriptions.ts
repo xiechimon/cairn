@@ -454,7 +454,9 @@ export async function testDevinSubscriptionModel(
   );
   const selected = catalog.find((entry) => entry.id === (devinSweVariant(model)?.baseId ?? model));
   if (!selected) throw new HttpError(400, 'Unknown model for this subscription');
-  const wire = devinWireModel('devin', model, selected.thinkingDefault) ?? model;
+  const variant = devinSweVariant(model);
+  const wire =
+    devinWireModel('devin', model, variant === null ? selected.thinkingDefault : null) ?? model;
   return runSubscriptionModelTurn(
     deps.db,
     deps.machineHub,

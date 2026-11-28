@@ -58,6 +58,21 @@ for (const [width, colorScheme] of [[1440, 'light'], [1440, 'dark'], [390, 'ligh
       const play = chip.getByRole('button', { name: `测试 ${provider.model}` });
       await expect(play).toBeVisible();
       await expect(detail.getByRole('button', { name: '全部测试' })).toBeVisible();
+      if (provider.id === 'devin') {
+        const report = page.getByTestId('model-test-result');
+        await play.click();
+        await expect(report).toHaveAttribute('data-phase', 'checking');
+        await expect.poll(() => typeof complete).toBe('function');
+        (complete as ((value: object) => void) | undefined)?.(passing);
+        await expect(report).toHaveAttribute('data-phase', 'passed');
+        const facts = page.getByTestId('model-test-detail');
+        await expect(facts.locator('dt', { hasText: 'SWE-2 Flash' })).toHaveCount(1);
+        await expect(facts).not.toContainText('swe-2-flash');
+        await page.screenshot({ path: info.outputPath('devin-passed.png') });
+        await page.keyboard.press('Escape');
+        await expect(report).toHaveCount(0);
+        continue;
+      }
       if (provider.id !== 'agy') continue;
       const report = page.getByTestId('model-test-result');
       for (const [phase, result] of [['passed', passing], ['failed', failing]] as const) {

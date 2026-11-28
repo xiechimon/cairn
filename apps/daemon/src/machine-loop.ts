@@ -2120,8 +2120,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               void deliverAntigravityModelProbe(ev.requestId, connectionId, probeSignal);
             }
             if (ev.type === 'provider.model-test' && connectionId !== null) {
-              void deliverModelTurn(ev.requestId, connectionId, streamCtrl.signal);
-              return;
+              void deliverModelTurn(ev.requestId, connectionId, probeSignal);
             }
             if (ev.type === 'antigravity.usage' && connectionId !== null) {
               void deliverAntigravityUsageProbe(ev.requestId, connectionId, probeSignal);

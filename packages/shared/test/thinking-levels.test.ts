@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { claudeCodeThinkingDefault, claudeCodeThinkingLevels } from '../src/thinking-levels.js';
+import {
+  claudeCodeThinkingDefault,
+  claudeCodeThinkingLevels,
+  devinSweVariant,
+  devinWireModel,
+} from '../src/thinking-levels.js';
 
 const FULL = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -86,5 +91,31 @@ describe('claudeCodeThinkingDefault', () => {
 
   it('has no default on a custom backend', () => {
     expect(claudeCodeThinkingDefault('claude-opus-4-7', { customBackend: true })).toBeUndefined();
+  });
+});
+
+describe('devinWireModel', () => {
+  it.each([
+    ['swe-2', 'high', 'swe-2-high'],
+    ['swe-2', 'off', 'swe-2-none'],
+    ['swe-2-flash', 'low', 'swe-2-flash-low'],
+    ['swe-2-1', null, 'swe-2-1-medium'],
+    ['swe-2-high', null, 'swe-2-high'],
+    ['swe-2-flash-low', undefined, 'swe-2-flash-low'],
+  ] as const)('encodes %s with effort %s as %s', (id, effort, expected) => {
+    expect(devinWireModel('devin', id, effort)).toBe(expected);
+  });
+
+  it('re-encodes an existing variant when a different effort is chosen', () => {
+    expect(devinWireModel('devin', 'swe-2-high', 'low')).toBe('swe-2-low');
+    expect(devinSweVariant(devinWireModel('devin', 'swe-2-1-medium', 'xhigh') ?? '')).toEqual({
+      baseId: 'swe-2-1',
+      level: 'xhigh',
+    });
+  });
+
+  it('leaves other providers and unknown families alone', () => {
+    expect(devinWireModel('claude', 'swe-2', 'high')).toBe('swe-2');
+    expect(devinWireModel('devin', 'glm-5-high', 'low')).toBe('glm-5-high');
   });
 });

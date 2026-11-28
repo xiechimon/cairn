@@ -135,11 +135,14 @@ export function devinWireModel(
   id: string | null,
   effort?: string | null,
 ): string | null {
-  const model = provider === 'devin' && id !== null ? sweModel(id) : undefined;
-  if (model === undefined || id === null) return id;
-  const level = thinkingLevelSchema.safeParse(effort);
-  const suffix = level.success ? level.data : model.defaultEffort;
-  return `${id}-${suffix === 'off' ? 'none' : suffix}`;
+  if (provider !== 'devin' || id === null) return id;
+  const variant = devinSweVariant(id);
+  const baseId = variant?.baseId ?? id;
+  const model = sweModel(baseId);
+  if (model === undefined) return id;
+  const chosen = thinkingLevelSchema.safeParse(effort);
+  const suffix = chosen.success ? chosen.data : (variant?.level ?? model.defaultEffort);
+  return `${baseId}-${suffix === 'off' ? 'none' : suffix}`;
 }
 
 export function devinCatalogFamilies<

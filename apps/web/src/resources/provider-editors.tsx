@@ -424,15 +424,18 @@ export function ModelTestReport({
   checks,
   failureSentence,
   failureShort = FAILURE_SHORT,
+  label,
   onClose,
 }: {
   report: ModelReport | null;
   checks: Record<string, ModelCheck>;
   failureSentence: Record<ProviderFailure, string>;
   failureShort?: Record<ProviderFailure, string>;
+  label?: (id: string) => string;
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const nameOf = label ?? ((id: string) => id);
   if (report === null) return null;
   const pending = report.ids.filter((id) => checks[id]?.phase === 'running').length;
   if (pending > 0) {
@@ -444,7 +447,7 @@ export function ModelTestReport({
         tone="checking"
         sentence={
           report.ids.length === 1
-            ? t('正在测试 {id}…', { id: report.ids[0] ?? '' })
+            ? t('正在测试 {id}…', { id: nameOf(report.ids[0] ?? '') })
             : t('正在测试 {done}/{n} 个模型…', {
                 done: report.ids.length - pending,
                 n: report.ids.length,
@@ -474,10 +477,13 @@ export function ModelTestReport({
   const sentence =
     first === undefined
       ? done.length === 1
-        ? t('{id} 回复了，能用。', { id: done[0]?.id ?? '' })
+        ? t('{id} 回复了，能用。', { id: nameOf(done[0]?.id ?? '') })
         : t('{n} 个模型都回复了，能用。', { n: done.length })
       : done.length === 1
-        ? t('{id} 未能连接：{reason}。', { id: first.id, reason: reasonOf(first.failure) })
+        ? t('{id} 未能连接：{reason}。', {
+            id: nameOf(first.id),
+            reason: reasonOf(first.failure),
+          })
         : kinds.size === 1
           ? t('{failed}/{n} 个模型未能连接：{reason}。', {
               failed: failures.length,
@@ -497,7 +503,11 @@ export function ModelTestReport({
         : failure === 'unavailable'
           ? t('测试未完成')
           : t('未通过 · {reason}', { reason: t(failureShort[failure]) });
-    return { label: id, value: `${outcome} · ${relativeTime(check.at, now, t)}`, code: true };
+    return {
+      label: nameOf(id),
+      value: `${outcome} · ${relativeTime(check.at, now, t)}`,
+      code: true,
+    };
   });
   return (
     <CheckResultPopover

@@ -988,6 +988,9 @@ export function SubscriptionDetail({
           checks={checks}
           failureSentence={modelFailureSentence(account.vendor)}
           failureShort={MODEL_FAILURE_SHORT}
+          {...(account.vendor === 'devin'
+            ? { label: (id: string) => models.find((model) => model.id === id)?.name ?? id }
+            : {})}
           onClose={tests.close}
         />
       </section>
