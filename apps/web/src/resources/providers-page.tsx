@@ -2,6 +2,7 @@ import {
   antigravitySubscriptionModelSchema,
   claudeSubscriptionModelSchema,
   devinSubscriptionModelSchema,
+  doubaoSubscriptionModelSchema,
   type ManagedUpdateRuntime,
   type ModelSource,
   type ModelSourceModel,
@@ -54,6 +55,17 @@ import {
   useUpdateDevinSubscriptionModels,
 } from '../api/devin-subscriptions.js';
 import {
+  fetchDoubaoUpstreamModels,
+  toDoubaoAccount,
+  useDeleteDoubaoSubscription,
+  useDisableDoubaoSubscription,
+  useDoubaoSubscriptions,
+  useDoubaoSubscriptionVerification,
+  useEnableDoubaoSubscription,
+  useRenameDoubaoSubscription,
+  useUpdateDoubaoSubscriptionModels,
+} from '../api/doubao-subscriptions.js';
+import {
   type ProvidersEnvelope,
   useApiMutations,
   useModelSources,
@@ -81,6 +93,7 @@ import {
   type SubscriptionRelogin,
 } from './add-provider-flow.js';
 import { AntigravityRelogin, antigravityBridge } from './antigravity-subscriptions.js';
+import { DoubaoRunnerLoginsSection } from './doubao-qr-login.js';
 import {
   applyListResponse,
   initialProviderRefresh,
@@ -109,7 +122,11 @@ import {
   subscriptionSummary,
   teamProviderStatusView,
 } from './subscription-detail.js';
-import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-groups.js';
+import {
+  groupAntigravityUpstream,
+  groupDevinUpstream,
+  groupDoubaoUpstream,
+} from './upstream-model-groups.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const ANTIGRAVITY_FALLBACK_REASONS = {
@@ -202,6 +219,14 @@ function displayedSubscriptionModels(
   account: SubscriptionAccount,
   runtimeModels: readonly ModelSourceModel[],
 ): SubscriptionModel[] {
+  if (account.vendor === 'doubao') {
+    const liveModels = account.runnerModels ?? runtimeModels;
+    const allowed = new Set(liveModels.map((model) => model.id));
+    if (account.models?.length) {
+      return allowed.size > 0 ? account.models.filter((model) => allowed.has(model.id)) : [];
+    }
+    return liveModels.map(({ id, name }) => ({ id, name }));
+  }
   if (account.models?.length) return account.models;
   if (account.vendor === 'antigravity') {
     return account.hasToken === false ? (account.runnerModels ?? []) : [];
@@ -279,19 +304,26 @@ export function ProvidersSection() {
   const refreshQuota = useRefreshClaudeQuota(teamId).mutate;
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
+  const doubaoSubscriptionsQ = useDoubaoSubscriptions(teamId, live);
   const refreshAntigravityQuota = useRefreshAntigravityQuota(teamId).mutate;
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
   const deleteDevinSubscription = useDeleteDevinSubscription(teamId);
   const deleteAntigravitySubscription = useDeleteAntigravitySubscription(teamId);
+  const deleteDoubaoSubscription = useDeleteDoubaoSubscription(teamId);
+  const enableDoubaoSubscription = useEnableDoubaoSubscription(teamId);
+  const disableDoubaoSubscription = useDisableDoubaoSubscription(teamId);
   const renameSubscription = useRenameClaudeSubscription(teamId);
   const renameDevinSubscription = useRenameDevinSubscription(teamId);
   const updateDevinModels = useUpdateDevinSubscriptionModels(teamId);
   const updateAntigravityModels = useUpdateAntigravitySubscriptionModels(teamId);
+  const updateDoubaoModels = useUpdateDoubaoSubscriptionModels(teamId);
   const updateClaudeModels = useUpdateClaudeSubscriptionModels(teamId);
   const renameAntigravitySubscription = useRenameAntigravitySubscription(teamId);
+  const renameDoubaoSubscription = useRenameDoubaoSubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
   const antigravityVerification = useAntigravitySubscriptionVerification(teamId);
+  const doubaoVerification = useDoubaoSubscriptionVerification(teamId);
   const [verifyAfterCreate, setVerifyAfterCreate] = useState<{
     id: string;
     vendor: AccountVendor;
@@ -349,9 +381,15 @@ export function ProvidersSection() {
   const antigravitySubscriptions: SubscriptionAccount[] = live
     ? (antigravitySubscriptionsQ.data ?? []).map((wire) => toAntigravityAccount(wire, now))
     : (fixtureAccounts?.antigravitySubscriptions ?? []);
+  const doubaoSubscriptions: SubscriptionAccount[] = live
+    ? (doubaoSubscriptionsQ.data?.subscriptions ?? []).map((wire) => toDoubaoAccount(wire))
+    : (fixtureAccounts?.doubaoSubscriptions ?? []);
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
   const antigravityApiIds = live ? (antigravitySubscriptionsQ.data ?? []).map((s) => s.id) : [];
+  const doubaoApiIds = live
+    ? (doubaoSubscriptionsQ.data?.subscriptions ?? []).map((s) => s.id)
+    : [];
   const antigravityOAuthIds = new Set(
     antigravitySubscriptionsQ.data
       ?.filter((row) => row.oauthPersonal === true)
@@ -546,9 +584,11 @@ export function ProvidersSection() {
         ? updateDevinModels
         : account.vendor === 'antigravity'
           ? updateAntigravityModels
-          : account.vendor === 'claude'
-            ? updateClaudeModels
-            : null;
+          : account.vendor === 'doubao'
+            ? updateDoubaoModels
+            : account.vendor === 'claude'
+              ? updateClaudeModels
+              : null;
     update?.mutate(
       { id: account.id, models },
       {
@@ -561,6 +601,7 @@ export function ProvidersSection() {
   const verifyByVendor: Partial<Record<AccountVendor, typeof verification.verify>> = {
     devin: devinVerification.verify,
     antigravity: antigravityVerification.verify,
+    doubao: doubaoVerification.verify,
   };
   const renameByVendor: Partial<
     Record<
@@ -575,22 +616,27 @@ export function ProvidersSection() {
   > = {
     devin: renameDevinSubscription,
     antigravity: renameAntigravitySubscription,
+    doubao: renameDoubaoSubscription,
   };
   const apiIdsByVendor: Partial<Record<AccountVendor, readonly string[]>> = {
     devin: devinApiIds,
     antigravity: antigravityApiIds,
+    doubao: doubaoApiIds,
   };
   const deleteByVendor: Partial<Record<AccountVendor, typeof deleteSubscription>> = {
     devin: deleteDevinSubscription,
     antigravity: deleteAntigravitySubscription,
+    doubao: deleteDoubaoSubscription,
   };
 
   const startVerification = (
     ref: { id: string; vendor: AccountVendor; runnerName?: string | null },
     opts: { retryOnMissingLogin?: boolean; force?: boolean } = {},
   ) => {
-    if (ref.vendor === 'antigravity') {
-      void antigravityVerification.verify(ref.id, {
+    if (ref.vendor === 'antigravity' || ref.vendor === 'doubao') {
+      const verifyHost =
+        ref.vendor === 'doubao' ? doubaoVerification.verify : antigravityVerification.verify;
+      void verifyHost(ref.id, {
         ...(ref.runnerName === undefined ? {} : { runnerName: ref.runnerName }),
         ...(opts.retryOnMissingLogin === true ? { retryOnMissingLogin: true } : {}),
         ...(opts.force === true ? { force: true } : {}),
@@ -606,6 +652,7 @@ export function ProvidersSection() {
     ...verification.states,
     ...devinVerification.states,
     ...antigravityVerification.states,
+    ...doubaoVerification.states,
   };
 
   const antigravityReloginFor = (account: SubscriptionAccount) => {
@@ -694,8 +741,26 @@ export function ProvidersSection() {
                       { id: account.id, label },
                       { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
                     ),
+                  ...(account.vendor === 'doubao' && providersQ.data?.canTestConnection === true
+                    ? {
+                        onToggleEnabled: () =>
+                          (account.enabled === false
+                            ? enableDoubaoSubscription
+                            : disableDoubaoSubscription
+                          ).mutate(account.id, {
+                            onSuccess: () =>
+                              void client.invalidateQueries({
+                                queryKey: [MODEL_ROUTING_KEY, teamId],
+                              }),
+                            onError: (error) => toastError(t('保存失败，请重试。'), error),
+                          }),
+                        toggleBusy:
+                          enableDoubaoSubscription.isPending || disableDoubaoSubscription.isPending,
+                      }
+                    : {}),
                   ...(account.vendor === 'devin' ||
                   account.vendor === 'antigravity' ||
+                  account.vendor === 'doubao' ||
                   account.vendor === 'claude'
                     ? {
                         onPickUpstream: (opener: HTMLButtonElement) =>
@@ -711,6 +776,7 @@ export function ProvidersSection() {
                         modelsBusy:
                           updateDevinModels.isPending ||
                           updateAntigravityModels.isPending ||
+                          updateDoubaoModels.isPending ||
                           updateClaudeModels.isPending,
                       }
                     : {}),
@@ -726,8 +792,10 @@ export function ProvidersSection() {
         : {
             onVerify: () => undefined,
             onRename: () => undefined,
+            ...(account.vendor === 'doubao' ? { onToggleEnabled: () => undefined } : {}),
             ...(account.vendor === 'devin' ||
             account.vendor === 'antigravity' ||
+            account.vendor === 'doubao' ||
             account.vendor === 'claude'
               ? { onPickUpstream: () => undefined, onRemoveModel: () => undefined }
               : {}),
@@ -737,6 +805,15 @@ export function ProvidersSection() {
           }),
     };
   };
+
+  const doubaoReloginFor = (account: SubscriptionAccount) =>
+    account.vendor === 'doubao' ? (
+      <DoubaoRunnerLoginsSection
+        account={account}
+        teamId={teamId}
+        canManage={!live || providersQ.data?.canTestConnection === true}
+      />
+    ) : undefined;
 
   const subscriptionDeps = {
     now,
@@ -774,6 +851,11 @@ export function ProvidersSection() {
       models: subscriptionModels(sources, 'antigravity'),
       reloginFor: antigravityReloginFor,
     }),
+    ...subscriptionEntries(doubaoSubscriptions, {
+      ...subscriptionDeps,
+      models: subscriptionModels(sources, 'doubao'),
+      reloginFor: doubaoReloginFor,
+    }),
     ...teamEntries(
       providers,
       deadModelIds(sources),
@@ -786,7 +868,10 @@ export function ProvidersSection() {
   ];
   const entries = orderByKeys(defaultEntries, (entry) => [entry.item.id], order);
   const partialFailure =
-    subscriptionsQ.isError || devinSubscriptionsQ.isError || antigravitySubscriptionsQ.isError
+    subscriptionsQ.isError ||
+    devinSubscriptionsQ.isError ||
+    antigravitySubscriptionsQ.isError ||
+    doubaoSubscriptionsQ.isError
       ? 'subscriptions'
       : providersQ.isError
         ? 'providers'
@@ -823,6 +908,7 @@ export function ProvidersSection() {
                   void subscriptionsQ.refetch();
                   void devinSubscriptionsQ.refetch();
                   void antigravitySubscriptionsQ.refetch();
+                  void doubaoSubscriptionsQ.refetch();
                 } else {
                   void providersQ.refetch();
                 }
@@ -849,6 +935,7 @@ export function ProvidersSection() {
                       subscriptionsQ,
                       devinSubscriptionsQ,
                       antigravitySubscriptionsQ,
+                      doubaoSubscriptionsQ,
                     )
                   : undefined
               }
@@ -903,14 +990,18 @@ export function ProvidersSection() {
                 groupModels:
                   pickingSubscription.vendor === 'devin'
                     ? groupDevinUpstream
-                    : groupAntigravityUpstream,
+                    : pickingSubscription.vendor === 'doubao'
+                      ? groupDoubaoUpstream
+                      : groupAntigravityUpstream,
               })}
           modelIdSchema={
             pickingSubscription.vendor === 'claude'
               ? claudeSubscriptionModelSchema.shape.id
               : pickingSubscription.vendor === 'devin'
                 ? devinSubscriptionModelSchema.shape.id
-                : antigravitySubscriptionModelSchema.shape.id
+                : pickingSubscription.vendor === 'doubao'
+                  ? doubaoSubscriptionModelSchema.shape.id
+                  : antigravitySubscriptionModelSchema.shape.id
           }
           testable={false}
           {...(pickingSubscription.vendor === 'antigravity'
@@ -928,7 +1019,9 @@ export function ProvidersSection() {
               ? fetchDevinUpstreamModels(teamId, pickingSubscription.id)
               : pickingSubscription.vendor === 'claude'
                 ? fetchClaudeUpstreamModels(teamId, pickingSubscription.id)
-                : fetchAntigravityUpstreamModels(teamId, pickingSubscription.id)
+                : pickingSubscription.vendor === 'doubao'
+                  ? fetchDoubaoUpstreamModels(teamId, pickingSubscription.id)
+                  : fetchAntigravityUpstreamModels(teamId, pickingSubscription.id)
           }
           opener={subscriptionPickerOpener}
           onClose={() => setSubscriptionPicker(null)}
@@ -951,7 +1044,8 @@ export function ProvidersSection() {
             confirmDisabled={
               deleteSubscription.isPending ||
               deleteDevinSubscription.isPending ||
-              deleteAntigravitySubscription.isPending
+              deleteAntigravitySubscription.isPending ||
+              deleteDoubaoSubscription.isPending
             }
             onCancel={() => setRemovingSubscription(null)}
             onConfirm={() => {

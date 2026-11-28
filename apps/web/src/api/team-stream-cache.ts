@@ -1,5 +1,6 @@
 import {
   buildRecordSchema,
+  doubaoLoginEventSchema,
   type NotificationRecord,
   notificationRecordSchema,
   type TasksQuery,
@@ -187,5 +188,17 @@ export function applyTeamStreamEvent(
     case 'chief.updated':
       void invalidateEventQueries(qc, { type: ev.type, teamId });
       break;
+    case 'doubao.login': {
+      const { data } = doubaoLoginEventSchema.safeParse(ev);
+      if (data !== undefined) {
+        void invalidateEventQueries(qc, {
+          type: 'doubao.login',
+          teamId,
+          machineId: data.machineId,
+          status: data.status,
+        });
+      }
+      break;
+    }
   }
 }

@@ -17,6 +17,8 @@ import {
   type MachineComputerFramesBody,
   type MachineComputerFramesResponse,
   type MachineDoneBody,
+  type MachineDoubaoLoginEventBody,
+  type MachineDoubaoVerifyBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
   type MachineImEventBody,
@@ -197,6 +199,8 @@ export interface MachineApi {
     signal: AbortSignal,
   ): Promise<void>;
   reportAntigravityVerify?(body: MachineAntigravityVerifyBody, signal?: AbortSignal): Promise<void>;
+  reportDoubaoVerify?(body: MachineDoubaoVerifyBody, signal?: AbortSignal): Promise<void>;
+  reportDoubaoLoginEvent?(body: MachineDoubaoLoginEventBody, signal?: AbortSignal): Promise<void>;
   steer(stepId: string): Promise<MachineSteerResponse | null>;
   steerAck?(stepId: string, body?: MachineSteerAckBody): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
@@ -761,6 +765,25 @@ export class MachineClient implements MachineApi {
     signal?: AbortSignal,
   ): Promise<void> {
     await this.request('POST', '/api/machine/antigravity/verify', {
+      body,
+      signal: signal ?? AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async reportDoubaoVerify(body: MachineDoubaoVerifyBody, signal?: AbortSignal): Promise<void> {
+    await this.request('POST', '/api/machine/doubao/verify', {
+      body,
+      signal: signal ?? AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async reportDoubaoLoginEvent(
+    body: MachineDoubaoLoginEventBody,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.request('POST', '/api/machine/doubao-login-event', {
       body,
       signal: signal ?? AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
       parse: (raw) => machineOkResponseSchema.parse(raw),

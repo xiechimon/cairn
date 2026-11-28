@@ -35,6 +35,7 @@ import {
   chiefTurnUsage,
   claudeSubscription,
   devinSubscription,
+  doubaoSubscription,
   machine,
   project,
   provider,
@@ -55,6 +56,7 @@ import {
   enabledDevinSubscriptionModels,
   hasActiveDevinSubscription,
 } from './devin-subscriptions.js';
+import { activeDoubaoSource, DEFAULT_DOUBAO_FALLBACK_MODELS } from './doubao-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
 import {
   nextProviderVersion,
@@ -353,6 +355,40 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
     });
 }
 
+function listDoubaoSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  const source = activeDoubaoSource(db, teamId);
+  if (source.kind === 'none') return [];
+  if (source.login.status === 'ok') {
+    const reported = source.login.models;
+    const picked = source.models.filter((model) => reported.some((entry) => entry.id === model.id));
+    const base =
+      picked.length > 0 || reported.length > 0
+        ? [...picked, ...reported]
+        : DEFAULT_DOUBAO_FALLBACK_MODELS;
+    const models = withKnownThinkingLevels(uniqueModels(base), reported);
+    return [
+      {
+        runtime: 'doubao',
+        installed: true,
+        hostname: source.login.hostname ?? 'doubao',
+        ...(source.login.runnerId !== null ? { machineId: source.login.runnerId } : {}),
+        models: models.map((model) => ({ ...model, slot: 'builtin' })),
+      },
+    ];
+  }
+  const models =
+    source.models.length > 0 ? uniqueModels(source.models) : [...DEFAULT_DOUBAO_FALLBACK_MODELS];
+  return [
+    {
+      runtime: 'doubao',
+      installed: source.login.status === 'missing_local_login',
+      hostname: source.login.hostname ?? 'doubao',
+      ...(source.login.runnerId !== null ? { machineId: source.login.runnerId } : {}),
+      models: models.map((model) => ({ ...model, slot: 'builtin' })),
+    },
+  ];
+}
+
 export function readProviderOrder(db: Db, teamId: string): string[] | null {
   const stored = db
     .select({ order: team.providerOrder })
@@ -391,6 +427,13 @@ function subscriptionKeys(db: Db, teamId: string) {
         .where(eq(antigravitySubscription.teamId, teamId))
         .all(),
     ),
+    doubao: keysOf(
+      db
+        .select({ id: doubaoSubscription.id })
+        .from(doubaoSubscription)
+        .where(eq(doubaoSubscription.teamId, teamId))
+        .all(),
+    ),
   } satisfies Partial<Record<ModelSourcesEnvelope['sources'][number]['runtime'], string[]>>;
 }
 
@@ -427,7 +470,8 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
     if (key !== undefined) return [key];
     return source.runtime === 'claude-code' ||
       source.runtime === 'devin' ||
-      source.runtime === 'antigravity'
+      source.runtime === 'antigravity' ||
+      source.runtime === 'doubao'
       ? subscriptions[source.runtime]
       : [];
   };
@@ -441,6 +485,7 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
         ...listDevinSources(deps.db, teamId),
         ...listGeminiSources(deps.db, teamId),
         ...listAntigravitySources(deps.db, teamId),
+        ...listDoubaoSources(deps.db, teamId),
       ],
       keysOf,
       readProviderOrder(deps.db, teamId),

@@ -1749,3 +1749,9 @@ html:not(.light)
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+.doubao-qr-frame {
+  background: var(--qr-light);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}

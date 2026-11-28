@@ -52,10 +52,12 @@ import {
   antigravityUsable,
   claudeCodeUsable,
   devinUsable,
+  doubaoUsable,
   machineRuntimeAvailable,
   requiredGithubPushRepoForStep,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import { activeDoubaoSource, DEFAULT_DOUBAO_FALLBACK_MODELS } from './doubao-subscriptions.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { isKeylessEndpoint, listConnectedTierSources, tierFallbackChain } from './source-tiers.js';
 import { decideStepRoute, primarySourceOnlyOffline } from './step-route.js';
@@ -253,7 +255,24 @@ export function defaultSessionChoice(
     return { reason: 'antigravity', provider: 'antigravity', modelId: antigravityModel };
   }
   const devinModel = devinDefaultModelId(db, teamId);
-  return devinModel === null ? null : { reason: 'devin', provider: 'devin', modelId: devinModel };
+  if (devinModel !== null) return { reason: 'devin', provider: 'devin', modelId: devinModel };
+  const doubaoModel = doubaoDefaultModelId(db, teamId);
+  return doubaoModel === null
+    ? null
+    : { reason: 'doubao', provider: 'doubao', modelId: doubaoModel };
+}
+
+function doubaoDefaultModelId(db: Pick<Db, 'select'>, teamId: string): string | null {
+  if (!doubaoUsable(db, teamId)) return null;
+  const source = activeDoubaoSource(db, teamId);
+  if (source.kind === 'none') return null;
+  const raw =
+    source.models.length > 0
+      ? source.models
+      : source.login.models.length > 0
+        ? source.login.models
+        : DEFAULT_DOUBAO_FALLBACK_MODELS;
+  return raw.find((model) => model.id !== '')?.id ?? null;
 }
 
 function isAnthropicApi(baseUrl: string): boolean {
@@ -325,7 +344,11 @@ export function defaultCoordinatorChoice(
     return { reason: 'antigravity', provider: 'antigravity', modelId: antigravityModel };
   }
   const devinModel = devinDefaultModelId(db, teamId);
-  return devinModel === null ? null : { reason: 'devin', provider: 'devin', modelId: devinModel };
+  if (devinModel !== null) return { reason: 'devin', provider: 'devin', modelId: devinModel };
+  const doubaoModel = doubaoDefaultModelId(db, teamId);
+  return doubaoModel === null
+    ? null
+    : { reason: 'doubao', provider: 'doubao', modelId: doubaoModel };
 }
 
 export function defaultCoordinatorRule(

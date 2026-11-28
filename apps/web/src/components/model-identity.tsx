@@ -10,6 +10,7 @@ import {
   ClaudeCodeMark,
   ClaudeMark,
   DevinMark,
+  DoubaoMark,
   GeminiMark,
   GrokMark,
   OpenAIMark,
@@ -57,6 +58,7 @@ export function engineRuntimeOf(engineOrRuntime: string | null | undefined): str
   if (norm === 'claude-code' || norm === 'claude code') return 'claude-code';
   if (norm === 'devin') return 'devin';
   if (norm === 'antigravity') return 'antigravity';
+  if (norm === 'doubao' || norm === '豆包') return 'doubao';
   if (norm === 'gemini') return 'gemini';
   if (norm === 'codex') return 'codex';
   if (norm === 'pi' || norm === 'cairn') return 'pi';
@@ -68,6 +70,7 @@ export function engineMarkFor(engineOrRuntime: string | null | undefined): MarkC
   if (runtime === 'claude-code') return ClaudeCodeMark;
   if (runtime === 'devin') return DevinMark;
   if (runtime === 'antigravity') return AntigravityMark;
+  if (runtime === 'doubao') return DoubaoMark;
   if (runtime === 'gemini') return GeminiMark;
   if (runtime === 'codex') return OpenAIMark;
   if (runtime === 'pi') return PiMark;
@@ -92,6 +95,7 @@ function markFromProviderId(provider: string): MarkComponent | null {
   if (lower.includes('xai') || lower.includes('grok')) return GrokMark;
   if (lower.includes('devin')) return DevinMark;
   if (lower.includes('antigravity')) return AntigravityMark;
+  if (lower.includes('doubao') || lower.includes('seed-lite')) return DoubaoMark;
   return null;
 }
 
@@ -112,6 +116,7 @@ export function modelMarkFor({
 
   if (effectiveRuntime === 'devin') return DevinMark;
   if (effectiveRuntime === 'antigravity') return AntigravityMark;
+  if (effectiveRuntime === 'doubao') return DoubaoMark;
 
   if (effectiveId.includes('claude')) return ClaudeMark;
   if (effectiveId.startsWith('devin') || effectiveId.includes('swe-')) return DevinMark;

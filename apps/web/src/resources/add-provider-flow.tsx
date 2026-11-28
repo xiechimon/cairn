@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useCreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
 import { useCreateDevinSubscription } from '../api/devin-subscriptions.js';
+import { useCreateDoubaoSubscription } from '../api/doubao-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -17,6 +18,7 @@ import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
 import { type DeviceSignInKind, useDeviceSignIn } from './device-sign-in.js';
 import { AddDevinSubscriptionDialog } from './devin-subscriptions.js';
+import { AddDoubaoSubscriptionDialog } from './doubao-subscriptions.js';
 
 export type AddProviderView =
   | 'closed'
@@ -24,11 +26,12 @@ export type AddProviderView =
   | 'codex-sign-in'
   | 'subscription'
   | 'devin-subscription'
-  | 'antigravity-subscription';
+  | 'antigravity-subscription'
+  | 'doubao-subscription';
 
 export type CreatedSubscription = { id: string; label: string };
 
-export type SubscriptionSource = 'claude' | 'devin' | 'antigravity';
+export type SubscriptionSource = 'claude' | 'devin' | 'antigravity' | 'doubao';
 
 export type SubscriptionRelogin =
   | { source: 'claude'; id: string; label: string }
@@ -66,6 +69,7 @@ export function AddProviderFlow({
   const createSubscription = useCreateClaudeSubscription(teamId);
   const createDevinSubscription = useCreateDevinSubscription(teamId);
   const createAntigravitySubscription = useCreateAntigravitySubscription(teamId);
+  const createDoubaoSubscription = useCreateDoubaoSubscription(teamId);
   const capabilities = useCapabilities(live);
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
@@ -178,6 +182,14 @@ export function AddProviderFlow({
                 }
               : undefined
           }
+          onPickDoubaoSubscription={
+            live
+              ? () => {
+                  createDoubaoSubscription.reset();
+                  onViewChange('doubao-subscription');
+                }
+              : undefined
+          }
         />
       ) : null}
       {view === 'subscription' && (
@@ -251,6 +263,33 @@ export function AddProviderFlow({
             error={createAntigravitySubscription.isError}
           />
         ))}
+      {view === 'doubao-subscription' && (
+        <AddDoubaoSubscriptionDialog
+          teamId={teamId}
+          onClose={() => {
+            createDoubaoSubscription.reset();
+            onViewChange('closed');
+          }}
+          onCreate={(body, onSaved) =>
+            createDoubaoSubscription.mutate(body, {
+              onSuccess: (created) => {
+                createDoubaoSubscription.reset();
+                if (onSaved !== undefined) {
+                  void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+                  void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+                  void client.invalidateQueries({ queryKey: ['doubao-subscriptions', teamId] });
+                  onSaved(created);
+                  return;
+                }
+                finishSubscription(created, 'doubao');
+              },
+            })
+          }
+          onFinish={(created) => finishSubscription(created, 'doubao')}
+          pending={createDoubaoSubscription.isPending}
+          error={createDoubaoSubscription.isError}
+        />
+      )}
     </>
   );
 }

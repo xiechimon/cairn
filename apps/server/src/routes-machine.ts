@@ -19,6 +19,8 @@ import {
   machineComputerFramesBodySchema,
   machineComputerRelayBodySchema,
   machineDoneBodySchema,
+  machineDoubaoLoginEventBodySchema,
+  machineDoubaoVerifyBodySchema,
   machineEnrollBodySchema,
   machineEnrollConfirmBodySchema,
   machineEnrollPollBodySchema,
@@ -87,6 +89,8 @@ import {
   receiveComputerFrames,
 } from './services/machine-computer.js';
 import { withFencedTransaction } from './services/machine-deps.js';
+import { applyDoubaoLoginEvent } from './services/machine-doubao-login.js';
+import { receiveDoubaoVerify } from './services/machine-doubao-verify.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import {
   ackMachineTokenRotation,
@@ -755,6 +759,30 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       async (row, decoded) => {
         const body = parseWith(machineAntigravityVerifyBodySchema, decoded ?? {}, 'body');
         receiveAntigravityVerify(deps, row.id, body);
+        return c.json({ ok: true as const });
+      },
+    );
+  });
+
+  app.post('/api/machine/doubao/verify', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineDoubaoVerifyBodySchema, decoded ?? {}, 'body');
+        receiveDoubaoVerify(deps, row.id, body);
+        return c.json({ ok: true as const });
+      },
+    );
+  });
+
+  app.post('/api/machine/doubao-login-event', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineDoubaoLoginEventBodySchema, decoded ?? {}, 'body');
+        applyDoubaoLoginEvent(deps, row.id, body);
         return c.json({ ok: true as const });
       },
     );

@@ -1,4 +1,4 @@
-import type { BuildRecord, TriggerSource } from '@cairn/shared';
+import type { BuildRecord, TaskRequest, TriggerSource } from '@cairn/shared';
 import {
   isInfoOutput,
   isRegisteredMachine,
@@ -25,7 +25,12 @@ export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): v
 
 function namedMachineForStart(
   deps: BuildDeps,
-  todoRecord: { teamId: string; routeOverride?: RouteOverride | null },
+  todoRecord: {
+    teamId: string;
+    projectId?: string;
+    routeOverride?: RouteOverride | null;
+    request?: TaskRequest | null;
+  },
   routeOverride: RouteOverride | undefined,
 ): { machineId: string; pin: boolean } | null {
   const profile = profileForStep(deps.db, todoRecord, 'session', null);

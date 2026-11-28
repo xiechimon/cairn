@@ -32,6 +32,7 @@ const HARNESS_NAMES = {
   pi: 'Cairn',
   devin: 'Devin',
   antigravity: 'Antigravity',
+  doubao: '豆包',
   gemini: 'Gemini',
 } as const;
 

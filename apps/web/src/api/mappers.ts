@@ -148,6 +148,8 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
     '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到「设置 → 模型」',
   'antigravity-subscription':
     '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在「设置 → 模型」中添加 Antigravity 订阅',
+  'doubao-subscription': '排队中：尚未启用豆包订阅——在「设置 → 模型」添加豆包订阅后即可扫码登录',
+  'doubao-login-required': '排队中：{machine} 尚未登录豆包，扫码后自动继续',
   'account-switched':
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始',
   'coordinator-provider-missing': 'Coordinator 规则使用的服务商「{name}」尚未添加',
@@ -171,6 +173,8 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
     '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到「设置 → 模型」',
   'antigravity-subscription':
     '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在「设置 → 模型」中添加 Antigravity 订阅',
+  'doubao-subscription': '排队中：尚未启用豆包订阅——在「设置 → 模型」添加豆包订阅后即可扫码登录',
+  'doubao-login-required': '排队中：目标执行机尚未登录豆包，扫码后自动继续',
   'github-push-missing':
     '排队中：没有在线执行机可推送到该 GitHub 仓库——在执行机上运行 gh auth login 登录 GitHub，或确认该账号有仓库写权限',
 };
@@ -1130,7 +1134,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           ? { outputTokens: runOutput }
           : {}),
         ...(queued != null && running.queue?.blocked != null
-          ? { blocked: true as const, blockedKind: running.queue.blocked.kind }
+          ? {
+              blocked: true as const,
+              blockedKind: running.queue.blocked.kind,
+              ...(running.queue.waitingFor != null ? { waitingFor: running.queue.waitingFor } : {}),
+            }
           : {}),
         ...(quota != null || (queued != null && running.queue?.hold != null)
           ? { quotaHeld: true as const }
@@ -2565,7 +2573,11 @@ export function mapChief(
           chiefStream.push({
             kind: 'streaming',
             ...(queued.blocked && turnQueue.blocked != null
-              ? { blocked: true as const, blockedKind: turnQueue.blocked.kind }
+              ? {
+                  blocked: true as const,
+                  blockedKind: turnQueue.blocked.kind,
+                  ...(turnQueue.waitingFor != null ? { waitingFor: turnQueue.waitingFor } : {}),
+                }
               : {}),
             label: queued.label,
             ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
@@ -2709,7 +2721,13 @@ export function mapOrchestrationFeedback(
       items.push({
         kind: 'streaming',
         ...(queued.blocked && thread.turnQueue.blocked != null
-          ? { blocked: true as const, blockedKind: thread.turnQueue.blocked.kind }
+          ? {
+              blocked: true as const,
+              blockedKind: thread.turnQueue.blocked.kind,
+              ...(thread.turnQueue.waitingFor != null
+                ? { waitingFor: thread.turnQueue.waitingFor }
+                : {}),
+            }
           : {}),
         label: queued.label,
         ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),

@@ -26,6 +26,7 @@ import {
   LOCAL_MACHINE_NEEDS_OWNER_REFUSAL,
   machineRecordSchema,
   machineStrain,
+  mergeReportedCapabilities,
   PROGRESS_ACTIVITY_PHASES,
   parseReportedCapabilities,
   parseStoredCapabilities,
@@ -39,10 +40,12 @@ import {
 import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
+  antigravitySubscription,
   apiKey,
   build,
   computer,
   computerCall,
+  doubaoSubscription,
   machine,
   phone,
   routingRule,
@@ -75,6 +78,7 @@ import {
   ownedStepRow,
   profileForStep,
 } from './machine-deps.js';
+import { isDoubaoAccountSwitching } from './machine-doubao-login.js';
 import {
   cancelMachineTokenRotation,
   scheduleMachineTokenRotation,
@@ -275,19 +279,6 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
 function parseCapabilitiesField(raw: unknown): MachineCapabilities | undefined {
   if (raw === undefined) return undefined;
   return parseReportedCapabilities(raw);
-}
-
-function mergeReportedCapabilities(
-  previous: MachineCapabilities | null,
-  reported: MachineCapabilities,
-): MachineCapabilities {
-  if (reported.osPlatform === undefined && previous?.osPlatform !== undefined) {
-    reported = { ...reported, osPlatform: previous.osPlatform };
-  }
-  if (reported.hardware === undefined && previous?.hardware !== undefined) {
-    return { ...reported, hardware: previous.hardware };
-  }
-  return reported;
 }
 
 function localMachineRow(db: Db, teamId: string, name: string) {
@@ -895,10 +886,17 @@ export function markPresence(
       previousLogin?.expiresAt !== reportedLogin?.expiresAt);
   const capabilities = parseCapabilitiesField(body.capabilities);
   const previousCapabilities = parseStoredCapabilities(row.capabilities) ?? null;
-  const merged =
+  const rawMerged =
     capabilities !== undefined
       ? mergeReportedCapabilities(previousCapabilities, capabilities)
       : undefined;
+  const merged =
+    rawMerged !== undefined &&
+    rawMerged.doubao?.authenticated === true &&
+    deps.machineHub !== undefined &&
+    isDoubaoAccountSwitching(deps.machineHub, machineId)
+      ? { ...rawMerged, doubao: { ...rawMerged.doubao, authenticated: false } }
+      : rawMerged;
   const reportedHostKey = body.hostKey ?? null;
   const legacyHostKeys = body.legacyHostKeys ?? [];
   const { retiredIds, computerChanged } = db.transaction(() => {
@@ -960,6 +958,9 @@ export function markPresence(
   const antigravityChanged =
     merged !== undefined &&
     JSON.stringify(merged.antigravity) !== JSON.stringify(row.capabilities?.antigravity);
+  const doubaoChanged =
+    merged !== undefined &&
+    JSON.stringify(merged.doubao) !== JSON.stringify(row.capabilities?.doubao);
   const githubPushChanged =
     merged !== undefined &&
     JSON.stringify(merged.githubPush) !== JSON.stringify(row.capabilities?.githubPush);
@@ -970,13 +971,14 @@ export function markPresence(
     computerChanged ||
     strainChanged ||
     antigravityChanged ||
+    doubaoChanged ||
     runtimeUpdateChanged ||
     githubPushChanged
   ) {
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }
-  if (githubPushChanged) {
+  if (githubPushChanged || doubaoChanged) {
     deps.machineHub.wake(row.teamId);
   }
 }
@@ -1036,6 +1038,14 @@ function reassignMachineReferencesInTx(
   db.update(computerCall)
     .set({ machineId: target.id })
     .where(eq(computerCall.machineId, dup.id))
+    .run();
+  db.update(antigravitySubscription)
+    .set({ runnerId: target.id })
+    .where(eq(antigravitySubscription.runnerId, dup.id))
+    .run();
+  db.update(doubaoSubscription)
+    .set({ runnerId: target.id })
+    .where(eq(doubaoSubscription.runnerId, dup.id))
     .run();
 }
 

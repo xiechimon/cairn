@@ -214,6 +214,7 @@ export interface ChiefBoundSubscriptions {
   claudeSubscriptionId?: string | null;
   devinSubscriptionId?: string | null;
   antigravitySubscriptionId?: string | null;
+  doubaoSubscriptionId?: string | null;
 }
 
 export function resolveChiefStepCredentials(

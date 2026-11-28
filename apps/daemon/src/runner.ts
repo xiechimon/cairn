@@ -77,6 +77,7 @@ export interface RunStepDeps {
   backendFor: (agentProviderId: string | null | undefined) => AgentBackend;
   devinHome?: () => string | undefined;
   antigravityAuth?: () => boolean;
+  doubaoAuth?: () => boolean;
   logger: DaemonLogger;
   paths: StatePaths;
   workspacesDir: string;
@@ -392,6 +393,7 @@ async function runClaimedStep(
     hasDevinToken: creds.devinToken !== undefined,
     hasAntigravityToken: creds.antigravityToken !== undefined,
     hasAntigravityHostAuth: deps.antigravityAuth?.() === true,
+    hasDoubaoHostAuth: deps.doubaoAuth?.() === true,
   });
   if (refusal !== null) {
     clearCredentials(creds);

@@ -28,6 +28,7 @@ import {
   runtimeGatePasses,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import { getModelLiveness, mergedCatalogModels } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
 import { antigravityQuotaExhausted, isKeylessEndpoint } from './source-tiers.js';
@@ -212,6 +213,9 @@ export function planModelFallback(
       );
     }
     if (runtime === 'devin') return devinSubOk;
+    if (runtime === 'doubao') {
+      return doubaoSubscriptionAllowsRunner(deps.db, agentRow.teamId, host.id, host.capabilities);
+    }
     if (runtime === 'pi') {
       const pRow = piProviders.get(m.provider);
       return pRow !== undefined && (pRow.keyed === 1 || isKeylessEndpoint(m.provider));

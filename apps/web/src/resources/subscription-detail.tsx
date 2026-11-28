@@ -69,6 +69,7 @@ const AUTH_RENEWAL: Record<AccountVendor, string> = {
   grok: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
   devin: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
   antigravity: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
+  doubao: '这个订阅在当前电脑上的豆包登录已失效，请在下方扫码重新登录。',
 };
 
 const EXPIRED_RENEWAL_COPY = '这个订阅已过期。点击「重新登录」更新凭据。';
@@ -79,6 +80,7 @@ const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
   grok: EXPIRED_RENEWAL_COPY,
   devin: EXPIRED_RENEWAL_COPY,
   antigravity: EXPIRED_RENEWAL_COPY,
+  doubao: EXPIRED_RENEWAL_COPY,
 };
 
 const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
@@ -87,6 +89,7 @@ const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
   grok: '服务器上找不到可执行的 agent',
   devin: '服务器上找不到 devin 命令',
   antigravity: AUTH_RENEWAL.antigravity,
+  doubao: AUTH_RENEWAL.doubao,
 };
 
 function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
@@ -96,7 +99,10 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
     unavailable: UNAVAILABLE_COPY[vendor],
     quota: '模型额度已用尽，请等待额度恢复后重试。',
     failed: '验证没有通过，请重试',
-    missing_local_login: '执行机尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
+    missing_local_login:
+      vendor === 'doubao'
+        ? '这台电脑尚未登录豆包，请在下方扫码登录。'
+        : '执行机尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
   };
 }
 
@@ -106,6 +112,7 @@ const PASSED_COPY: Record<AccountVendor, string> = {
   grok: '这个订阅的登录有效。',
   devin: 'Devin 接受了这个凭据。',
   antigravity: 'Antigravity 接受了这个凭据。',
+  doubao: '豆包接受了这个凭据。',
 };
 
 const VERIFYING_COPY: Record<AccountVendor, string> = {
@@ -114,6 +121,7 @@ const VERIFYING_COPY: Record<AccountVendor, string> = {
   grok: '正在检查这个订阅的登录…',
   devin: '正在让 Devin 检查这个凭据…',
   antigravity: '正在让 Antigravity 检查这个凭据…',
+  doubao: '正在让豆包检查这个凭据…',
 };
 
 const MODEL_FAILURE_SHORT: Record<ProviderFailure, string> = { ...FAILURE_SHORT, auth: '登录失效' };
@@ -256,6 +264,9 @@ export function subscriptionStatusView(
   t: TFunc,
   clock: (ts: number, now: number) => string,
 ): SubscriptionStatusView {
+  if (account.enabled === false) {
+    return { tone: 'off', label: t('已停用'), reason: null };
+  }
   switch (account.state) {
     case 'ok':
       if (account.runnerOffline === true) {
@@ -263,27 +274,45 @@ export function subscriptionStatusView(
       }
       if (account.runnerLogin === 'unavailable' || account.runnerLogin === 'missing_local_login') {
         const reason =
-          account.vendor === 'antigravity' &&
-          account.runnerLogin === 'missing_local_login' &&
-          account.runnerName != null
-            ? t('这个订阅绑定在 {machine}。请在 {machine} 上登录 Antigravity，或改用 API key。', {
-                machine: account.runnerName,
-              })
-            : account.vendor === 'antigravity' &&
+          account.vendor === 'doubao' && account.runnerLogin === 'missing_local_login'
+            ? t(
+                account.runnerName != null
+                  ? '{machine} 尚未登录豆包，请在下方扫码登录。'
+                  : '目标执行机尚未登录豆包，请在下方扫码登录。',
+                account.runnerName != null ? { machine: account.runnerName } : undefined,
+              )
+            : account.vendor === 'doubao' &&
                 account.runnerLogin === 'unavailable' &&
                 account.runnerName != null
-              ? t(
-                  '{machine} 尚未安装 Antigravity，或暂不可用。请确认执行机在线后重试，或改用 API key。',
-                  {
-                    machine: account.runnerName,
-                  },
-                )
+              ? t('{machine} 尚未安装豆包，或暂不可用。请确认执行机在线后重试。', {
+                  machine: account.runnerName,
+                })
               : account.vendor === 'antigravity' &&
-                  account.runnerLogin === 'unavailable' &&
-                  account.runnerName == null &&
-                  (account.runnerLogins?.length ?? 0) > 1
-                ? t('这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。')
-                : t(AUTH_RENEWAL[account.vendor]);
+                  account.runnerLogin === 'missing_local_login' &&
+                  account.runnerName != null
+                ? t(
+                    '这个订阅绑定在 {machine}。请在 {machine} 上登录 Antigravity，或改用 API key。',
+                    {
+                      machine: account.runnerName,
+                    },
+                  )
+                : account.vendor === 'antigravity' &&
+                    account.runnerLogin === 'unavailable' &&
+                    account.runnerName != null
+                  ? t(
+                      '{machine} 尚未安装 Antigravity，或暂不可用。请确认执行机在线后重试，或改用 API key。',
+                      {
+                        machine: account.runnerName,
+                      },
+                    )
+                  : account.vendor === 'antigravity' &&
+                      account.runnerLogin === 'unavailable' &&
+                      account.runnerName == null &&
+                      (account.runnerLogins?.length ?? 0) > 1
+                    ? t(
+                        '这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。',
+                      )
+                    : t(AUTH_RENEWAL[account.vendor]);
         return {
           tone: 'warn',
           label: hostRunnerStatusLabel(account, t),
@@ -330,6 +359,7 @@ const SUBSCRIPTION_RUNTIME: Partial<Record<AccountVendor, ModelSourceRuntime>> =
   claude: 'claude-code',
   devin: 'devin',
   antigravity: 'antigravity',
+  doubao: 'doubao',
 };
 
 export interface RuntimeUpdateSummary {
@@ -699,9 +729,11 @@ function VerifyResultPopover({
         onClose={() => setOpen(false)}
         tone="checking"
         sentence={
-          vendor === 'antigravity' && checkingRunner !== null
-            ? t('正在让 {machine} 上的 Antigravity 检查这个凭据…', { machine: checkingRunner })
-            : t(VERIFYING_COPY[vendor])
+          vendor === 'doubao' && checkingRunner !== null
+            ? t('正在让 {machine} 上的豆包检查这个凭据…', { machine: checkingRunner })
+            : vendor === 'antigravity' && checkingRunner !== null
+              ? t('正在让 {machine} 上的 Antigravity 检查这个凭据…', { machine: checkingRunner })
+              : t(VERIFYING_COPY[vendor])
         }
         detail={null}
         testId="subscription-verify-feedback"
@@ -721,9 +753,11 @@ function VerifyResultPopover({
       phase={verification.phase}
       sentence={withCodeSpans(
         verification.phase === 'passed'
-          ? vendor === 'antigravity' && checkedRunner !== null
-            ? t('{machine} 上的 Antigravity 接受了这个凭据。', { machine: checkedRunner })
-            : t(PASSED_COPY[vendor])
+          ? vendor === 'doubao' && checkedRunner !== null
+            ? t('{machine} 上的豆包接受了这个凭据。', { machine: checkedRunner })
+            : vendor === 'antigravity' && checkedRunner !== null
+              ? t('{machine} 上的 Antigravity 接受了这个凭据。', { machine: checkedRunner })
+              : t(PASSED_COPY[vendor])
           : verification.phase === 'not-run'
             ? t(NOT_RUN_COPY[verification.cause])
             : runnerOffline === true && verification.reason === 'unavailable'
@@ -731,31 +765,59 @@ function VerifyResultPopover({
                 ? t('执行机 {machine} 离线', { machine: checkedRunner })
                 : t('执行机离线')
               : verification.reason === 'unavailable' &&
-                  vendor === 'antigravity' &&
+                  vendor === 'doubao' &&
                   checkedRunner !== null
-                ? t(
-                    '无法在 {machine} 上运行 Antigravity 检查，请确认执行机已安装 Antigravity 且在线后重试。',
-                    { machine: checkedRunner },
-                  )
+                ? t('{machine} 暂不可用（未安装豆包或正在切换账号），请确认状态后重试。', {
+                    machine: checkedRunner,
+                  })
                 : verification.reason === 'unavailable' &&
                     vendor === 'antigravity' &&
-                    checkedRunner === null &&
-                    multiRunnerUnbound
-                  ? t('这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。')
-                  : verification.reason === 'timeout' &&
+                    checkedRunner !== null
+                  ? t(
+                      '无法在 {machine} 上运行 Antigravity 检查，请确认执行机已安装 Antigravity 且在线后重试。',
+                      { machine: checkedRunner },
+                    )
+                  : verification.reason === 'unavailable' &&
                       vendor === 'antigravity' &&
-                      checkedRunner !== null
-                    ? t('{machine} 上的 Antigravity 验证超时，请重试', { machine: checkedRunner })
-                    : verification.reason === 'auth' && expired
-                      ? t(EXPIRED_RENEWAL[vendor])
-                      : verification.reason === 'missing_local_login' && checkedRunner !== null
-                        ? t(
-                            '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
-                            {
-                              machine: checkedRunner,
-                            },
-                          )
-                        : t(failureCopy(vendor)[verification.reason]),
+                      checkedRunner === null &&
+                      multiRunnerUnbound
+                    ? t(
+                        '这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。',
+                      )
+                    : verification.reason === 'timeout' &&
+                        vendor === 'doubao' &&
+                        checkedRunner !== null
+                      ? t('{machine} 上的豆包验证超时，请重试', { machine: checkedRunner })
+                      : verification.reason === 'timeout' &&
+                          vendor === 'antigravity' &&
+                          checkedRunner !== null
+                        ? t('{machine} 上的 Antigravity 验证超时，请重试', {
+                            machine: checkedRunner,
+                          })
+                        : verification.reason === 'failed' &&
+                            vendor === 'doubao' &&
+                            checkedRunner !== null
+                          ? t(
+                              '无法在 {machine} 上运行豆包检查，请确认执行机已安装豆包且在线后重试。',
+                              {
+                                machine: checkedRunner,
+                              },
+                            )
+                          : verification.reason === 'auth' && expired
+                            ? t(EXPIRED_RENEWAL[vendor])
+                            : verification.reason === 'missing_local_login' &&
+                                checkedRunner !== null
+                              ? vendor === 'doubao'
+                                ? t('{machine} 尚未登录豆包，请在下方扫码登录。', {
+                                    machine: checkedRunner,
+                                  })
+                                : t(
+                                    '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
+                                    {
+                                      machine: checkedRunner,
+                                    },
+                                  )
+                              : t(failureCopy(vendor)[verification.reason]),
       )}
       detail={verifyDetailFacts(vendor, verification, at, Date.now(), t)}
       testId="subscription-verify-feedback"
@@ -768,6 +830,8 @@ export interface SubscriptionActions {
   onSignInAgain?: () => void;
   signingInAgain?: boolean;
   onVerify?: () => void;
+  onToggleEnabled?: () => void;
+  toggleBusy?: boolean;
   onUpdateRuntime?: () => void;
   updatingRuntime?: boolean;
   onRename?: (label: string) => void;
@@ -898,6 +962,7 @@ export function SubscriptionDetail({
         {...(actions.onRename === undefined ? {} : { onRename: actions.onRename })}
         aside={
           (actions.onSignInAgain !== undefined ||
+            actions.onToggleEnabled !== undefined ||
             showRuntimeUpdate ||
             actions.onVerify !== undefined) && (
             <span className="flex items-center gap-2">
@@ -906,6 +971,17 @@ export function SubscriptionDetail({
                   onClick={actions.onSignInAgain}
                   pending={actions.signingInAgain === true}
                 />
+              )}
+              {actions.onToggleEnabled !== undefined && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="subscription-toggle-enabled"
+                  disabled={actions.toggleBusy === true}
+                  onClick={actions.onToggleEnabled}
+                >
+                  {account.enabled === false ? t('启用') : t('停用')}
+                </Button>
               )}
               {showRuntimeUpdate && (
                 <Button

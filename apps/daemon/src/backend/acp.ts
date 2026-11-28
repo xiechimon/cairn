@@ -237,6 +237,25 @@ function antigravityAcpErrorMessage(error: unknown, message: string): string {
   return message;
 }
 
+function isDoubaoAuthError(error: unknown, message: string): boolean {
+  return (
+    acpErrorCode(error) === -32000 ||
+    /authentication required|not logged in|unauthorized|登录已失效|请运行\s*doubao login|run doubao login/i.test(
+      message,
+    )
+  );
+}
+
+function doubaoAcpErrorMessage(error: unknown, message: string): string {
+  if (FAILED_SPAWN.test(message) || /\bdoubao\b(?:(?!\bdoubao\b).)*not found/i.test(message)) {
+    return '未找到豆包 CLI 运行时，请在 Cairn 中重新触发豆包扫码登录以自动安装。';
+  }
+  if (isDoubaoAuthError(error, message)) {
+    return `豆包未登录或登录已失效，请在 Cairn 中重新扫码登录。 ${message}`;
+  }
+  return message;
+}
+
 export function acpErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/spawn agy (?:(?!spawn agy ).)*ENOENT|\bagy\b(?:(?!\bagy\b).)*not found/i.test(message)) {
@@ -544,7 +563,12 @@ class AcpSession implements AgentSessionHandle {
           this.adapter?.harness === 'antigravity'
             ? isAntigravityAuthError(error, rawMessage) ||
               isAntigravityAuthError(error, baseMessage)
-            : !this.adapter && (isGeminiAuthMessage(rawMessage) || isGeminiAuthMessage(message));
+            : this.adapter?.harness === 'doubao'
+              ? isDoubaoAuthError(error, rawMessage) || isDoubaoAuthError(error, baseMessage)
+              : !this.adapter && (isGeminiAuthMessage(rawMessage) || isGeminiAuthMessage(message));
+        if (isAuth && this.adapter?.harness === 'doubao') {
+          this.adapter.onDoubaoAuthFailure?.();
+        }
         const structured =
           direct !== null && direct.failureCode !== 'runtime_exited'
             ? direct
@@ -948,7 +972,8 @@ class AcpBackend implements AgentBackend {
       ? 'gemini'
       : adapter.harness === 'devin' ||
           adapter.harness === 'claude-code' ||
-          adapter.harness === 'antigravity'
+          adapter.harness === 'antigravity' ||
+          adapter.harness === 'doubao'
         ? adapter.harness
         : null;
     if (briefId !== null) {
@@ -1265,6 +1290,9 @@ class AcpBackend implements AgentBackend {
           sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
           syncAntigravityToolPermission(sessionEnv.HOME, policy);
           cleanupHooks = installAntigravityTurnHooks(opts.cwd, policy);
+        }
+        if (adapter?.harness === 'doubao') {
+          sessionEnv.DOUBAO_CLI_NO_UPDATE_CHECK = '1';
         }
         const env = runtimeChildEnv(sessionEnv);
         child = spawnProcess(command, args, {
@@ -1704,7 +1732,10 @@ class AcpBackend implements AgentBackend {
                     throw new StepFailureError(crash.message, crash.code, crash.detail);
                   }
                   const detail = error instanceof Error ? error.message : String(error);
-                  if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
+                  if (
+                    (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) ||
+                    (adapter?.harness === 'doubao' && isDoubaoAuthError(error, detail))
+                  ) {
                     throw error;
                   }
                   if (!caps?.loadSession) {
@@ -1724,7 +1755,10 @@ class AcpBackend implements AgentBackend {
                     throw new StepFailureError(crash.message, crash.code, crash.detail);
                   }
                   const detail = error instanceof Error ? error.message : String(error);
-                  if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
+                  if (
+                    (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) ||
+                    (adapter?.harness === 'doubao' && isDoubaoAuthError(error, detail))
+                  ) {
                     throw error;
                   }
                   throw new SessionNotResumableError(resumeId, detail);
@@ -1765,6 +1799,12 @@ class AcpBackend implements AgentBackend {
               isInternalAntigravityModelId,
             );
             if (models.length > 0) adapter.onAntigravityModels?.(models);
+          } else if (adapter?.harness === 'doubao') {
+            const models = advertisedAcpModels(modelOption, {
+              [currentValueOf(modelOption)]: response.configOptions ?? [],
+              [opts.modelId]: configOptions,
+            });
+            if (models.length > 0) adapter.onDoubaoModels?.(models);
           }
         } else if (adapter) {
           throw new Error('ACP adapter did not advertise model configuration');
@@ -1800,16 +1840,31 @@ class AcpBackend implements AgentBackend {
           });
         }
         const modes = 'modes' in response ? response.modes : null;
-        if (policy !== 'normal') {
-          if (modes) {
+        if (policy !== 'normal' || isRestricted) {
+          if (modes && modes.availableModes.length > 0) {
             const target = restrictiveAcpMode(modes);
             if (target !== null) {
               await connection.agent.request(methods.agent.session.setMode, {
                 sessionId,
                 modeId: target,
               });
+            } else if (adapter?.harness === 'doubao') {
+              const restrictive =
+                modes.availableModes.find((mode) => mode.id === 'default') ??
+                modes.availableModes.find((mode) => mode.id === 'plan');
+              if (restrictive === undefined) {
+                throw new Error(
+                  'doubao ACP did not offer a restrictive mode: refusing a locked turn (fail-closed)',
+                );
+              }
+              if (modes.currentModeId !== restrictive.id) {
+                await connection.agent.request(methods.agent.session.setMode, {
+                  sessionId,
+                  modeId: restrictive.id,
+                });
+              }
             }
-          } else if (adapter?.harness === 'devin') {
+          } else if (adapter?.harness === 'devin' || adapter?.harness === 'doubao') {
             throw new Error(
               `${adapter.harness} ACP did not report its modes: refusing a locked turn (fail-closed)`,
             );
@@ -1822,6 +1877,18 @@ class AcpBackend implements AgentBackend {
             sessionId,
             modeId: 'bypass',
           });
+        }
+        if (adapter?.harness === 'doubao' && policy === 'normal' && !isRestricted) {
+          if (!modes?.availableModes.some((mode) => mode.id === 'bypass_permissions'))
+            throw new Error(
+              'Doubao ACP did not offer bypass_permissions mode for unattended steps',
+            );
+          if (modes.currentModeId !== 'bypass_permissions') {
+            await connection.agent.request(methods.agent.session.setMode, {
+              sessionId,
+              modeId: 'bypass_permissions',
+            });
+          }
         }
         if (adapter?.harness === 'antigravity') {
           const modes = 'modes' in response ? response.modes : null;
@@ -1891,19 +1958,27 @@ class AcpBackend implements AgentBackend {
         const mapped = adapter
           ? adapter.harness === 'antigravity'
             ? antigravityAcpErrorMessage(error, message)
-            : message
+            : adapter.harness === 'doubao'
+              ? doubaoAcpErrorMessage(error, message)
+              : message
           : acpErrorMessage(recorded !== null ? message : error);
         const finalMessage =
           recorded !== null || mapped !== message
             ? mapped
             : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`;
         const isMissingBinary =
-          /^Antigravity executable not found:|^Gemini executable not found:/.test(finalMessage) ||
-          FAILED_SPAWN.test(message);
+          /^Antigravity executable not found:|^Gemini executable not found:|^Doubao CLI not found/.test(
+            finalMessage,
+          ) || FAILED_SPAWN.test(message);
         const isAuth =
           adapter?.harness === 'antigravity'
             ? isAntigravityAuthError(error, message) || isAntigravityAuthError(error, finalMessage)
-            : !adapter && isGeminiAuthMessage(finalMessage);
+            : adapter?.harness === 'doubao'
+              ? isDoubaoAuthError(error, message) || isDoubaoAuthError(error, finalMessage)
+              : !adapter && isGeminiAuthMessage(finalMessage);
+        if (isAuth && adapter?.harness === 'doubao') {
+          adapter.onDoubaoAuthFailure?.();
+        }
         const direct = stepFailureOf(error);
         if (recorded !== null && recorded.code !== 'runtime_exited') {
           throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
@@ -1944,7 +2019,7 @@ export interface AcpUpdateNormalization {
 }
 
 export interface AcpBackendOptions {
-  harness: 'claude-code' | 'devin' | 'antigravity';
+  harness: 'claude-code' | 'devin' | 'antigravity' | 'doubao';
   command: string;
   args?: string[];
   resolveLaunch?: () => AcpResolvedLaunch | null;
@@ -1958,6 +2033,8 @@ export interface AcpBackendOptions {
   onSkillsLog?: (msg: string) => void;
   onDevinModels?: (models: ModelSourceModel[]) => void;
   onAntigravityModels?: (models: ModelSourceModel[]) => void;
+  onDoubaoModels?: (models: ModelSourceModel[]) => void;
+  onDoubaoAuthFailure?: () => void;
   createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;
   cancelTimeoutMs?: number;

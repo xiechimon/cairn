@@ -461,6 +461,7 @@ export type TranscriptItem =
       outputTokens?: number;
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];
+      waitingFor?: { machineId: string; name: string };
       quotaHeld?: true;
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
@@ -736,6 +737,7 @@ export type ChiefStreamItem =
       signalAt?: number;
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];
+      waitingFor?: { machineId: string; name: string };
       queueWait?: QueueWait;
     };
 

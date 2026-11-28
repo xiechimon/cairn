@@ -47,14 +47,16 @@ export function chiefLastRanOnOtherAccount(
   threadId: string,
   stepId: string,
   boundSubscriptionId: string | null,
-  runtime: 'claude-code' | 'devin' | 'antigravity' = 'claude-code',
+  runtime: 'claude-code' | 'devin' | 'antigravity' | 'doubao' = 'claude-code',
 ): boolean {
   const column =
     runtime === 'devin'
       ? step.devinSubscriptionId
       : runtime === 'antigravity'
         ? step.antigravitySubscriptionId
-        : step.claudeSubscriptionId;
+        : runtime === 'doubao'
+          ? step.doubaoSubscriptionId
+          : step.claudeSubscriptionId;
   const chiefSteps = and(eq(step.buildId, threadId), eq(step.kind, 'chief'), ne(step.id, stepId));
   const last =
     db
@@ -73,4 +75,29 @@ export function chiefLastRanOnOtherAccount(
       .get();
   const previous = last?.subscriptionId ?? null;
   return previous !== null && previous !== boundSubscriptionId;
+}
+
+export function chiefLastSessionBefore(
+  db: Pick<Db, 'select'>,
+  threadId: string,
+  stepId: string,
+  cutoffMs: number | undefined,
+): boolean {
+  if (cutoffMs === undefined) return false;
+  const last = db
+    .select({ createdAt: step.createdAt, claimedAt: step.claimedAt })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, threadId),
+        eq(step.kind, 'chief'),
+        ne(step.id, stepId),
+        isNotNull(step.sessionId),
+      ),
+    )
+    .orderBy(desc(step.createdAt))
+    .limit(1)
+    .get();
+  if (last === undefined) return false;
+  return (last.claimedAt ?? last.createdAt) < cutoffMs;
 }

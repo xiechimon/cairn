@@ -4,6 +4,7 @@ import type {
 } from './antigravity-subscription.js';
 import type { ClaudeSubscription } from './claude-subscription.js';
 import type { DevinSubscription } from './devin-subscription.js';
+import type { DoubaoSubscription, DoubaoSubscriptionModel } from './doubao-subscription.js';
 import type { SubscriptionCheck } from './subscription-check.js';
 
 export interface ClaudeSubscriptionQuotaWindow {
@@ -42,6 +43,31 @@ export interface AntigravitySubscriptionListEntry extends AntigravitySubscriptio
   runnerOffline?: boolean;
   runnerModels?: AntigravitySubscriptionModel[];
   runnerLogins?: AntigravityRunnerLogin[];
+  lastUsedAt?: number | null;
+  stepsLast24h?: number | null;
+  lastCheck?: SubscriptionCheck | null;
+}
+
+export interface DoubaoRunnerLogin {
+  runnerId: string;
+  name: string;
+  online: boolean;
+  installed: boolean;
+  platformSupported?: boolean;
+  status: 'ok' | 'missing_local_login' | 'not_installed' | 'unsupported_platform' | 'unavailable';
+}
+
+export interface DoubaoSubscriptionListEntry extends DoubaoSubscription {
+  runnerName?: string | null;
+  runnerLogin?:
+    | 'ok'
+    | 'missing_local_login'
+    | 'not_installed'
+    | 'unsupported_platform'
+    | 'unavailable';
+  runnerOffline?: boolean;
+  runnerModels?: DoubaoSubscriptionModel[];
+  runnerLogins?: DoubaoRunnerLogin[];
   lastUsedAt?: number | null;
   stepsLast24h?: number | null;
   lastCheck?: SubscriptionCheck | null;

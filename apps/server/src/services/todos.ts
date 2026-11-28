@@ -88,6 +88,7 @@ import {
   capabilityGatePasses,
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
+import { enabledDoubaoSubscriptionId } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import {
   claimEffect,
@@ -627,6 +628,7 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
               claude: enabledSubscriptionId(deps, row.teamId),
               devin: enabledDevinSubscriptionId(deps, row.teamId),
               antigravity: enabledAntigravitySubscriptionId(deps, row.teamId),
+              doubao: enabledDoubaoSubscriptionId(deps, row.teamId),
             },
             agentRow.provider,
           );

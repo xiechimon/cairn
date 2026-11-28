@@ -155,7 +155,7 @@ export function lastContextBearingTurnUsage(
   return lastContextBearingTurnUsageWhere(db, eq(chiefTurnUsage.threadId, threadId));
 }
 
-const SESSION_ROTATING_RUNTIMES: ReadonlySet<string> = new Set(['devin', 'antigravity']);
+const SESSION_ROTATING_RUNTIMES: ReadonlySet<string> = new Set(['devin', 'antigravity', 'doubao']);
 
 export function rotatesPastCompaction(db: Db, threadId: string, runtime: string): boolean {
   if (!SESSION_ROTATING_RUNTIMES.has(runtime)) return false;
@@ -277,6 +277,7 @@ const HARNESS_LABELS: Record<string, string> = {
   pi: 'Cairn',
   devin: 'Devin',
   antigravity: 'Antigravity',
+  doubao: '豆包',
   gemini: 'Gemini',
 };
 

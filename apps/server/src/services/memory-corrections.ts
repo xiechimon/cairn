@@ -413,7 +413,7 @@ function savedBy(time: number, entry: Entry, versions: readonly Row[]): boolean 
 }
 
 function promptMayNotBeResent(tx: Tx, turn: StepRow): boolean {
-  if (turn.antigravitySubscriptionId === null) return false;
+  if (turn.antigravitySubscriptionId === null && turn.doubaoSubscriptionId === null) return false;
   if (turn.sessionId !== null) return true;
   return (
     tx

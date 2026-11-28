@@ -76,6 +76,7 @@ import {
   coordinatorConversation,
   coordinatorEntry,
   devinSubscription,
+  doubaoSubscription,
   machine,
   memoryCorrection,
   message,
@@ -132,6 +133,7 @@ import {
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
+import { activeDoubaoSource } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -323,7 +325,8 @@ function outageReasonFromQueue(
   if (
     blocked === 'claude-logged-out' ||
     blocked === 'devin-subscription' ||
-    blocked === 'antigravity-subscription'
+    blocked === 'antigravity-subscription' ||
+    blocked === 'doubao-subscription'
   ) {
     return { reason: 'subscription', retryAt: null };
   }
@@ -426,6 +429,17 @@ function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
       .select({ id: antigravitySubscription.id })
       .from(antigravitySubscription)
       .where(eq(antigravitySubscription.teamId, chiefRow.teamId))
+      .get() !== undefined
+  ) {
+    return { reason: 'subscription', model, retryAt: null };
+  }
+  if (
+    runtime === 'doubao' &&
+    activeDoubaoSource(db, chiefRow.teamId).kind === 'none' &&
+    db
+      .select({ id: doubaoSubscription.id })
+      .from(doubaoSubscription)
+      .where(eq(doubaoSubscription.teamId, chiefRow.teamId))
       .get() !== undefined
   ) {
     return { reason: 'subscription', model, retryAt: null };
@@ -535,6 +549,7 @@ export function releaseParkedCoordinatorSteps(
           claudeSubscriptionId: null,
           devinSubscriptionId: null,
           antigravitySubscriptionId: null,
+          doubaoSubscriptionId: null,
           mcpGrant: null,
           targetMachineId: null,
           routedFromMachineId: null,

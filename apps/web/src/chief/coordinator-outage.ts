@@ -13,6 +13,7 @@ export function resolveCoordinatorOutage(
     kind === 'claude-logged-out' ||
     kind === 'devin-subscription' ||
     kind === 'antigravity-subscription' ||
+    kind === 'doubao-subscription' ||
     kind === 'coordinator-provider-missing' ||
     kind === 'coordinator-provider-no-key'
   ) {

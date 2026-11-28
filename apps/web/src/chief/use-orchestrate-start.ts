@@ -41,9 +41,8 @@ export function useOrchestrateStart(): OrchestrateStart {
       opts?: { savedTitle?: string; inThread?: boolean },
     ) => {
       if (!live || inFlight.current) return;
-      const sessionMachineId = routingQ.data?.rules?.find(
-        (rule) => rule.use === 'session',
-      )?.machineId;
+      const sessionRule = routingQ.data?.rules?.find((rule) => rule.use === 'session');
+      const sessionMachineId = sessionRule?.machineId;
       if (needsMachineName(machinesQ.data, sessionMachineId, todo.routeOverride?.machineId)) {
         toast.warning(t('先选择执行机'), {
           description: t('多台执行机在线时，开工前要在规则里点名一台。'),

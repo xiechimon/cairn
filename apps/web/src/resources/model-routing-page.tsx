@@ -9,6 +9,7 @@ import {
 import { toClaudeAccount } from '../api/claude-accounts.js';
 import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
 import { toDevinAccount, useDevinSubscriptions } from '../api/devin-subscriptions.js';
+import { toDoubaoAccount, useDoubaoSubscriptions } from '../api/doubao-subscriptions.js';
 import { useModelSources, useProjects, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import {
@@ -20,7 +21,7 @@ import {
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { PROVIDERS } from '../components/accounts/account-parts.js';
-import { AntigravityMark, ClaudeMark, DevinMark } from '../components/brand-marks.js';
+import { AntigravityMark, ClaudeMark, DevinMark, DoubaoMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { RouteUseGlyph } from '../components/route-use-glyph.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
@@ -44,6 +45,7 @@ const SUBSCRIPTION_MARKS = {
   'claude-code': ClaudeMark,
   devin: DevinMark,
   antigravity: AntigravityMark,
+  doubao: DoubaoMark,
 } as const;
 
 function RoutingContent() {
@@ -57,6 +59,7 @@ function RoutingContent() {
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
+  const doubaoSubscriptionsQ = useDoubaoSubscriptions(teamId, live);
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
@@ -78,6 +81,9 @@ function RoutingContent() {
     antigravitySubscriptions: live
       ? (antigravitySubscriptionsQ.data ?? []).map((wire) => toAntigravityAccount(wire, now))
       : (fixtureAccounts?.antigravitySubscriptions ?? []),
+    doubaoSubscriptions: live
+      ? (doubaoSubscriptionsQ.data?.subscriptions ?? []).map((wire) => toDoubaoAccount(wire))
+      : (fixtureAccounts?.doubaoSubscriptions ?? []),
     providers: live ? (providersQ.data?.providers ?? []) : (fixture.resources?.providers ?? []),
     routing,
   });

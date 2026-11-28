@@ -26,6 +26,7 @@ import {
   requiredGithubPushRepoForStep,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import { activeDoubaoSource, enabledDoubaoSubscriptionId } from './doubao-subscriptions.js';
 import { projectOfTodo } from './git.js';
 import {
   chiefIneligibility,
@@ -49,7 +50,11 @@ import {
   routeForStep,
 } from './routing-rules.js';
 
-function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueueBlocked {
+function ineligibleBlocked(
+  gap: MachineIneligibility,
+  runtime: string,
+  machineName?: string,
+): StepQueueBlocked {
   switch (gap.kind) {
     case 'runner-outdated':
       return { kind: 'runner-outdated', missing: [] };
@@ -69,6 +74,10 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
       return { kind: 'devin-subscription', missing: [] };
     case 'antigravity-subscription':
       return { kind: 'antigravity-subscription', missing: [] };
+    case 'doubao-subscription':
+      return { kind: 'doubao-subscription', missing: [] };
+    case 'doubao-login-required':
+      return { kind: 'doubao-login-required', missing: machineName ? [machineName] : [] };
     case 'github-push':
       return { kind: 'github-push-missing', missing: [] };
   }
@@ -169,6 +178,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   const enabledId = enabledSubscriptionId({ db }, teamId);
   const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
   const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);
+  const enabledDoubaoId = enabledDoubaoSubscriptionId({ db }, teamId);
 
   interface WorkerRouting {
     verdict: RouteVerdict;
@@ -210,6 +220,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
         claude: enabledId,
         devin: enabledDevinId,
         antigravity: enabledAntigravityId,
+        doubao: enabledDoubaoId,
       },
       facts.model.provider,
     );
@@ -249,6 +260,25 @@ export function stepQueueProjector(db: Db, teamId: string) {
       return { verdict, blocked: { kind: 'account-switched', missing: [] }, ...extra };
     }
     if (verdict.claim) return { verdict, blocked: undefined, ...extra };
+    const doubaoNoTargetBlocked = (
+      checkOnline: (m: (typeof teamMachines)[number]) => MachineIneligibility | null,
+    ): StepQueueBlocked => {
+      if (activeDoubaoSource(db, teamId).kind === 'none') {
+        return { kind: 'doubao-subscription', missing: [] };
+      }
+      const onlineRunners = teamMachines.filter(
+        (m) => m.retiredAt === null && isRegisteredMachine(m) && m.online,
+      );
+      if (onlineRunners.length === 0) return { kind: 'machine-offline', missing: [] };
+      const gaps = onlineRunners.map(checkOnline);
+      if (gaps.every((gap) => gap?.kind === 'runtime')) {
+        return { kind: 'runtime-disabled', missing: [MODEL_SOURCE_RUNTIME_LABELS.doubao] };
+      }
+      if (gaps.some((gap) => gap?.kind === 'model')) {
+        return { kind: 'model-unavailable', missing: [] };
+      }
+      return { kind: 'machine-offline', missing: [] };
+    };
     const named = verdict.waitingFor;
     if (homeRetired && facts.localProject && named === target.homeMachineId) {
       return { verdict, blocked: { kind: 'machine-retired', missing: [] }, ...extra };
@@ -270,6 +300,13 @@ export function stepQueueProjector(db: Db, teamId: string) {
             ...extra,
           };
         }
+      }
+      if (stepRuntimeFor(facts.model.provider) === 'doubao') {
+        return {
+          verdict,
+          blocked: doubaoNoTargetBlocked((m) => workerIneligibility(db, m, facts, catalog, now)),
+          ...extra,
+        };
       }
       return {
         verdict,
@@ -298,6 +335,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
           : ineligibleBlocked(
               gap,
               MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(facts.model.provider)],
+              home.name,
             ),
       ...extra,
     };
@@ -358,6 +396,28 @@ export function stepQueueProjector(db: Db, teamId: string) {
     }
     const waitingOn = resolution.waitingForId;
     const home = waitingOn === null ? undefined : teamMachines.find((m) => m.id === waitingOn);
+    if (waitingOn === null && stepRuntimeFor(provider) === 'doubao') {
+      if (activeDoubaoSource(db, teamId).kind === 'none') {
+        return { blocked: { kind: 'doubao-subscription', missing: [] }, waitingOn, ...extra };
+      }
+      const onlineRunners = teamMachines.filter(
+        (m) => m.retiredAt === null && isRegisteredMachine(m) && m.online,
+      );
+      if (onlineRunners.length === 0) {
+        return { blocked: { kind: 'machine-offline', missing: [] }, waitingOn, ...extra };
+      }
+      const gaps = onlineRunners.map((m) =>
+        chiefIneligibility(db, m, agentRow ?? { requiredCapabilities: null }, provider, now),
+      );
+      if (gaps.every((gap) => gap?.kind === 'runtime')) {
+        return {
+          blocked: { kind: 'runtime-disabled', missing: [MODEL_SOURCE_RUNTIME_LABELS.doubao] },
+          waitingOn,
+          ...extra,
+        };
+      }
+      return { blocked: { kind: 'machine-offline', missing: [] }, waitingOn, ...extra };
+    }
     if (home === undefined || !home.online) {
       return { blocked: { kind: 'machine-offline', missing: [] }, waitingOn, ...extra };
     }
@@ -365,7 +425,11 @@ export function stepQueueProjector(db: Db, teamId: string) {
       const gap = chiefIneligibility(db, home, agentRow, provider, now);
       if (gap !== null) {
         return {
-          blocked: ineligibleBlocked(gap, MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]),
+          blocked: ineligibleBlocked(
+            gap,
+            MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)],
+            home.name,
+          ),
           waitingOn,
           ...extra,
         };

@@ -12,6 +12,7 @@ import type { Db } from '../db/client.js';
 import { claudeSubscription, devinSubscription, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { listAntigravitySubscriptions } from './antigravity-subscriptions.js';
+import { DEFAULT_DOUBAO_FALLBACK_MODELS, listDoubaoSubscriptions } from './doubao-subscriptions.js';
 
 const CLAUDE_ROUTING_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 
@@ -77,6 +78,25 @@ export function getModelRouting(db: Db, teamId: string) {
       kind: 'subscription',
       models,
       available: row.expiresAt === null || row.expiresAt > now,
+    });
+  }
+  for (const row of listDoubaoSubscriptions({ db }, teamId).subscriptions) {
+    const listedModels = row.models ?? [];
+    const runnerModels = row.runnerModels ?? [];
+    const resolved =
+      listedModels.length > 0
+        ? listedModels
+        : runnerModels.length > 0
+          ? runnerModels
+          : [...DEFAULT_DOUBAO_FALLBACK_MODELS];
+    const models = resolved.map((model) => model.id).filter((id) => id !== '');
+    if (models.length === 0) continue;
+    connections.push({
+      id: row.id,
+      vendor: 'doubao',
+      kind: 'subscription',
+      models,
+      available: row.runnerLogin === 'ok',
     });
   }
   for (const row of db.select().from(provider).where(eq(provider.teamId, teamId)).all()) {

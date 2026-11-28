@@ -19,6 +19,7 @@ import { accountHeld } from './claude-account-hold.js';
 import { enabledSubscriptionId, recordClaudeQuotaNotices } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
+import { enabledDoubaoSubscriptionId } from './doubao-subscriptions.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
   liveMachineId,
@@ -131,6 +132,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
             priorMachineId: null,
             priorMachineLiveId: null,
             priorSubscriptionId: null,
+            priorStepAt: null,
             freshSession: true,
           }
         : priorSessionOf(
@@ -141,6 +143,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
               claude: enabledId,
               devin: enabledDevinId,
               antigravity: enabledAntigravityId,
+              doubao: enabledDoubaoSubscriptionId({ db: deps.db }, teamId),
             },
             agentRow.provider,
           );

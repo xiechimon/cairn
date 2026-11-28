@@ -11,7 +11,11 @@ import { MACHINE_TOKEN_PATTERN } from '../brand.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { hostKeySchema, machineRecordSchema } from '../records/machine.js';
-import { antigravityModelSchema, GITHUB_PUSH_MAX_REPOS } from '../records/machine-capabilities.js';
+import {
+  antigravityModelSchema,
+  doubaoModelSchema,
+  GITHUB_PUSH_MAX_REPOS,
+} from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
   messageRoleSchema,
@@ -403,6 +407,13 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.usage'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.verify'), checkId: antigravityCheckIdSchema }),
+  z.object({ type: z.literal('doubao.verify'), checkId: antigravityCheckIdSchema }),
+  z.object({
+    type: z.literal('doubao.login.start'),
+    loginId: antigravityCheckIdSchema,
+    logoutFirst: z.boolean().optional(),
+  }),
+  z.object({ type: z.literal('doubao.login.cancel'), loginId: antigravityCheckIdSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
   z.object({ type: z.literal('runtime.update'), runtime: managedUpdateRuntimeSchema }),
@@ -438,6 +449,62 @@ export const machineAntigravityVerifyBodySchema = z.object({
   error: z.string().max(500).optional(),
 });
 export type MachineAntigravityVerifyBody = z.infer<typeof machineAntigravityVerifyBodySchema>;
+
+export const machineDoubaoVerifyBodySchema = z.object({
+  checkId: antigravityCheckIdSchema,
+  installed: z.boolean(),
+  authenticated: z.boolean(),
+  platformSupported: z.boolean().optional(),
+  timedOut: z.boolean().optional(),
+  version: z.string().min(1).max(64).optional(),
+  models: z.array(doubaoModelSchema).max(2000).optional(),
+  probedAt: z.number().int().nonnegative().optional(),
+  durationMs: z.number().int().nonnegative().max(300_000).optional(),
+  error: z.string().max(500).optional(),
+});
+export type MachineDoubaoVerifyBody = z.infer<typeof machineDoubaoVerifyBodySchema>;
+
+export const machineDoubaoLoginEventBodySchema = z.object({
+  loginId: antigravityCheckIdSchema,
+  status: z.enum([
+    'installing',
+    'starting',
+    'qr',
+    'scanned',
+    'verifying',
+    'succeeded',
+    'expired',
+    'refused',
+    'cancelled',
+    'failed',
+  ]),
+  revision: z.number().int().nonnegative().max(10_000),
+  qrPngBase64: z.string().max(100_000).optional(),
+  reason: z
+    .enum([
+      'unsupported_platform',
+      'install_failed',
+      'keychain_locked',
+      'unsupported_account',
+      'refused',
+      'expired',
+      'offline',
+      'unknown',
+    ])
+    .optional(),
+  detail: z.string().max(500).optional(),
+  doubao: z
+    .object({
+      installed: z.boolean(),
+      authenticated: z.boolean(),
+      platformSupported: z.boolean().optional(),
+      version: z.string().min(1).max(64).optional(),
+      models: z.array(doubaoModelSchema).max(2000).optional(),
+      probedAt: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
+});
+export type MachineDoubaoLoginEventBody = z.infer<typeof machineDoubaoLoginEventBodySchema>;
 
 export const steerAnswerSchema = z.object({
   requestId: z.string().min(1),
@@ -749,6 +816,18 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/antigravity/verify',
     reason:
       '[design] live Antigravity Runner sign-in probe reply correlated by checkId and scoped to the authenticated machine',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/doubao/verify',
+    reason:
+      '[design] live Doubao Runner sign-in probe reply correlated by checkId and scoped to the authenticated machine',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/doubao-login-event',
+    reason:
+      '[design] live Doubao Runner QR login event correlated by loginId and scoped to the authenticated machine',
   },
   {
     method: 'GET',

@@ -1150,17 +1150,24 @@
           "apps/web/src/resources/antigravity-subscriptions.tsx",
           "apps/web/src/board/antigravity-login-banner.tsx",
           "apps/web/src/antigravity-login-warning.ts",
-          "apps/web/src/api/antigravity-subscriptions.ts"
+          "apps/web/src/api/antigravity-subscriptions.ts",
+          "apps/web/src/resources/doubao-subscriptions.tsx",
+          "apps/web/src/resources/doubao-qr-login.tsx",
+          "apps/web/src/api/doubao-subscriptions.ts"
         ],
         "daemon": [
-          "apps/daemon/src/backend/antigravity-managed.ts"
+          "apps/daemon/src/backend/antigravity-managed.ts",
+          "apps/daemon/src/backend/doubao-probe.ts",
+          "apps/daemon/src/backend/doubao-managed.ts",
+          "apps/daemon/src/backend/doubao-login.ts"
         ],
         "other": [
           "apps/desktop/src/antigravity-auth.ts",
           "apps/desktop/src/preload.ts",
           "apps/desktop/src/main.ts",
           "packages/shared/src/node/antigravity-install.ts",
-          "packages/shared/src/antigravity-local.ts"
+          "packages/shared/src/antigravity-local.ts",
+          "packages/shared/src/node/doubao-install.ts"
         ],
         "server": [
           "apps/server/src/services/providers.ts",
@@ -1169,6 +1176,9 @@
           "apps/server/src/services/devin-subscription-verification.ts",
           "apps/server/src/services/antigravity-subscriptions.ts",
           "apps/server/src/services/antigravity-subscription-verification.ts",
+          "apps/server/src/services/doubao-subscriptions.ts",
+          "apps/server/src/services/machine-doubao-verify.ts",
+          "apps/server/src/services/machine-doubao-login.ts",
           "apps/server/src/services/model-liveness.ts"
         ]
       },
@@ -1183,6 +1193,9 @@
           "/api/teams/:id/claude-subscriptions**",
           "/api/teams/:id/devin-subscriptions**",
           "/api/teams/:id/antigravity-subscriptions**",
+          "/api/teams/:id/doubao-subscriptions**",
+          "/api/teams/:id/machines/:mid/doubao-login",
+          "/api/machine/doubao-login-event",
           "/api/teams/:id/models",
           "/api/teams/:id/model-sources",
           "/api/oauth/callback"
@@ -1212,24 +1225,32 @@
         "docs/spec/11-model-service-and-machine-localization.md",
         "docs/research/r16-model-catalog-liveness.md",
         "docs/design/devin-subscription-source.md",
-        "docs/design/antigravity-subscription-source.md"
+        "docs/design/antigravity-subscription-source.md",
+        "docs/design/doubao-runtime.md"
       ],
       "evidence": [
         "apps/web/e2e/providers-claude-subscription.spec.ts",
         "apps/web/e2e/provider-add-dialog.spec.ts",
         "apps/web/e2e/devin-local-login.spec.ts",
         "apps/web/e2e/antigravity-local-login.spec.ts",
+        "apps/web/e2e/providers-doubao-subscription.spec.ts",
         "apps/server/test/claude-subscriptions.test.ts",
         "apps/server/test/devin-subscriptions.test.ts",
         "apps/server/test/antigravity-subscriptions.test.ts",
+        "apps/server/test/doubao-subscriptions.test.ts",
+        "apps/server/test/doubao-claim.test.ts",
         "packages/shared/test/devin-local.test.ts",
         "packages/shared/test/antigravity-local.test.ts",
         "packages/shared/test/antigravity-install.test.ts",
+        "packages/shared/test/doubao-subscription.test.ts",
         "apps/web/test/antigravity-login-warning.test.ts",
+        "apps/web/test/doubao-subscriptions.test.ts",
         "apps/daemon/test/devin-acp.test.ts",
         "apps/daemon/test/devin-managed.test.ts",
         "apps/daemon/test/antigravity-acp.test.ts",
-        "apps/daemon/test/antigravity-managed.test.ts"
+        "apps/daemon/test/antigravity-managed.test.ts",
+        "apps/daemon/test/doubao-acp.test.ts",
+        "apps/daemon/test/doubao-login.test.ts"
       ]
     },
     {

@@ -83,6 +83,7 @@ import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-r
 import { showChart, showDiff } from './chief-show.js';
 import { readConversationPage } from './conversation-page.js';
 import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
+import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
 import { isGithubRepoRef, PROJECT_FILES_MAX_LIMIT, readFile, readFiles } from './git.js';
@@ -307,6 +308,7 @@ function trimProviderSummary<T extends { installed: boolean }>(
 function trimCapabilitiesForCoordinator(
   capabilities: NonNullable<ReturnType<typeof parseStoredCapabilities>>,
   antigravityAllowed = false,
+  doubaoAllowed = false,
 ) {
   const devin = trimProviderSummary(capabilities.devin);
   const gemini = trimProviderSummary(capabilities.gemini);
@@ -315,6 +317,9 @@ function trimCapabilitiesForCoordinator(
     rawAntigravity?.installed && antigravityAllowed
       ? { ...rawAntigravity, authenticated: true }
       : rawAntigravity;
+  const rawDoubao = trimProviderSummary(capabilities.doubao, true);
+  const doubao =
+    rawDoubao?.installed && doubaoAllowed ? { ...rawDoubao, authenticated: true } : rawDoubao;
   return {
     ...(capabilities.osPlatform !== undefined ? { osPlatform: capabilities.osPlatform } : {}),
     ...(capabilities.computerName !== undefined ? { computerName: capabilities.computerName } : {}),
@@ -335,6 +340,7 @@ function trimCapabilitiesForCoordinator(
     ...(devin !== undefined ? { devin } : {}),
     ...(gemini !== undefined ? { gemini } : {}),
     ...(antigravity !== undefined ? { antigravity } : {}),
+    ...(doubao !== undefined ? { doubao } : {}),
   };
 }
 
@@ -520,13 +526,19 @@ export async function executeChiefTool(
             parsed != null &&
             parsed.antigravity?.installed === true &&
             antigravitySubscriptionAllowsRunner(db, ctx.teamId, m.id, parsed);
+          const doubaoAllowed =
+            parsed != null &&
+            parsed.doubao?.installed === true &&
+            doubaoSubscriptionAllowsRunner(db, ctx.teamId, m.id, parsed);
           return {
             id: m.id,
             name: m.name,
             online: m.online,
             latestCliVersion: m.latestCliVersion,
             capabilities:
-              parsed != null ? trimCapabilitiesForCoordinator(parsed, antigravityAllowed) : null,
+              parsed != null
+                ? trimCapabilitiesForCoordinator(parsed, antigravityAllowed, doubaoAllowed)
+                : null,
           };
         }),
       );

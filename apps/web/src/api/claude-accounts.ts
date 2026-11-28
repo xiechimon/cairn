@@ -4,6 +4,7 @@ import type {
   ClaudeSubscriptionListEntry,
   ClaudeSubscriptionQuotaWindow,
   DevinSubscriptionModel,
+  DoubaoRunnerLogin,
   MachineRecord,
 } from '@cairn/shared';
 
@@ -12,7 +13,14 @@ export type AccountState = (typeof ACCOUNT_STATES)[number];
 
 export type QuotaWindow = ClaudeSubscriptionQuotaWindow;
 
-export const ACCOUNT_VENDORS = ['claude', 'codex', 'grok', 'devin', 'antigravity'] as const;
+export const ACCOUNT_VENDORS = [
+  'claude',
+  'codex',
+  'grok',
+  'devin',
+  'antigravity',
+  'doubao',
+] as const;
 export type AccountVendor = (typeof ACCOUNT_VENDORS)[number];
 
 export type SubscriptionModel = DevinSubscriptionModel;
@@ -21,6 +29,7 @@ export interface SubscriptionAccount {
   id: string;
   vendor: AccountVendor;
   label: string;
+  enabled?: boolean;
   expiresAt: number | null;
   createdAt: number;
   plan: string | null;
@@ -37,6 +46,7 @@ export interface SubscriptionAccount {
   runnerOffline?: boolean;
   runnerModels?: SubscriptionModel[];
   runnerLogins?: AntigravityRunnerLogin[];
+  doubaoRunnerLogins?: DoubaoRunnerLogin[];
 }
 
 const isAccountState = (value: unknown): value is AccountState =>
@@ -68,7 +78,7 @@ export interface AccountMachine {
   name: string;
 }
 
-export type ProviderRuntime = 'claude-code' | 'codex' | 'pi' | 'devin' | 'antigravity';
+export type ProviderRuntime = 'claude-code' | 'codex' | 'pi' | 'devin' | 'antigravity' | 'doubao';
 export type ProviderLogin = 'logged-in' | 'logged-out' | 'unknown';
 
 export interface MachineProvider {

@@ -27,14 +27,16 @@ import { build, machine, type project, provider, step, todo } from '../db/schema
 import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
+import { activeDoubaoSource } from './doubao-subscriptions.js';
 import { githubRepoOfProject } from './git.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
-): 'pi' | 'claude-code' | 'gemini' | 'devin' | 'antigravity' {
+): 'pi' | 'claude-code' | 'gemini' | 'devin' | 'antigravity' | 'doubao' {
   if (agentProvider === 'gemini') return 'gemini';
   if (agentProvider === 'devin') return 'devin';
   if (agentProvider === 'antigravity') return 'antigravity';
+  if (agentProvider === 'doubao') return 'doubao';
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 
@@ -42,7 +44,7 @@ export interface MachineRuntimeFacts {
   claudeCodeReport: Pick<ClaudeCodeReport, 'installed'> | null;
   capabilities: Pick<
     MachineCapabilities,
-    'executor' | 'devin' | 'antigravity' | 'osPlatform' | 'confinement'
+    'executor' | 'devin' | 'antigravity' | 'doubao' | 'osPlatform' | 'confinement'
   > | null;
 }
 
@@ -54,6 +56,7 @@ export function machineRuntimeAvailable(
   if (runtime === 'gemini') return false;
   if (runtime === 'devin') return machineRow.capabilities?.devin?.installed === true;
   if (runtime === 'antigravity') return machineRow.capabilities?.antigravity?.installed === true;
+  if (runtime === 'doubao') return machineRow.capabilities?.doubao?.installed === true;
   return (
     machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
   );
@@ -63,7 +66,14 @@ export function machineRuntimeClaimable(
   machineRow: MachineRuntimeFacts,
   runtime: MachineRuntime,
 ): boolean {
-  return runtime === 'gemini' || machineRuntimeAvailable(machineRow, runtime);
+  if (runtime === 'gemini') return true;
+  if (runtime === 'doubao') {
+    return (
+      machineRow.capabilities?.doubao !== undefined &&
+      machineRow.capabilities.doubao.platformSupported !== false
+    );
+  }
+  return machineRuntimeAvailable(machineRow, runtime);
 }
 
 export function availableRuntimes(machineRow: MachineRuntimeFacts): MachineRuntime[] {
@@ -132,6 +142,11 @@ export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boole
     );
 }
 
+export function doubaoUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
+  const source = activeDoubaoSource(db, teamId);
+  return source.kind === 'host' && source.login.status === 'ok';
+}
+
 export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): boolean {
   return (
     db
@@ -154,6 +169,9 @@ function runtimeMissingReason(name: string, runtime: MachineRuntime): string {
   }
   if (runtime === 'antigravity') {
     return `执行机 ${name} 尚未安装 Antigravity（agy 未检测到且托管下载失败或未上线）：请安装 agy 或重启执行机。`;
+  }
+  if (runtime === 'doubao') {
+    return `执行机 ${name} 暂不支持豆包 CLI（需受支持平台且执行机已升级到支持豆包的版本）。`;
   }
   return `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：安装后重启执行机。`;
 }
@@ -259,6 +277,17 @@ export function homeMachineRejectReason(
       return `执行机 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该执行机的 ~/.claude/settings.json 配上，或在路由规则里换模型）。`;
     }
   }
+  const doubaoModels = machineRow.capabilities?.doubao?.models ?? [];
+  if (
+    runtime === 'doubao' &&
+    agentRow.modelId != null &&
+    agentRow.modelId !== '' &&
+    machineRow.capabilities?.doubao?.authenticated === true &&
+    doubaoModels.length > 0 &&
+    !doubaoModels.some((m) => m.id === agentRow.modelId)
+  ) {
+    return `执行机 ${machineRow.name} 的豆包账号未提供模型 ${agentRow.modelId}。`;
+  }
   return null;
 }
 
@@ -281,6 +310,8 @@ export interface EligibilityInput {
   devinSubscriptionMissing: boolean;
   antigravitySubscriptionMissing?: boolean;
   antigravityHostLogin?: boolean;
+  doubaoSubscriptionMissing?: boolean;
+  doubaoLoginRequired?: boolean;
   githubPushMissing?: boolean;
 }
 
@@ -338,6 +369,8 @@ export type MachineIneligibility =
         | 'claude-login'
         | 'devin-subscription'
         | 'antigravity-subscription'
+        | 'doubao-subscription'
+        | 'doubao-login-required'
         | 'github-push';
     }
   | { kind: 'model'; reason: string }
@@ -354,7 +387,7 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   }
   if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };
   const modelReject =
-    agentRow.machineId === machineRow.id
+    agentRow.machineId === machineRow.id && runtime !== 'doubao'
       ? null
       : homeMachineRejectReason(machineRow, model, input.catalog);
   if (modelReject !== null) return { kind: 'model', reason: modelReject };
@@ -372,6 +405,12 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   }
   if (runtime === 'antigravity' && input.antigravitySubscriptionMissing === true) {
     return { kind: 'antigravity-subscription' };
+  }
+  if (runtime === 'doubao' && input.doubaoSubscriptionMissing === true) {
+    return { kind: 'doubao-subscription' };
+  }
+  if (runtime === 'doubao' && input.doubaoLoginRequired === true) {
+    return { kind: 'doubao-login-required' };
   }
   if (input.githubPushMissing === true) {
     return { kind: 'github-push' };

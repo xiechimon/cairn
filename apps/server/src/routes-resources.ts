@@ -8,6 +8,7 @@ import {
   createAntigravitySubscriptionSchema,
   createClaudeSubscriptionSchema,
   createDevinSubscriptionSchema,
+  createDoubaoSubscriptionSchema,
   createMcpConnectorBodySchema,
   createProviderBodySchema,
   createScheduleBodySchema,
@@ -18,6 +19,7 @@ import {
   machineStrain,
   managedUpdateRuntimeSchema,
   PHASE_VALUES,
+  patchDoubaoSubscriptionSchema,
   patchMachineBodySchema,
   patchMcpConnectorBodySchema,
   patchProviderBodySchema,
@@ -31,6 +33,7 @@ import {
   secretRequestAnswerSchema,
   setSecretBodySchema,
   skillRecordSchema,
+  startDoubaoLoginBodySchema,
   startGithubConnectorDeviceBodySchema,
   startMcpConnectorOAuthBodySchema,
   THINKING_LEVELS,
@@ -118,6 +121,17 @@ import {
 } from './services/devin-subscriptions.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
+  createDoubaoSubscription,
+  deleteDoubaoSubscription,
+  disableDoubaoSubscription,
+  enableDoubaoSubscription,
+  listDoubaoSubscriptionSteps,
+  listDoubaoSubscriptions,
+  listDoubaoUpstreamModels,
+  patchDoubaoSubscription,
+  verifyDoubaoSubscriptionConnection,
+} from './services/doubao-subscriptions.js';
+import {
   deleteGithubConnection,
   hasGithubConnection,
   readGithubConnectionStatus,
@@ -135,6 +149,11 @@ import { adoptGithubProfile } from './services/github-profile.js';
 import { mintGithubWebhook, revokeGithubWebhook } from './services/github-webhook.js';
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
+import {
+  cancelDoubaoLogin,
+  getDoubaoLogin,
+  startDoubaoLogin,
+} from './services/machine-doubao-login.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
 import { cancelMachineTokenRotation, rotateMachineToken } from './services/machine-rotate-token.js';
 import { machineRunningCount, toMachineRecord } from './services/machines.js';
@@ -608,6 +627,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       ? { verifyTimeoutMs: ctx.antigravityVerifyTimeoutMs }
       : {}),
   };
+  const doubaoSvc = {
+    db: ctx.db,
+    machineHub: ctx.machineHub,
+    ...(ctx.doubaoVerifyTimeoutMs !== undefined
+      ? { verifyTimeoutMs: ctx.doubaoVerifyTimeoutMs }
+      : {}),
+  };
   const claudeUpstreamSvc = () => ({
     ...keysvc,
     fetch: ctx.providerTestFetch ?? globalThis.fetch,
@@ -885,6 +911,125 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         teamId,
         c.req.param('cid'),
         c.req.raw.signal,
+      ),
+    );
+  });
+
+  app.get('/api/teams/:id/doubao-subscriptions', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listDoubaoSubscriptions(doubaoSvc, teamId));
+  });
+
+  app.post('/api/teams/:id/doubao-subscriptions', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(createDoubaoSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(createDoubaoSubscription(doubaoSvc, teamId, body), 201);
+  });
+
+  app.patch('/api/teams/:id/doubao-subscriptions/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(patchDoubaoSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(patchDoubaoSubscription(doubaoSvc, teamId, c.req.param('cid'), body));
+  });
+
+  app.delete('/api/teams/:id/doubao-subscriptions/:cid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    if (!deleteDoubaoSubscription(doubaoSvc, teamId, c.req.param('cid'))) {
+      throw notFound('Doubao subscription connection');
+    }
+    return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/doubao-subscriptions/:cid/enable', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(enableDoubaoSubscription(doubaoSvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/doubao-subscriptions/:cid/disable', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(disableDoubaoSubscription(doubaoSvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/doubao-subscriptions/:cid/steps', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
+    return c.json(listDoubaoSubscriptionSteps(doubaoSvc, teamId, c.req.param('cid'), limit));
+  });
+
+  app.post('/api/teams/:id/doubao-subscriptions/:cid/verify', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(
+      await verifyDoubaoSubscriptionConnection(doubaoSvc, teamId, c.req.param('cid'), {
+        signal: c.req.raw.signal,
+      }),
+    );
+  });
+
+  app.post('/api/teams/:id/doubao-subscriptions/:cid/upstream-models', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(listDoubaoUpstreamModels(doubaoSvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/machines/:mid/doubao-login', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'sign in Doubao on a runner');
+    const body = parseWith(startDoubaoLoginBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    return c.json(
+      startDoubaoLogin(
+        { db: ctx.db, hub: ctx.hub, machineHub: ctx.machineHub },
+        {
+          teamId,
+          machineId: c.req.param('mid'),
+          ...body,
+          ...(ctx.doubaoLoginTimeoutMs !== undefined
+            ? { timeoutMs: ctx.doubaoLoginTimeoutMs }
+            : {}),
+        },
+      ),
+    );
+  });
+
+  app.get('/api/teams/:id/machines/:mid/doubao-login', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(
+      getDoubaoLogin(
+        { db: ctx.db, hub: ctx.hub, machineHub: ctx.machineHub },
+        { teamId, machineId: c.req.param('mid'), includeQr: isOwnerSession(c) },
+      ),
+    );
+  });
+
+  app.delete('/api/teams/:id/machines/:mid/doubao-login', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'cancel Doubao sign-in');
+    const loginId = c.req.query('loginId');
+    return c.json(
+      cancelDoubaoLogin(
+        { db: ctx.db, hub: ctx.hub, machineHub: ctx.machineHub },
+        {
+          teamId,
+          machineId: c.req.param('mid'),
+          ...(loginId !== undefined && loginId !== '' ? { loginId } : {}),
+        },
       ),
     );
   });

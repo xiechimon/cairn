@@ -458,4 +458,27 @@ describe('prepareStepEnv', () => {
     for (const fn of [...cleanupsOther].reverse()) await fn();
     expect(existsSync(other.env.HOME!)).toBe(false);
   });
+
+  test('doubao preserves host HOME and sets DOUBAO_CLI_NO_UPDATE_CHECK', async () => {
+    const hostHome = realpathSync(testTempDir('doubao-host-home-'));
+    const cleanups: (() => void | Promise<void>)[] = [];
+    const prepared = prepareStepEnv(
+      (() => {
+        const { temporary: _, ...rest } = input({
+          runtimeId: 'doubao',
+          inherited: { HOME: hostHome },
+          agentConfig: { cairnHome: join(hostHome, '.cairn'), realHome: hostHome },
+        });
+        return rest;
+      })(),
+      cleanups,
+    );
+    try {
+      if ('error' in prepared) throw new Error(prepared.error);
+      expect(prepared.env.HOME).toBe(hostHome);
+      expect(prepared.env.DOUBAO_CLI_NO_UPDATE_CHECK).toBe('1');
+    } finally {
+      for (const fn of [...cleanups].reverse()) await fn();
+    }
+  });
 });

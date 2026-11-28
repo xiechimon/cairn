@@ -55,11 +55,12 @@ const STALL_RECOVERY_HOLD_REASON = 'stall_recovery';
 const QUOTA_HOLD_REASON = 'quota';
 const WATCHED_PHASES: readonly Phase[] = ['queued', 'planning', 'building', 'review'];
 
-type RuntimeWindowKey = 'antigravity' | 'devin' | 'claude-code' | 'pi' | 'default';
+type RuntimeWindowKey = 'antigravity' | 'devin' | 'doubao' | 'claude-code' | 'pi' | 'default';
 
 const CHIEF_QUIET_MS: Record<RuntimeWindowKey, number> = {
   antigravity: 180_000,
   devin: 180_000,
+  doubao: 180_000,
   'claude-code': 240_000,
   pi: 180_000,
   default: 300_000,
@@ -68,6 +69,7 @@ const CHIEF_QUIET_MS: Record<RuntimeWindowKey, number> = {
 const WORKER_QUIET_MS: Record<RuntimeWindowKey, number> = {
   antigravity: 360_000,
   devin: 360_000,
+  doubao: 360_000,
   'claude-code': 480_000,
   pi: 360_000,
   default: 900_000,
@@ -118,6 +120,7 @@ function runtimeWindowKey(row: StepRow): RuntimeWindowKey {
   if (provider === null || provider === '' || provider === 'unknown') return 'default';
   if (provider === 'antigravity') return 'antigravity';
   if (provider === 'devin') return 'devin';
+  if (provider === 'doubao') return 'doubao';
   if (isBackendRuntimeId(provider)) return 'claude-code';
   const runtime = stepRuntimeFor(provider);
   return runtime === 'gemini' ? 'default' : runtime;

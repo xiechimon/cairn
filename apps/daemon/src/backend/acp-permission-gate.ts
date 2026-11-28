@@ -17,6 +17,7 @@ export interface AcpGateDecision {
 const PERMISSIVE_MODES = new Set([
   'bypass',
   'bypasspermissions',
+  'bypass_permissions',
   'autonomous',
   'full-access',
   'accept-edits',

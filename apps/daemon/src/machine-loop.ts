@@ -51,6 +51,9 @@ import { probeAntigravityUsage } from './backend/antigravity-usage.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
+import { createDoubaoLoginRunner, type DoubaoLoginRunner } from './backend/doubao-login.js';
+import { createDoubaoManaged, type DoubaoManaged } from './backend/doubao-managed.js';
+import type { DoubaoController } from './backend/doubao-probe.js';
 import { runnerHostShellConfinement } from './backend/host-shell-confinement.js';
 import type { ManagedRuntime } from './backend/managed-runtime.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
@@ -149,6 +152,9 @@ export interface MachineLoopOpts {
   claudeManaged?: ManagedRuntime;
   devinManaged?: ManagedRuntime;
   antigravityManaged?: AntigravityManaged;
+  doubaoManaged?: DoubaoManaged;
+  doubaoProbe?: DoubaoController;
+  doubaoLoginRunner?: DoubaoLoginRunner;
   geminiManaged?: ManagedRuntime;
   updateChecksEnabled?: () => boolean;
   updateCheckIntervalMs?: number;
@@ -168,6 +174,7 @@ export interface MachineLoopOpts {
   antigravityEnsureRetryMs?: number;
   antigravityReprobeMs?: number;
   antigravityUpdateCheckMs?: number;
+  doubaoReprobeMs?: number;
   computerPresence?: ComputerPresenceSource;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
@@ -588,6 +595,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       log: (line) => logger.machine(line),
       fetchImpl: installFetch,
     });
+  const doubaoManaged =
+    opts.doubaoManaged ??
+    createDoubaoManaged({
+      root: toolInstallRoot(paths.home, 'doubao'),
+      fetchImpl: installFetch,
+      log: (line) => logger.machine(line),
+    });
+  const doubaoProbe = opts.doubaoProbe ?? doubaoManaged.probeController();
+  const learnedDoubaoModels = new Map<string, ModelSourceModel>();
   const geminiManaged =
     opts.geminiManaged ??
     createGeminiManaged({
@@ -668,6 +684,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     .catch((error: unknown) => {
       logger.machine(
         `antigravity managed setup failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+  void doubaoProbe
+    .refresh()
+    .then((report) => {
+      if (report.installed || report.authenticated) announcePresence();
+    })
+    .catch((error: unknown) => {
+      logger.machine(
+        `doubao initial probe failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   const runnerReleaseVersion = readRunnerReleaseVersion(capEnv);
@@ -766,6 +792,32 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           models: merged,
         };
       })(),
+      ...((): { doubao?: NonNullable<ReturnType<DoubaoController['current']>> } => {
+        const current = doubaoProbe.current();
+        if (current === null) return {};
+        const baseModels = current.models ?? [];
+        const merged = baseModels.map((model) => {
+          const learned = learnedDoubaoModels.get(model.id);
+          if (learned?.thinkingLevels === undefined) return model;
+          return {
+            id: model.id,
+            name: model.name,
+            thinkingLevels: learned.thinkingLevels,
+            ...(learned.thinkingDefault !== undefined
+              ? { thinkingDefault: learned.thinkingDefault }
+              : {}),
+          };
+        });
+        for (const [id, learned] of learnedDoubaoModels) {
+          if (!merged.some((model) => model.id === id)) merged.push(learned);
+        }
+        return {
+          doubao: {
+            ...current,
+            ...(merged.length > 0 ? { models: merged } : {}),
+          },
+        };
+      })(),
       executor: 'host' as const,
       antigravityOAuthProfile: true,
       ...(client.claimAntigravityModelProbe && client.finishAntigravityModelProbe
@@ -802,6 +854,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let devinBackend: AgentBackend | null = null;
   let antigravityBackend: { key: string; backend: AgentBackend } | null = null;
+  let doubaoBackend: AgentBackend | null = null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
   const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
@@ -853,6 +906,39 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         };
       }
       return antigravityBackend.backend;
+    }
+    if (agentProviderId === 'doubao') {
+      doubaoBackend ??= createAcpBackend({
+        harness: 'doubao',
+        command: doubaoManaged.current()?.command ?? 'doubao',
+        args: ['acp', 'serve'],
+        resolveLaunch: () => {
+          const resolved = doubaoManaged.current();
+          return resolved === null
+            ? null
+            : { command: resolved.command, args: ['acp', 'serve'], release: () => {} };
+        },
+        permissions: 'allow-once',
+        sessionResume: true,
+        allowHostMcp: true,
+        usageEvents: false,
+        skills: { skillsDir: config.skillsDir, cwd: config.home },
+        onSkillsLog: (msg) => logger.skills(msg),
+        onDoubaoModels: (models) => {
+          for (const model of models) {
+            if (model.thinkingLevels !== undefined) {
+              learnedDoubaoModels.set(model.id, model);
+            } else if (!learnedDoubaoModels.has(model.id)) {
+              learnedDoubaoModels.set(model.id, model);
+            }
+          }
+        },
+        onDoubaoAuthFailure: () => {
+          doubaoProbe.invalidateAuth();
+          announcePresence();
+        },
+      });
+      return doubaoBackend;
     }
     if (agentProviderId === 'devin') {
       const install = devinManaged.current();
@@ -1841,6 +1927,84 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       rotationInFlight = false;
     }
   };
+  let activeDoubaoVerifies = 0;
+  const runDoubaoVerify = async (checkId: string) => {
+    if (
+      stopping ||
+      streamCtrl.signal.aborted ||
+      activeDoubaoVerifies >= MAX_CONCURRENT_ANTIGRAVITY_VERIFIES
+    ) {
+      return;
+    }
+    activeDoubaoVerifies += 1;
+    const started = performance.now();
+    try {
+      const before = doubaoProbe.current();
+      const report = await doubaoProbe.refresh();
+      if (stopping || streamCtrl.signal.aborted) return;
+      const durationMs = Math.min(Math.max(0, Math.round(performance.now() - started)), 300_000);
+      const signal = AbortSignal.any([streamCtrl.signal, AbortSignal.timeout(15_000)]);
+      await client
+        .reportDoubaoVerify?.(
+          {
+            checkId,
+            installed: report.installed,
+            authenticated: report.authenticated === true,
+            ...(report.platformSupported !== undefined
+              ? { platformSupported: report.platformSupported }
+              : {}),
+            ...(report.version !== undefined ? { version: report.version } : {}),
+            ...(report.models !== undefined ? { models: report.models } : {}),
+            ...(report.probedAt !== undefined ? { probedAt: report.probedAt } : {}),
+            durationMs,
+          },
+          signal,
+        )
+        .catch((reportErr: unknown) =>
+          logger.machine(
+            `doubao verify report failed: ${reportErr instanceof Error ? reportErr.message : String(reportErr)}`,
+          ),
+        );
+      if (JSON.stringify(before) !== JSON.stringify(report)) announcePresence();
+    } catch (err: unknown) {
+      const durationMs = Math.min(Math.max(0, Math.round(performance.now() - started)), 300_000);
+      const current = doubaoProbe.current();
+      await client
+        .reportDoubaoVerify?.(
+          {
+            checkId,
+            installed: current?.installed === true,
+            authenticated: false,
+            durationMs,
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 500),
+          },
+          AbortSignal.any([streamCtrl.signal, AbortSignal.timeout(15_000)]),
+        )
+        .catch(() => {});
+    } finally {
+      activeDoubaoVerifies -= 1;
+    }
+  };
+  const doubaoLoginRunner =
+    opts.doubaoLoginRunner ??
+    createDoubaoLoginRunner({
+      ensureBinary: (signal) => trackInstall(doubaoManaged.ensure(signal)),
+      refreshProbe: () => doubaoProbe.refresh(),
+      onLogoutStart: () => {
+        doubaoProbe.invalidateAuth();
+        announcePresence();
+      },
+      onEvent: async (event) => {
+        if (stopping || streamCtrl.signal.aborted) return;
+        const signal = AbortSignal.any([streamCtrl.signal, AbortSignal.timeout(15_000)]);
+        await client.reportDoubaoLoginEvent?.(event, signal);
+        if (event.status === 'succeeded') announcePresence();
+      },
+      onEmitError: (err) =>
+        logger.machine(
+          `doubao login event failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+    });
   void (async () => {
     let backoff = 1_000;
     let announced = false;
@@ -1853,7 +2017,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         await client.stream(
           probeSignal,
           (ev) => {
-            if (ev.type === 'hello') connectionId = ev.connectionId;
+            if (ev.type === 'hello') {
+              connectionId = ev.connectionId;
+              doubaoLoginRunner.cancel();
+            }
             if (ev.type === 'shutdown') {
               void stop(
                 'the server told this Runner to stop: it was removed, revoked or enrolled again, or another process connected with the same credentials',
@@ -1888,6 +2055,17 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'antigravity.verify') {
               void runAntigravityVerify(ev.checkId);
+            }
+            if (ev.type === 'doubao.verify') {
+              void runDoubaoVerify(ev.checkId);
+            }
+            if (ev.type === 'doubao.login.start') {
+              void doubaoLoginRunner.start(ev.loginId, {
+                ...(ev.logoutFirst !== undefined ? { logoutFirst: ev.logoutFirst } : {}),
+              });
+            }
+            if (ev.type === 'doubao.login.cancel') {
+              doubaoLoginRunner.cancel(ev.loginId);
             }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
@@ -1930,6 +2108,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         }
       } finally {
         streamSession.abort();
+        doubaoLoginRunner.cancel();
       }
       if (streamCtrl.signal.aborted) return;
       if (rotatedReconnect) {
@@ -1945,6 +2124,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let antigravityReprobeAt = Date.now() + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
   let antigravityUpdateCheckAt =
     Date.now() + (opts.antigravityUpdateCheckMs ?? ANTIGRAVITY_UPDATE_CHECK_MS);
+  let doubaoReprobeAt = Date.now() + (opts.doubaoReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
   const presenceTimer = setInterval(() => {
     const currentAg = antigravityManaged.current();
     const now = Date.now();
@@ -1997,6 +2177,27 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         .catch(() => {});
     }
     checkRuntimeUpdates();
+    const beforeDoubao = doubaoProbe.current();
+    if (beforeDoubao === null || beforeDoubao.authenticated !== true || now >= doubaoReprobeAt) {
+      if (beforeDoubao?.authenticated === true) {
+        doubaoReprobeAt = now + (opts.doubaoReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
+      }
+      void doubaoProbe
+        .refresh()
+        .then((after) => {
+          if (stopping) return;
+          if (
+            beforeDoubao === null ||
+            beforeDoubao.installed !== after.installed ||
+            beforeDoubao.authenticated !== after.authenticated ||
+            beforeDoubao.version !== after.version ||
+            JSON.stringify(beforeDoubao.models) !== JSON.stringify(after.models)
+          ) {
+            announcePresence();
+          }
+        })
+        .catch(() => {});
+    }
     void githubPushProbe.refresh().catch(() => {});
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())
@@ -2017,6 +2218,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       backendFor,
       devinHome: () => devinManaged.current()?.home,
       antigravityAuth: () => antigravityManaged.current()?.authenticated === true,
+      doubaoAuth: () => doubaoProbe.current()?.authenticated === true,
       logger,
       paths,
       workspace,
@@ -2093,7 +2295,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       pendingUploads: journal.pending(),
       strandedAttempts,
       maxStrandedAttempts: STRANDED_UPLOAD_MAX_ATTEMPTS,
-      activeAntigravityVerifies,
+      activeAntigravityVerifies:
+        activeAntigravityVerifies + (doubaoLoginRunner.activeLoginId() !== null ? 1 : 0),
       activeComputerCalls: computerDispatcher.activeCount(),
       activeScreens: screens.activeCount(),
     });
@@ -2177,6 +2380,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     streamCtrl.abort();
     probeCtrl.abort();
     claimCtrl.abort();
+    doubaoLoginRunner.shutdown();
     await githubPushProbe.settled();
     imsgBridge.stop();
     installStop.abort();

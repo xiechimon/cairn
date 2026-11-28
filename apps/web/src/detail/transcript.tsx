@@ -1,4 +1,4 @@
-import type { StepPromptOrigin } from '@cairn/shared';
+import type { StepPromptOrigin, StepQueueBlocked } from '@cairn/shared';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { joinMeta } from '../board/rel-time.js';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
@@ -34,6 +34,10 @@ import { WorkTrace } from './work-trace.js';
 interface TranscriptProps {
   transcript: TranscriptItem[];
   result?: ReactNode;
+  blockedActions?: (
+    kind: StepQueueBlocked['kind'] | undefined,
+    waitingFor?: { machineId: string; name: string },
+  ) => ReactNode;
 }
 
 const ROW_BASE = 'flex items-start';
@@ -144,6 +148,7 @@ function Row({
   defaultExpanded,
   entering,
   enteringUser,
+  blockedActions,
 }: {
   item: TranscriptItem;
   prev: TranscriptItem | undefined;
@@ -152,6 +157,10 @@ function Row({
   defaultExpanded: boolean;
   entering: Set<string>;
   enteringUser: string | null;
+  blockedActions?: (
+    kind: StepQueueBlocked['kind'] | undefined,
+    waitingFor?: { machineId: string; name: string },
+  ) => ReactNode;
 }) {
   const margin = rowMargin(item, prev);
   switch (item.kind) {
@@ -406,7 +415,11 @@ function Row({
           {item.blocked === true ? (
             <TaskBlockedRow
               text={t(item.label, item.labelVars)}
-              actions={<CoordinatorFixLinks kind={item.blockedKind} />}
+              actions={
+                blockedActions?.(item.blockedKind, item.waitingFor) ?? (
+                  <CoordinatorFixLinks kind={item.blockedKind} />
+                )
+              }
             />
           ) : (
             <TaskLiveRow
@@ -689,7 +702,7 @@ function EnteringItem({
   );
 }
 
-export function Transcript({ transcript, result }: TranscriptProps) {
+export function Transcript({ transcript, result, blockedActions }: TranscriptProps) {
   const { t } = useI18n();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
   const live = transcript.some(
@@ -768,6 +781,7 @@ export function Transcript({ transcript, result }: TranscriptProps) {
           defaultExpanded={item.kind === 'work' && item.expanded === true}
           entering={entering}
           enteringUser={enteringUser}
+          blockedActions={blockedActions}
         />
       </EnteringItem>
     );

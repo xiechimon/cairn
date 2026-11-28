@@ -7,6 +7,7 @@ import type {
   MachineAttachmentResponse,
   MachineCapabilities,
   MachineDoneBody,
+  MachineDoubaoVerifyBody,
   MachineEnrollResponse,
   MachinePresenceBody,
   MachineSteerAckBody,
@@ -356,6 +357,7 @@ export interface BootOpts {
   devinManaged?: import('../src/backend/managed-runtime.js').ManagedRuntime;
   geminiManaged?: import('../src/backend/managed-runtime.js').ManagedRuntime;
   antigravityManaged?: import('../src/backend/antigravity-managed.js').AntigravityManaged;
+  doubaoProbe?: import('../src/backend/doubao-probe.js').DoubaoController;
   updateChecksEnabled?: () => boolean;
   updateCheckIntervalMs?: number;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
@@ -450,6 +452,7 @@ export function startMachine(opts: BootOpts) {
       ...(opts.antigravityManaged !== undefined
         ? { antigravityManaged: opts.antigravityManaged }
         : {}),
+      ...(opts.doubaoProbe !== undefined ? { doubaoProbe: opts.doubaoProbe } : {}),
       ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
     });
     return { handlePromise, api, lines, paths, home, ownsHome };

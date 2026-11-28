@@ -13,6 +13,7 @@ export interface AccountsContent {
   subscriptions: SubscriptionAccount[];
   devinSubscriptions: SubscriptionAccount[];
   antigravitySubscriptions?: SubscriptionAccount[];
+  doubaoSubscriptions?: SubscriptionAccount[];
   otherAccounts: SubscriptionAccount[];
   machines: AccountMachine[];
   providers: { id: string; label: string }[];
@@ -331,6 +332,7 @@ export const ACCOUNTS: AccountsContent = {
   subscriptions: ACCOUNT_SUBSCRIPTIONS,
   devinSubscriptions: DEVIN_SUBSCRIPTIONS,
   antigravitySubscriptions: [],
+  doubaoSubscriptions: [],
   otherAccounts: OTHER_ACCOUNTS,
   machines: ACCOUNT_MACHINES,
   providers: [
@@ -416,6 +418,7 @@ export const accountsEmpty: FixtureSet = {
       subscriptions: [],
       devinSubscriptions: [],
       antigravitySubscriptions: [],
+      doubaoSubscriptions: [],
       otherAccounts: [],
       machines: [],
       providers: [],

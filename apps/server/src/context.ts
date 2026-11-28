@@ -110,6 +110,8 @@ export interface AppContext {
   providerTestTimeoutMs?: number;
   antigravityVerifyTimeoutMs?: number;
   tokenRotationTimeoutMs?: number;
+  doubaoVerifyTimeoutMs?: number;
+  doubaoLoginTimeoutMs?: number;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
   ownerChannel?: OwnerChannel;

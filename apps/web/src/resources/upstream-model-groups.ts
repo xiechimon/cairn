@@ -83,3 +83,35 @@ export function groupAntigravityUpstream(models: UpstreamOption[]): [string, Ups
     a === '其他' ? 1 : b === '其他' ? -1 : a.localeCompare(b),
   );
 }
+
+const DOUBAO_FAMILY_LABELS: [RegExp, string][] = [
+  [/^(4|5|9|seed-|doubao\b)/i, 'Doubao'],
+  [/deepseek/i, 'DeepSeek'],
+  [/glm/i, 'GLM'],
+  [/kimi/i, 'Kimi'],
+  [/qwen/i, 'Qwen'],
+  [/mimo/i, 'MiMo'],
+];
+
+export function groupDoubaoUpstream(models: UpstreamOption[]): [string, UpstreamOption[]][] {
+  const byFamily = new Map<string, UpstreamOption[]>();
+  for (const model of models) {
+    const hay = `${model.id} ${model.name}`;
+    const hit = DOUBAO_FAMILY_LABELS.find(([pattern]) => pattern.test(hay));
+    const family = hit === undefined ? '其他' : hit[1];
+    const group = byFamily.get(family);
+    if (group === undefined) byFamily.set(family, [model]);
+    else group.push(model);
+  }
+  return [...byFamily.entries()].sort(([a], [b]) =>
+    a === 'Doubao'
+      ? -1
+      : b === 'Doubao'
+        ? 1
+        : a === '其他'
+          ? 1
+          : b === '其他'
+            ? -1
+            : a.localeCompare(b),
+  );
+}

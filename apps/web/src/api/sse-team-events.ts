@@ -38,6 +38,12 @@ export type StreamQueryEvent =
       todoId?: string | undefined;
       status: string;
     }
+  | {
+      type: 'doubao.login';
+      teamId: string;
+      machineId: string;
+      status: string;
+    }
   | { type: 'reconnect' }
   | { type: 'reconcile'; teamId: string };
 
@@ -60,6 +66,8 @@ const reconciled = new Set([
   'changes',
   'usage',
   'design',
+  'doubao-subscriptions',
+  'doubao-login',
   'projectBuilds',
   'search',
   'model-routing',
@@ -165,7 +173,7 @@ function searchEffect(
 
 export function streamEventQueryEffect(
   event: StreamQueryEvent,
-  [kind, id]: QueryKey,
+  [kind, id, third]: QueryKey,
   data?: unknown,
 ): QueryEffect {
   switch (event.type) {
@@ -227,11 +235,28 @@ export function streamEventQueryEffect(
       return id === event.teamId &&
         (kind === 'machines' ||
           kind === 'antigravity-subscriptions' ||
+          kind === 'doubao-subscriptions' ||
           kind === 'model-sources' ||
           kind === 'computers' ||
           kind === 'model-routing')
         ? 'cancel'
         : 'ignore';
+    case 'doubao.login':
+      if (kind === 'doubao-login') {
+        return id === event.teamId && third === event.machineId ? 'cancel' : 'ignore';
+      }
+      if (event.status === 'succeeded') {
+        return id === event.teamId &&
+          (kind === 'doubao-subscriptions' ||
+            kind === 'machines' ||
+            kind === 'model-sources' ||
+            kind === 'model-routing' ||
+            kind === 'todos' ||
+            kind === 'tasks')
+          ? 'cancel'
+          : 'ignore';
+      }
+      return 'ignore';
     case 'computer.state':
       return kind === 'computers' && id === event.teamId ? 'cancel' : 'ignore';
     case 'chief.updated':
@@ -255,6 +280,9 @@ export function streamEventQueryEffect(
       return (id === event.conversationId &&
         ((typeof kind === 'string' && ['build', 'steps', 'changes', 'usage'].includes(kind)) ||
           (kind === 'messages' && (terminal || (chief && event.status === 'claimed'))))) ||
+        (kind === 'doubao-subscriptions' &&
+          id === event.teamId &&
+          (terminal || event.status === 'claimed')) ||
         kind === 'plans' ||
         (kind === 'todo' && event.todoId !== undefined && id === event.todoId) ||
         (chief && (kind === 'chiefThreads' || (kind === 'chief' && terminal)))

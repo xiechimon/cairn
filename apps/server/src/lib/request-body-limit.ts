@@ -28,7 +28,10 @@ function budgetOf(c: Context): number {
     case '/api/machine/upload-urls/:stepId':
       return 64 * KIB;
     case '/api/machine/antigravity/verify':
+    case '/api/machine/doubao/verify':
       return 128 * KIB;
+    case '/api/machine/doubao-login-event':
+      return 256 * KIB;
     case '/api/machine/done/:stepId':
     case '/api/machine/tool/:stepId':
       return 16 * MIB;

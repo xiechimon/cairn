@@ -61,8 +61,11 @@ test.describe('a server with a GitHub OAuth client', () => {
         'Claude 订阅',
         'Devin 订阅',
         'GitHub Copilot 订阅',
+        '豆包订阅',
       ].sort(),
     );
-    for (const label of labels) expect(label.trim()).toMatch(/^\S(.*\S)? 订阅$/);
+    for (const label of labels) {
+      expect(label.trim()).toMatch(/^([\u4e00-\u9fff]+|\S(.*\S)? )订阅$/);
+    }
   });
 });

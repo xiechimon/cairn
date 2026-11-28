@@ -2,7 +2,7 @@ import type { RunnerOfflineContent, StepQueueBlocked } from '@cairn/shared';
 import { CircleAlert, CircleStop } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useProviders } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
@@ -32,6 +32,7 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
+import { DoubaoQrLoginCard } from '../resources/doubao-qr-login.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { RunTraceLink, turnRunIdOf } from '../runs/run-trace-link.js';
 import { settingsHref } from '../settings/settings-href.js';
@@ -352,6 +353,7 @@ const COORDINATOR_FIXES: Partial<
   'claude-logged-out': [{ label: '添加 Claude 订阅', href: settingsHref('routing') }],
   'devin-subscription': [{ label: '添加 Devin 订阅', href: settingsHref('routing') }],
   'antigravity-subscription': [{ label: '添加 Antigravity 订阅', href: settingsHref('routing') }],
+  'doubao-subscription': [{ label: '添加豆包订阅', href: settingsHref('routing') }],
   'coordinator-provider-missing': [
     { label: '添加服务商', href: settingsHref('routing') },
     { label: '改 Coordinator 规则', href: COORDINATOR_ROUTING_HREF },
@@ -490,6 +492,20 @@ function subagentStatusLabel(sub: ChiefSubagentInfo, t: TFunc): string {
     case 'aborted':
       return t('已停止');
   }
+}
+
+function ChiefDoubaoQrActions({ waitingFor }: { waitingFor: { machineId: string; name: string } }) {
+  const { live, teamId } = useLiveData();
+  const providersQ = useProviders(teamId, live);
+  return (
+    <DoubaoQrLoginCard
+      teamId={teamId}
+      machineId={waitingFor.machineId}
+      machineName={waitingFor.name}
+      autoStart
+      canManage={!live || providersQ.data?.canTestConnection === true}
+    />
+  );
 }
 
 function SubagentProgressList({ items }: { items: readonly ChiefSubagentInfo[] }) {
@@ -708,7 +724,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               labelVars={item.labelVars}
               notice={isLiveNotice(item.label)}
               blocked={item.blocked === true}
-              blockedActions={<CoordinatorFixLinks kind={item.blockedKind} />}
+              blockedActions={
+                item.blockedKind === 'doubao-login-required' && item.waitingFor !== undefined ? (
+                  <ChiefDoubaoQrActions waitingFor={item.waitingFor} />
+                ) : (
+                  <CoordinatorFixLinks kind={item.blockedKind} />
+                )
+              }
             />
           </MessageContent>
         </Message>

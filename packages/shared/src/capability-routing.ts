@@ -6,7 +6,7 @@ import { isBannedModelId } from './tier-selection.js';
 export const DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
-export type CandidateHarness = 'claude-code' | 'pi' | 'devin' | 'antigravity';
+export type CandidateHarness = 'claude-code' | 'pi' | 'devin' | 'antigravity' | 'doubao';
 export type CandidateRejection = 'harness-missing' | 'unavailable' | 'quota' | 'no-candidate';
 
 export interface CapabilityCandidate {

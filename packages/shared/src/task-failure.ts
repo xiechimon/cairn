@@ -307,7 +307,7 @@ export function noVisionSignalOf(message: string): boolean {
   return (
     /not a multimodal model/i.test(text) ||
     /does not support images?/i.test(text) ||
-    /gemini ACP backend: image capability is not advertised/.test(text)
+    /\bACP backend: image capability is not advertised/.test(text)
   );
 }
 

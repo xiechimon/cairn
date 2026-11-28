@@ -98,6 +98,26 @@ export function AntigravityMark({ width = 16, height = 16, ...props }: SVGProps<
   );
 }
 
+export function DoubaoMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
+  const mark = LOBEHUB_MONO.doubao;
+  return (
+    <svg
+      aria-hidden="true"
+      width={width}
+      height={height}
+      viewBox={mark.viewBox}
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+      {...props}
+    >
+      {mark.paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 export function DevinMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   const mark = LOBEHUB_MONO.devin;
   return (

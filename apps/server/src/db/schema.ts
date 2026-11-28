@@ -24,6 +24,7 @@ import type {
   DesignViewport,
   DevinSubscriptionModel,
   DocumentDiffFile,
+  DoubaoSubscriptionModel,
   EvidenceStore,
   ImConnectionStatus,
   ImPairedSender,
@@ -366,6 +367,7 @@ export const step = sqliteTable(
     claudeSubscriptionId: text('claudeSubscriptionId'),
     devinSubscriptionId: text('devinSubscriptionId'),
     antigravitySubscriptionId: text('antigravitySubscriptionId'),
+    doubaoSubscriptionId: text('doubaoSubscriptionId'),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
@@ -739,7 +741,7 @@ export const stepRoute = sqliteTable(
       .references(() => team.id),
     kind: text('kind').$type<StepKind>().notNull(),
     difficulty: text('difficulty').$type<'easy' | 'standard' | 'hard'>().notNull(),
-    harness: text('harness').$type<'claude-code' | 'pi' | 'devin' | 'antigravity'>(),
+    harness: text('harness').$type<'claude-code' | 'pi' | 'devin' | 'antigravity' | 'doubao'>(),
     provider: text('provider'),
     modelId: text('modelId'),
     machineId: text('machineId'),
@@ -1670,6 +1672,28 @@ export const antigravitySubscription = sqliteTable(
   },
   (t) => [
     uniqueIndex('antigravity_subscription_one_enabled')
+      .on(t.teamId)
+      .where(sql`${t.enabledAt} is not null`),
+  ],
+);
+
+export const doubaoSubscription = sqliteTable(
+  'doubao_subscription',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    runnerId: text('runnerId'),
+    enabledAt: epochMs('enabledAt'),
+    models: json<DoubaoSubscriptionModel[]>('models').notNull().default(sql`'[]'`),
+    lastCheck: json<SubscriptionCheck | null>('lastCheck'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('doubao_subscription_team_idx').on(t.teamId),
+    uniqueIndex('doubao_subscription_one_enabled')
       .on(t.teamId)
       .where(sql`${t.enabledAt} is not null`),
   ],

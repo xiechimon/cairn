@@ -49,6 +49,10 @@ import {
   stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
+import {
+  doubaoSubscriptionAllowsRunner,
+  enabledDoubaoSubscriptionId,
+} from './doubao-subscriptions.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { localFolderActionAuthorizationRefusal } from './local-folder-action.js';
@@ -74,6 +78,7 @@ import {
   upsertMessage,
   withFencedTransaction,
 } from './machine-deps.js';
+import { isDoubaoAccountSwitching } from './machine-doubao-login.js';
 import {
   chiefIneligibility,
   priorSessionOf,
@@ -218,6 +223,14 @@ async function buildChiefClaim(
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized() || !agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
+  const runtime = stepRuntimeFor(model.provider);
+  if (
+    runtime === 'doubao' &&
+    deps.machineHub !== undefined &&
+    isDoubaoAccountSwitching(deps.machineHub, machineId)
+  ) {
+    return null;
+  }
   if (
     !machineRow ||
     chiefIneligibility(deps.db, machineRow, agentRow, model.provider, nowMs()) !== null
@@ -225,15 +238,24 @@ async function buildChiefClaim(
     return null;
   const readmeSection = await greetingReadmeSection(deps, stepRow, threadRow, signal);
   if (!stillAuthorized()) return null;
+  if (
+    runtime === 'doubao' &&
+    deps.machineHub !== undefined &&
+    isDoubaoAccountSwitching(deps.machineHub, machineId)
+  ) {
+    return null;
+  }
   const freshMachine = deps.db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (
     !freshMachine ||
     chiefIneligibility(deps.db, freshMachine, agentRow, model.provider, nowMs()) !== null
   )
     return null;
-  const runtime = stepRuntimeFor(model.provider);
   const bindSubscription =
-    runtime === 'claude-code' || runtime === 'devin' || runtime === 'antigravity'
+    runtime === 'claude-code' ||
+    runtime === 'devin' ||
+    runtime === 'antigravity' ||
+    runtime === 'doubao'
       ? { runtime, teamId: threadRow.teamId }
       : null;
   const routeSwitch =
@@ -672,10 +694,18 @@ async function tryClaim(
     const claimRuntimeIsClaudeCode = stepRuntimeFor(model.provider) === 'claude-code';
     const claimRuntimeIsDevin = stepRuntimeFor(model.provider) === 'devin';
     const claimRuntimeIsAntigravity = stepRuntimeFor(model.provider) === 'antigravity';
+    const claimRuntimeIsDoubao = stepRuntimeFor(model.provider) === 'doubao';
     const enabledId = enabledSubscriptionId({ db }, teamId);
     const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
     const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);
+    const enabledDoubaoId = enabledDoubaoSubscriptionId({ db }, teamId);
     if (claimRuntimeIsAntigravity && enabledAntigravityId === null) continue;
+    if (
+      claimRuntimeIsDoubao &&
+      (enabledDoubaoId === null ||
+        (deps.machineHub !== undefined && isDoubaoAccountSwitching(deps.machineHub, machineId)))
+    )
+      continue;
     const prior = priorSessionOf(
       db,
       cand.stepRow,
@@ -684,10 +714,16 @@ async function tryClaim(
         claude: enabledId,
         devin: enabledDevinId,
         antigravity: enabledAntigravityId,
+        doubao: enabledDoubaoId,
       },
       model.provider,
     );
-    const { priorSessionId, priorMachineId, priorMachineLiveId, freshSession } = prior;
+    const { priorSessionId, priorMachineId, priorMachineLiveId, priorStepAt } = prior;
+    const switchedAfterPrior =
+      claimRuntimeIsDoubao &&
+      machineRow.capabilities?.doubao?.switchedAt !== undefined &&
+      (priorStepAt ?? 0) < machineRow.capabilities.doubao.switchedAt;
+    const freshSession = prior.freshSession || switchedAfterPrior;
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
@@ -738,6 +774,7 @@ async function tryClaim(
           teamId,
           Math.max(claimedAt, nowMs()),
         );
+        const boundDoubaoId = enabledDoubaoSubscriptionId({ db: tx }, teamId);
         if (claimRuntimeIsClaudeCode) {
           if (boundId !== enabledId) return false;
           const fresh = priorSessionOf(
@@ -759,6 +796,14 @@ async function tryClaim(
           (boundAntigravityId === null ||
             boundAntigravityId !== enabledAntigravityId ||
             !antigravitySubscriptionAllowsRunner(tx, teamId, machineId))
+        )
+          return false;
+        if (
+          claimRuntimeIsDoubao &&
+          (boundDoubaoId === null ||
+            boundDoubaoId !== enabledDoubaoId ||
+            !doubaoSubscriptionAllowsRunner(tx, teamId, machineId) ||
+            (deps.machineHub !== undefined && isDoubaoAccountSwitching(deps.machineHub, machineId)))
         )
           return false;
         const latestTodo = tx.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
@@ -788,6 +833,15 @@ async function tryClaim(
         if (!freshMachine) return false;
         resolvedMachine = freshMachine;
         workerMcp = stepMcpGrant(tx, freshMachine, false);
+        if (
+          claimRuntimeIsDoubao &&
+          freshSession !==
+            (prior.freshSession ||
+              (freshMachine?.capabilities?.doubao?.switchedAt !== undefined &&
+                (priorStepAt ?? 0) < freshMachine.capabilities.doubao.switchedAt))
+        ) {
+          return false;
+        }
         const txGithubPushRepo = requiredGithubPushRepoForStep({
           project: claimProject,
           step: cand.stepRow,
@@ -824,6 +878,7 @@ async function tryClaim(
           claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
           devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
           antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
+          doubaoSubscriptionId: claimRuntimeIsDoubao ? boundDoubaoId : null,
           ranModel: pinnedModel,
           ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
           mcpGrant: workerMcp ?? null,

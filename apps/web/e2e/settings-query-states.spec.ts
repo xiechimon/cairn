@@ -32,6 +32,7 @@ const ROUTING_PAGE_OK: Record<string, unknown> = {
   'claude-subscriptions': [],
   'devin-subscriptions': [],
   'antigravity-subscriptions': [],
+  'doubao-subscriptions': { subscriptions: [], runnerLogins: [] },
 };
 
 async function stub(page: Page, endpoint: string, state: { fail: boolean; ok: unknown }) {

@@ -3592,6 +3592,69 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
+        "checkId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string",
+        },
+        "type": {
+          "const": "doubao.verify",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "checkId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "loginId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string",
+        },
+        "logoutFirst": {
+          "type": "boolean",
+        },
+        "type": {
+          "const": "doubao.login.start",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "loginId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "loginId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string",
+        },
+        "type": {
+          "const": "doubao.login.cancel",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "loginId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "call": {
           "additionalProperties": false,
           "properties": {
@@ -6507,6 +6570,8 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                         "claude-logged-out",
                         "devin-subscription",
                         "antigravity-subscription",
+                        "doubao-subscription",
+                        "doubao-login-required",
                         "account-switched",
                         "coordinator-provider-missing",
                         "coordinator-provider-no-key",
@@ -6659,6 +6724,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                             "pi",
                             "devin",
                             "antigravity",
+                            "doubao",
                           ],
                           "type": "string",
                         },
@@ -8410,6 +8476,8 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                 "claude-logged-out",
                 "devin-subscription",
                 "antigravity-subscription",
+                "doubao-subscription",
+                "doubao-login-required",
                 "account-switched",
                 "coordinator-provider-missing",
                 "coordinator-provider-no-key",
@@ -8562,6 +8630,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                     "pi",
                     "devin",
                     "antigravity",
+                    "doubao",
                   ],
                   "type": "string",
                 },
@@ -10227,6 +10296,49 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
     {
       "additionalProperties": false,
       "properties": {
+        "loginId": {
+          "type": "string",
+        },
+        "machineId": {
+          "type": "string",
+        },
+        "revision": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "status": {
+          "enum": [
+            "installing",
+            "starting",
+            "qr",
+            "scanned",
+            "verifying",
+            "succeeded",
+            "expired",
+            "refused",
+            "cancelled",
+            "failed",
+          ],
+          "type": "string",
+        },
+        "type": {
+          "const": "doubao.login",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "machineId",
+        "loginId",
+        "status",
+        "revision",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "connectionId": {
           "minLength": 1,
           "type": "string",
@@ -10809,6 +10921,8 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                                     "claude-logged-out",
                                     "devin-subscription",
                                     "antigravity-subscription",
+                                    "doubao-subscription",
+                                    "doubao-login-required",
                                     "account-switched",
                                     "coordinator-provider-missing",
                                     "coordinator-provider-no-key",
@@ -10961,6 +11075,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                                         "pi",
                                         "devin",
                                         "antigravity",
+                                        "doubao",
                                       ],
                                       "type": "string",
                                     },
@@ -12009,6 +12124,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "claude_subscription",
   "devin_subscription",
   "antigravity_subscription",
+  "doubao_subscription",
   "skill_audit",
   "gate_digest",
   "gate_round",
@@ -13323,6 +13439,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                     "claude-logged-out",
                     "devin-subscription",
                     "antigravity-subscription",
+                    "doubao-subscription",
+                    "doubao-login-required",
                     "account-switched",
                     "coordinator-provider-missing",
                     "coordinator-provider-no-key",
@@ -13852,6 +13970,91 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                     },
                   },
                   "type": "object",
+                },
+                "version": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "installed",
+              ],
+              "type": "object",
+            },
+            "doubao": {
+              "additionalProperties": false,
+              "properties": {
+                "authenticated": {
+                  "type": "boolean",
+                },
+                "installed": {
+                  "type": "boolean",
+                },
+                "models": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "name": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "thinkingDefault": {
+                        "enum": [
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                        ],
+                        "type": "string",
+                      },
+                      "thinkingLevels": {
+                        "items": {
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max",
+                          ],
+                          "type": "string",
+                        },
+                        "maxItems": 7,
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "maxItems": 2000,
+                  "type": "array",
+                },
+                "platformSupported": {
+                  "type": "boolean",
+                },
+                "probedAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "switchedAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
                 },
                 "version": {
                   "maxLength": 64,

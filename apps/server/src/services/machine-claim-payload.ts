@@ -40,7 +40,11 @@ import {
 } from '../db/schema.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { chiefHistoryFor } from './chief-claim-history.js';
-import { chiefLastRanOnOtherAccount, chiefLastRanOnOtherMachine } from './claude-account-hold.js';
+import {
+  chiefLastRanOnOtherAccount,
+  chiefLastRanOnOtherMachine,
+  chiefLastSessionBefore,
+} from './claude-account-hold.js';
 import { rotatesPastCompaction } from './coordinator-context.js';
 import { resolveCoordinatorRemoteTools } from './coordinator-diagnostics.js';
 import { chiefTurnContext } from './coordinator-steps.js';
@@ -248,11 +252,18 @@ export function buildChiefClaimPayload(
               .from(step)
               .where(eq(step.id, stepRow.id))
               .get()?.id ?? null)
-          : null;
+          : runtime === 'doubao'
+            ? (deps.db
+                .select({ id: step.doubaoSubscriptionId })
+                .from(step)
+                .where(eq(step.id, stepRow.id))
+                .get()?.id ?? null)
+            : null;
   const localDiskSessionRuntime =
     runtime === 'antigravity' ||
     runtime === 'claude-code' ||
     runtime === 'devin' ||
+    runtime === 'doubao' ||
     runtime === 'gemini';
   const continuesSession =
     !stepRow.freshSession &&
@@ -263,7 +274,10 @@ export function buildChiefClaimPayload(
       localDiskSessionRuntime &&
       chiefLastRanOnOtherMachine(deps.db, threadRow.id, threadRow.sessionId, stepRow.id, machineId)
     ) &&
-    (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
+    (runtime !== 'claude-code' &&
+    runtime !== 'devin' &&
+    runtime !== 'antigravity' &&
+    runtime !== 'doubao'
       ? true
       : !chiefLastRanOnOtherAccount(
           deps.db,
@@ -271,6 +285,15 @@ export function buildChiefClaimPayload(
           stepRow.id,
           boundSubscriptionId,
           runtime,
+        ) &&
+        !(
+          runtime === 'doubao' &&
+          chiefLastSessionBefore(
+            deps.db,
+            threadRow.id,
+            stepRow.id,
+            machineRow?.capabilities?.doubao?.switchedAt,
+          )
         ));
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const memoryEditTurn = memoryEditIdOfPrompt(stepRow.prompt) !== null;

@@ -3457,4 +3457,84 @@ export const EN: Record<string, string> = {
   '切换本机工作区失败。': 'Could not switch back to local workspace.',
   '已退出 Cairn 账号': 'Signed out of Cairn',
   '退出账号失败，请重试。': 'Could not sign out. Please try again.',
+  豆包: 'Doubao',
+  豆包订阅: 'Doubao subscription',
+  添加豆包订阅: 'Add Doubao subscription',
+  启用豆包订阅: 'Enable the Doubao subscription',
+  停用豆包订阅: 'Disable the Doubao subscription',
+  移除豆包订阅: 'Remove the Doubao subscription',
+  发起豆包扫码登录: 'Start Doubao QR sign-in',
+  取消豆包扫码登录: 'Cancel Doubao QR sign-in',
+  所有豆包模型: 'All Doubao models',
+  '已在 {machine} 登录豆包': 'Signed in to Doubao on {machine}',
+  '豆包任务会自动路由到已登录的电脑；其他电脑如需运行豆包，可在需要时直接在 Cairn 内扫码。':
+    'Doubao tasks automatically route to a signed-in computer; any other computer can scan in Cairn when needed.',
+  '保存后直接在下方展示 {machine} 的登录二维码，用手机豆包 App 扫码一次即可，无需打开终端。':
+    'Save to show the QR code for {machine} here and scan once with the Doubao app—no terminal required.',
+  '当前暂无可扫码的在线执行机；保存后，执行机上线时可直接在 Cairn 内扫码登录。':
+    'No supported Runner is online yet; once one comes online you can scan the QR code directly in Cairn.',
+  保存并扫码登录: 'Save & scan QR',
+  稍后扫码: 'Scan later',
+  扫码电脑: 'Sign-in computer',
+  '{machine} 豆包扫码登录': 'Sign in to Doubao on {machine}',
+  各电脑登录状态: 'Computer sign-ins',
+  '需要管理员在 {machine} 扫码登录豆包': 'Ask an admin to scan the Doubao QR code for {machine}',
+  '正在获取 {machine} 登录二维码…': 'Getting Doubao QR code for {machine}…',
+  '正在 {machine} 自动安装豆包组件…': 'Installing Doubao CLI on {machine}…',
+  '用手机豆包 App 扫描二维码确认登录；无需在这台电脑打开终端。':
+    'Scan with the Doubao mobile app to confirm; no terminal needed on this computer.',
+  '{machine} 豆包登录二维码': 'Doubao login QR code for {machine}',
+  刷新二维码: 'Refresh QR code',
+  '正在加载二维码…': 'Loading QR code…',
+  '已扫码，请在手机豆包 App 确认登录…': 'QR scanned—confirm sign-in in the Doubao app…',
+  '手机已确认，正在验证账号…': 'Phone confirmed—verifying account…',
+  '{machine} 已登录豆包。': 'Doubao is signed in on {machine}.',
+  二维码已过期: 'QR code expired',
+  '扫码会话已中断，请重新获取二维码。':
+    'Sign-in session was interrupted—fetch a fresh QR code to continue.',
+  重新获取二维码: 'Get fresh QR code',
+  手机端已拒绝本次登录: 'Sign-in was declined on the phone',
+  已取消扫码登录: 'QR sign-in cancelled',
+  '执行机 {machine} 已离线，恢复在线后点击重试。':
+    'Runner {machine} went offline—click Retry once it comes back online.',
+  '{machine} 的登录钥匙串已锁定，请先在该电脑解锁钥匙串后重试。':
+    'The login keychain on {machine} is locked—open Keychain Access on that Mac and try again.',
+  '当前扫码账号受限或需要额外验证，暂不支持用于 CLI 登录，请更换账号重试。':
+    'This Doubao account requires additional verification and cannot sign in to CLI. Try another account.',
+  更换账号重试: 'Try another account',
+  '{machine} 当前平台暂不支持豆包 CLI。': 'Doubao CLI is not supported on {machine}.',
+  '未能在 {machine} 自动下载豆包组件，请检查网络后重试。':
+    'Could not install Doubao CLI on {machine}. Check the connection and try again.',
+  '登录未完成，请重试。': 'Sign-in did not complete. Try again.',
+  '无法发起扫码登录，请重试。': 'Could not start QR sign-in. Try again.',
+  '切换账号会先退出 {machine} 当前的豆包登录（含本机 CLI）。':
+    'Switching accounts signs out the current Doubao login on {machine}, including its local CLI.',
+  '无法获取扫码状态，请重试。': 'Could not check QR sign-in status. Try again.',
+  '这个订阅在当前电脑上的豆包登录已失效，请在下方扫码重新登录。':
+    'This subscription’s Doubao login is no longer valid. Scan the QR code below to sign in again.',
+  '这台电脑尚未登录豆包，请在下方扫码登录。':
+    'This computer is not signed in to Doubao yet. Scan the QR code below.',
+  '豆包接受了这个凭据。': 'Doubao accepted this login.',
+  '正在让豆包检查这个凭据…': 'Checking login with Doubao…',
+  '正在让 {machine} 上的豆包检查这个凭据…': 'Checking Doubao login on {machine}…',
+  '{machine} 上的豆包接受了这个凭据。': 'Doubao on {machine} accepted this login.',
+  '无法在 {machine} 上运行豆包检查，请确认执行机已安装豆包且在线后重试。':
+    'Could not run the Doubao check on {machine}. Confirm Doubao is installed and the Runner is online, then try again.',
+  '{machine} 暂不可用（未安装豆包或正在切换账号），请确认状态后重试。':
+    '{machine} is temporarily unavailable (Doubao CLI not installed or switching accounts). Check the Runner status and try again.',
+  '{machine} 上的豆包验证超时，请重试': 'Doubao verification timed out on {machine}. Try again.',
+  '{machine} 尚未登录豆包，请在下方扫码登录。':
+    '{machine} is not signed in to Doubao yet. Scan the QR code below.',
+  '目标执行机尚未登录豆包，请在下方扫码登录。':
+    'The target computer is not signed in to Doubao yet. Scan the QR code below.',
+  '{machine} 尚未安装豆包，或暂不可用。请确认执行机在线后重试。':
+    'Doubao is not installed or unavailable on {machine}. Confirm the Runner is online and try again.',
+  已停用: 'Disabled',
+  停用: 'Disable',
+  '排队中：尚未启用豆包订阅——在「设置 → 模型」添加豆包订阅后即可扫码登录':
+    'Queued: Doubao subscription is not enabled yet—add it under Settings → Model to sign in via QR',
+  '排队中：{machine} 尚未登录豆包，扫码后自动继续':
+    'Queued: {machine} is not signed in to Doubao yet—scan the QR code to continue',
+  '排队中：目标执行机尚未登录豆包，扫码后自动继续':
+    'Queued: target computer is not signed in to Doubao yet—scan the QR code to continue',
 };

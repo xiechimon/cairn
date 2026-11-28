@@ -113,6 +113,40 @@ export const antigravityReportSchema = z
   .strict();
 export type AntigravityReport = z.infer<typeof antigravityReportSchema>;
 
+export const doubaoModelSchema = z.object({
+  id: z.string().min(1).max(256),
+  name: z.string().min(1).max(256),
+  thinkingLevels: z.array(thinkingLevelSchema).max(THINKING_LEVELS.length).optional(),
+  thinkingDefault: thinkingLevelSchema.optional(),
+});
+export type DoubaoModel = z.infer<typeof doubaoModelSchema>;
+
+export const doubaoReportSchema = z
+  .object({
+    installed: z.boolean(),
+    authenticated: z.boolean().optional(),
+    platformSupported: z.boolean().optional(),
+    version: z.string().min(1).max(64).optional(),
+    models: z.array(doubaoModelSchema).max(2000).optional(),
+    probedAt: z.number().int().nonnegative().optional(),
+    switchedAt: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type DoubaoReport = z.infer<typeof doubaoReportSchema>;
+
+export function pickNewerDoubaoReport(
+  previous: DoubaoReport | undefined,
+  incoming: DoubaoReport | undefined,
+): DoubaoReport | undefined {
+  if (incoming === undefined) return previous;
+  if (previous === undefined) return incoming;
+  const prevAt = previous.probedAt ?? 0;
+  const nextAt = incoming.probedAt ?? 0;
+  const chosen = prevAt > nextAt ? previous : incoming;
+  const switchedAt = Math.max(previous.switchedAt ?? 0, incoming.switchedAt ?? 0);
+  return switchedAt > 0 ? { ...chosen, switchedAt } : chosen;
+}
+
 export const agentReachReportSchema = z.object({
   version: z.string().min(1).max(32),
   channels: z
@@ -280,6 +314,7 @@ export const machineCapabilitiesSchema = z.object({
   devin: devinReportSchema.optional(),
   gemini: geminiReportSchema.optional(),
   antigravity: antigravityReportSchema.optional(),
+  doubao: doubaoReportSchema.optional(),
   antigravityOAuthProfile: z.literal(true).optional(),
   antigravitySubscriptionModels: z.literal(true).optional(),
   antigravityUsage: z.literal(true).optional(),
@@ -313,6 +348,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const devin = devinReportSchema.safeParse(rec.devin);
   const gemini = geminiReportSchema.safeParse(rec.gemini);
   const antigravity = antigravityReportSchema.safeParse(rec.antigravity);
+  const doubao = doubaoReportSchema.safeParse(rec.doubao);
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
@@ -344,6 +380,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(devin.success ? { devin: devin.data } : {}),
     ...(gemini.success ? { gemini: gemini.data } : {}),
     ...(antigravity.success ? { antigravity: antigravity.data } : {}),
+    ...(doubao.success ? { doubao: doubao.data } : {}),
     ...(rec.antigravityOAuthProfile === true ? { antigravityOAuthProfile: true } : {}),
     ...(rec.antigravitySubscriptionModels === true ? { antigravitySubscriptionModels: true } : {}),
     ...(rec.antigravityUsage === true ? { antigravityUsage: true } : {}),
@@ -443,6 +480,24 @@ export function parseStoredCapabilities(raw: unknown): MachineCapabilities | nul
   return parseReportedCapabilities(raw) ?? null;
 }
 
+export function mergeReportedCapabilities(
+  previous: MachineCapabilities | null | undefined,
+  reported: MachineCapabilities,
+): MachineCapabilities {
+  let next = reported;
+  if (next.osPlatform === undefined && previous?.osPlatform !== undefined) {
+    next = { ...next, osPlatform: previous.osPlatform };
+  }
+  if (next.hardware === undefined && previous?.hardware !== undefined) {
+    next = { ...next, hardware: previous.hardware };
+  }
+  const mergedDoubao = pickNewerDoubaoReport(previous?.doubao, next.doubao);
+  if (mergedDoubao !== undefined && mergedDoubao !== next.doubao) {
+    next = { ...next, doubao: mergedDoubao };
+  }
+  return next;
+}
+
 export const requiredCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()).optional(),
   models: z.array(z.string()).optional(),
@@ -478,6 +533,8 @@ export const stepQueueBlockedSchema = z.object({
     'claude-logged-out',
     'devin-subscription',
     'antigravity-subscription',
+    'doubao-subscription',
+    'doubao-login-required',
     'account-switched',
     'coordinator-provider-missing',
     'coordinator-provider-no-key',

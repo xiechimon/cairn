@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { agentTodoSchema } from '../agent-todo.js';
+import { doubaoLoginStatusSchema } from '../doubao-subscription.js';
 import { buildRecordSchema } from '../records/build.js';
 import { recordId } from '../records/common.js';
 import { transcriptRowSchema } from '../records/message.js';
@@ -78,6 +79,15 @@ export const chiefUpdatedEventSchema = z.object({
   type: z.literal('chief.updated'),
 });
 export type ChiefUpdatedEvent = z.infer<typeof chiefUpdatedEventSchema>;
+
+export const doubaoLoginEventSchema = z.object({
+  type: z.literal('doubao.login'),
+  machineId: recordId,
+  loginId: z.string(),
+  status: doubaoLoginStatusSchema,
+  revision: z.number().int().nonnegative(),
+});
+export type DoubaoLoginEvent = z.infer<typeof doubaoLoginEventSchema>;
 
 export const conversationMessageEventSchema = z.object({
   type: z.literal('message'),
@@ -160,6 +170,7 @@ export const teamStreamEventSchema = z.discriminatedUnion('type', [
   notificationEventSchema,
   computerStateEventSchema,
   chiefUpdatedEventSchema,
+  doubaoLoginEventSchema,
   streamHelloEventSchema,
   conversationEnvelopeEventSchema,
 ]);

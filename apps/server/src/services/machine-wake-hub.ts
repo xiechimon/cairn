@@ -263,6 +263,21 @@ export class MachineWakeHub {
     }
   }
 
+  pushDoubaoVerify(machineId: string, checkId: string): boolean {
+    return this.sendToMachine(machineId, { type: 'doubao.verify', checkId });
+  }
+
+  sendToMachine(machineId: string, ev: MachineStreamEvent): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send(ev);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   isConnected(machineId: string): boolean {
     return this.streamsByMachine.has(machineId);
   }

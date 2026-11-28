@@ -6,7 +6,14 @@ import { machineCapabilitiesSchema, machineStrainReasonSchema } from './machine-
 export const MACHINE_HOST_KEY_PATTERN = /^[a-f0-9]{64}$/;
 export const hostKeySchema = z.string().regex(MACHINE_HOST_KEY_PATTERN);
 
-export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini', 'devin', 'antigravity'] as const;
+export const MACHINE_RUNTIMES = [
+  'pi',
+  'claude-code',
+  'gemini',
+  'devin',
+  'antigravity',
+  'doubao',
+] as const;
 export type MachineRuntime = (typeof MACHINE_RUNTIMES)[number];
 
 export const machineRunningThreadSchema = z.object({

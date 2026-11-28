@@ -17,6 +17,7 @@ import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { requiredGithubPushRepoForStep } from './dispatch-eligibility.js';
+import { enabledDoubaoSubscriptionId } from './doubao-subscriptions.js';
 import { projectOfTodo } from './git.js';
 import {
   priorSessionOf,
@@ -101,6 +102,7 @@ function sessionStarted(db: Db, row: PendingRow): boolean {
       claude: enabledSubscriptionId({ db }, row.todoRow.teamId),
       devin: enabledDevinSubscriptionId({ db }, row.todoRow.teamId),
       antigravity: enabledAntigravitySubscriptionId({ db }, row.todoRow.teamId),
+      doubao: enabledDoubaoSubscriptionId({ db }, row.todoRow.teamId),
     },
     profileForStep(db, row.todoRow, row.stepRow.kind, row.stepRow.id)?.provider ?? null,
   );

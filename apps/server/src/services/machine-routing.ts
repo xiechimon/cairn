@@ -20,6 +20,7 @@ import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
   antigravityUsesHostLogin,
   githubPushCapable,
+  homeMachineRejectReason,
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
@@ -28,6 +29,7 @@ import {
   runnerCannotConnect,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import { activeDoubaoSource, doubaoRunnerEligibility } from './doubao-subscriptions.js';
 import type { RouteProfile } from './routing-rules.js';
 
 type MachineRow = typeof machine.$inferSelect;
@@ -48,6 +50,10 @@ export function workerIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const runtime = stepRuntimeFor(facts.model.provider);
+  const doubaoGate =
+    runtime === 'doubao'
+      ? doubaoRunnerEligibility(db, machineRow.teamId, machineRow.id, machineRow.capabilities)
+      : 'ok';
   const ineligible = machineEligibility({
     machine: machineRow,
     agent: facts.agentRow,
@@ -69,6 +75,8 @@ export function workerIneligibility(
       ),
     antigravityHostLogin:
       runtime === 'antigravity' && antigravityUsesHostLogin(db, machineRow.teamId),
+    doubaoSubscriptionMissing: runtime === 'doubao' && doubaoGate === 'subscription',
+    doubaoLoginRequired: runtime === 'doubao' && doubaoGate === 'login-required',
     githubPushMissing:
       facts.githubPushRepo != null &&
       !githubPushCapable(machineRow.capabilities, facts.githubPushRepo, now),
@@ -79,7 +87,7 @@ export function workerIneligibility(
 export function chiefIneligibility(
   db: Pick<Db, 'select' | 'update'>,
   machineRow: MachineRow,
-  agentRow: Pick<RouteProfile, 'requiredCapabilities'>,
+  agentRow: Pick<RouteProfile, 'requiredCapabilities'> & { modelId?: string | null },
   provider: string | null | undefined,
   now: number,
 ): MachineIneligibility | null {
@@ -111,6 +119,22 @@ export function chiefIneligibility(
     )
   )
     return { kind: 'antigravity-subscription' };
+  if (runtime === 'doubao') {
+    const modelReject = homeMachineRejectReason(machineRow, {
+      provider,
+      modelId: agentRow.modelId,
+    });
+    if (modelReject !== null) return { kind: 'model', reason: modelReject };
+    const gate = doubaoRunnerEligibility(
+      db,
+      machineRow.teamId,
+      machineRow.id,
+      machineRow.capabilities,
+    );
+    if (gate === 'subscription') return { kind: 'doubao-subscription' };
+    if (gate === 'unsupported') return { kind: 'runtime' };
+    if (gate === 'login-required') return { kind: 'doubao-login-required' };
+  }
   const missing = missingCapabilities(machineRow, agentRow);
   if (missing.length > 0) return { kind: 'capability', missing };
   return null;
@@ -143,6 +167,7 @@ export function priorSessionOf(
     claude: string | null;
     devin: string | null;
     antigravity?: string | null;
+    doubao?: string | null;
   },
   intentProvider: string | null = null,
 ): {
@@ -150,6 +175,7 @@ export function priorSessionOf(
   priorMachineId: string | null;
   priorMachineLiveId: string | null;
   priorSubscriptionId: string | null;
+  priorStepAt: number | null;
   freshSession: boolean;
 } {
   const prior = db
@@ -158,9 +184,12 @@ export function priorSessionOf(
       machineId: step.machineId,
       fallback: step.fallback,
       ranModel: step.ranModel,
+      createdAt: step.createdAt,
+      claimedAt: step.claimedAt,
       subscriptionId: step.claudeSubscriptionId,
       devinSubscriptionId: step.devinSubscriptionId,
       antigravitySubscriptionId: step.antigravitySubscriptionId,
+      doubaoSubscriptionId: step.doubaoSubscriptionId,
     })
     .from(step)
     .where(
@@ -192,13 +221,16 @@ export function priorSessionOf(
   const priorSubscriptionId = priorRow?.subscriptionId ?? null;
   const priorDevinSubscriptionId = priorRow?.devinSubscriptionId ?? null;
   const priorAntigravitySubscriptionId = priorRow?.antigravitySubscriptionId ?? null;
+  const priorDoubaoSubscriptionId = priorRow?.doubaoSubscriptionId ?? null;
   const startsNewRun =
     (stepRow.byPerson || stepRow.kind === 'merge') &&
     ((priorSubscriptionId !== null && priorSubscriptionId !== enabledSubscriptionIds.claude) ||
       (priorDevinSubscriptionId !== null &&
         priorDevinSubscriptionId !== enabledSubscriptionIds.devin) ||
       (priorAntigravitySubscriptionId !== null &&
-        priorAntigravitySubscriptionId !== (enabledSubscriptionIds.antigravity ?? null)));
+        priorAntigravitySubscriptionId !== (enabledSubscriptionIds.antigravity ?? null)) ||
+      (priorDoubaoSubscriptionId !== null &&
+        priorDoubaoSubscriptionId !== (enabledSubscriptionIds.doubao ?? null)));
   return {
     priorSessionId: startsNewRun ? null : (priorRow?.sessionId ?? null),
     priorMachineId: startsNewRun ? null : (priorRow?.machineId ?? null),
@@ -207,6 +239,7 @@ export function priorSessionOf(
         ? null
         : priorRow.machineId,
     priorSubscriptionId,
+    priorStepAt: priorRow === null ? null : (priorRow.claimedAt ?? priorRow.createdAt),
     freshSession:
       startsNewRun ||
       planHandoffMissing ||
@@ -403,6 +436,29 @@ function poolResolution(input: {
   };
 }
 
+function doubaoDefaultTarget(
+  pool: readonly MachineRow[],
+  defaultMachineId: string | null,
+): string | null {
+  const sorted = [...pool].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : 1,
+  );
+  const authed = sorted.filter((m) => m.capabilities?.doubao?.authenticated === true);
+  const candidates = authed.length > 0 ? authed : sorted;
+  if (defaultMachineId !== null && candidates.some((m) => m.id === defaultMachineId)) {
+    return defaultMachineId;
+  }
+  return candidates[0]?.id ?? null;
+}
+
+function doubaoCapablePool(activeMachines: readonly MachineRow[]): readonly MachineRow[] {
+  const capable = activeMachines.filter(
+    (m) =>
+      m.capabilities?.doubao !== undefined && m.capabilities.doubao.platformSupported !== false,
+  );
+  return capable.length > 0 ? capable : activeMachines;
+}
+
 export function resolveChiefCandidates(input: {
   db: Db;
   teamId: string;
@@ -441,6 +497,19 @@ export function resolveChiefCandidates(input: {
       const hostId = source.login.runnerId;
       return pinnedTo(hostId, eligibleOnline, toAlternates(hostId), 'host-subscription');
     }
+  }
+
+  if (stepRuntimeFor(provider) === 'doubao') {
+    const source = activeDoubaoSource(db, teamId);
+    if (source.kind === 'none') return pinnedTo(null, [], [], 'host-subscription');
+    const pool = doubaoCapablePool(activeMachines);
+    const pinned = liveMachineId(db, input.pinnedMachineId);
+    const targetId =
+      source.runnerId !== null
+        ? source.runnerId
+        : ((pinned !== null && pool.some((m) => m.id === pinned) ? pinned : undefined) ??
+          doubaoDefaultTarget(pool, teamDefaultMachineId(db, teamId)));
+    return pinnedTo(targetId, eligibleOnline, toAlternates(targetId), 'host-subscription');
   }
 
   return poolResolution({
@@ -514,6 +583,23 @@ export function resolveWorkerCandidates(input: {
       const hostId = source.login.runnerId;
       return pinnedTo(hostId, eligibleOnline, toAlternates(hostId), 'host-subscription');
     }
+  }
+
+  if (stepRuntimeFor(facts.model.provider) === 'doubao') {
+    const source = activeDoubaoSource(db, teamId);
+    if (source.kind === 'none') return pinnedTo(null, [], [], 'host-subscription');
+    const pool = doubaoCapablePool(activeMachines);
+    const osFilter = facts.agentRow.requiredCapabilities?.os;
+    const filteredPool =
+      osFilter !== undefined ? pool.filter((m) => runnerOsOf(m.capabilities) === osFilter) : pool;
+    const rule = liveMachineId(db, input.ruleMachineId);
+    const targetId =
+      source.runnerId !== null
+        ? source.runnerId
+        : ((rule !== null && pool.some((m) => m.id === rule) ? rule : undefined) ??
+          doubaoDefaultTarget(filteredPool, input.defaultMachineId) ??
+          rule);
+    return pinnedTo(targetId, eligibleOnline, toAlternates(targetId), 'host-subscription');
   }
 
   return poolResolution({

@@ -528,7 +528,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; +devin_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message; 5346 −chief_report −retro_proposal; seq-13 +computer_browser_lease; 5349 −chief_summary; 5348 −harness_* −thread_*; seq-11 +external_effect +im_seen_inbound +im_turn_origin; +phone; −autonomy_state −member_activity −schedule_report; +pairing_request)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, shell_command, and memory_candidate (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(92);
+    expect(DB_TABLES).toHaveLength(93);
     expect(DB_TABLES).not.toContain('memory_candidate');
     expect(INTERNAL_ONLY_TABLES).not.toContain('memory_candidate');
     for (const table of [
@@ -545,6 +545,7 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
       'mcp_connector',
       'devin_subscription',
       'antigravity_subscription',
+      'doubao_subscription',
     ]) {
       expect(DB_TABLES).toContain(table);
       expect(INTERNAL_ONLY_TABLES).toContain(table);
@@ -637,8 +638,14 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
 });
 
 describe('AgentBackend seam (01 §5, 00/D1 seam)', () => {
-  it('BACKEND_RUNTIME_IDS accepts claude-code, gemini, devin and antigravity; pi is still not a backend identity', () => {
-    expect(BACKEND_RUNTIME_IDS).toEqual(['claude-code', 'gemini', 'devin', 'antigravity']);
+  it('BACKEND_RUNTIME_IDS accepts claude-code, gemini, devin, antigravity and doubao; pi is still not a backend identity', () => {
+    expect(BACKEND_RUNTIME_IDS).toEqual([
+      'claude-code',
+      'gemini',
+      'devin',
+      'antigravity',
+      'doubao',
+    ]);
     expect(BACKEND_RUNTIME_IDS).not.toContain('pi');
     for (const id of BACKEND_RUNTIME_IDS) {
       expect(MODEL_SOURCE_RUNTIMES).toContain(id);
@@ -650,6 +657,7 @@ describe('AgentBackend seam (01 §5, 00/D1 seam)', () => {
     expect(isBackendRuntimeId('gemini')).toBe(true);
     expect(isBackendRuntimeId('devin')).toBe(true);
     expect(isBackendRuntimeId('antigravity')).toBe(true);
+    expect(isBackendRuntimeId('doubao')).toBe(true);
     expect(isBackendRuntimeId('stub-gw')).toBe(false);
     expect(isBackendRuntimeId('pi')).toBe(false);
     expect(isBackendRuntimeId('anthropic')).toBe(false);

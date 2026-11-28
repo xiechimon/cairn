@@ -1,3 +1,4 @@
+import type { StepQueueBlocked } from '@cairn/shared';
 import { ArrowDown } from 'lucide-react';
 import {
   forwardRef,
@@ -36,6 +37,10 @@ interface TranscriptColumnProps {
   transcript: TranscriptItem[];
   lead?: ReactNode;
   result?: ReactNode;
+  blockedActions?: (
+    kind: StepQueueBlocked['kind'] | undefined,
+    waitingFor?: { machineId: string; name: string },
+  ) => ReactNode;
   autoScroll: boolean;
   running?: boolean;
   settled?: boolean;
@@ -63,6 +68,7 @@ function TranscriptColumnInner({
   transcript,
   lead,
   result,
+  blockedActions,
   running,
   settled = true,
   threadKey,
@@ -131,7 +137,12 @@ function TranscriptColumnInner({
       >
         <MessageScrollerContent className={CONTENT_CLS}>
           {lead}
-          <Transcript key={threadKey} transcript={transcript} result={result} />
+          <Transcript
+            key={threadKey}
+            transcript={transcript}
+            result={result}
+            blockedActions={blockedActions}
+          />
         </MessageScrollerContent>
       </FadeScrollerViewport>
       <JumpToLatestButton label={t('滚动到最新')}>

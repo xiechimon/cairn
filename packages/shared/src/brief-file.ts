@@ -6,7 +6,14 @@ export { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END };
 
 export const BRIEF_MANAGED_SEPARATOR = '\n\n';
 
-export const BRIEF_BACKEND_IDS = ['pi', 'claude-code', 'gemini', 'devin', 'antigravity'] as const;
+export const BRIEF_BACKEND_IDS = [
+  'pi',
+  'claude-code',
+  'gemini',
+  'devin',
+  'antigravity',
+  'doubao',
+] as const;
 export type BriefBackendId = (typeof BRIEF_BACKEND_IDS)[number];
 
 export const BRIEF_CANDIDATES: Record<BriefBackendId, readonly string[]> = {
@@ -15,6 +22,7 @@ export const BRIEF_CANDIDATES: Record<BriefBackendId, readonly string[]> = {
   gemini: ['GEMINI.md'],
   devin: ['AGENTS.md', 'AGENTS.MD'],
   antigravity: ['AGENTS.md', 'AGENTS.MD', 'GEMINI.md'],
+  doubao: ['AGENTS.md', 'AGENTS.MD'],
 };
 
 export const BRIEF_CREATE_NAME: Record<BriefBackendId, string> = {
@@ -23,6 +31,7 @@ export const BRIEF_CREATE_NAME: Record<BriefBackendId, string> = {
   gemini: 'GEMINI.md',
   devin: 'AGENTS.md',
   antigravity: 'AGENTS.md',
+  doubao: 'AGENTS.md',
 };
 
 export const BRIEF_RECONCILE_FILENAMES: readonly string[] = [
@@ -38,6 +47,7 @@ export function briefBackendForProvider(provider: string | null | undefined): Br
   if (provider === 'gemini') return 'gemini';
   if (provider === 'devin') return 'devin';
   if (provider === 'antigravity') return 'antigravity';
+  if (provider === 'doubao') return 'doubao';
   return isBackendRuntimeId(provider) ? 'claude-code' : 'pi';
 }
 

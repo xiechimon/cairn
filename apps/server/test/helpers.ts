@@ -99,6 +99,8 @@ export function bootServer(
     providerTestTimeoutMs?: number;
     antigravityVerifyTimeoutMs?: number;
     tokenRotationTimeoutMs?: number;
+    doubaoVerifyTimeoutMs?: number;
+    doubaoLoginTimeoutMs?: number;
     authToken?: string | null;
     ownerChannel?: AppContext['ownerChannel'];
     accessVerifier?: AppContext['accessVerifier'];
@@ -223,6 +225,12 @@ export function bootServer(
       ...(opts.tokenRotationTimeoutMs === undefined
         ? {}
         : { tokenRotationTimeoutMs: opts.tokenRotationTimeoutMs }),
+      ...(opts.doubaoVerifyTimeoutMs === undefined
+        ? {}
+        : { doubaoVerifyTimeoutMs: opts.doubaoVerifyTimeoutMs }),
+      ...(opts.doubaoLoginTimeoutMs === undefined
+        ? {}
+        : { doubaoLoginTimeoutMs: opts.doubaoLoginTimeoutMs }),
       githubFetch: opts.githubFetch ?? rejectingGithubFetch,
       ...(opts.githubBaseFetch !== undefined ? { githubBaseFetch: opts.githubBaseFetch } : {}),
       ...(opts.githubAppTokenSocket !== undefined

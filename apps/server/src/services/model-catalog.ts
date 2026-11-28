@@ -12,15 +12,18 @@ import {
   antigravitySubscription,
   claudeSubscription,
   devinSubscription,
+  doubaoSubscription,
   machine,
   provider,
 } from '../db/schema.js';
 import { stepRuntimeFor } from './dispatch-eligibility.js';
+import { DEFAULT_DOUBAO_FALLBACK_MODELS } from './doubao-subscriptions.js';
 
 export interface TeamModelCatalog {
   providers: Map<string, { label: string; models: Map<string, string> }>;
   devinModels: Map<string, string>;
   antigravityModels: Map<string, string>;
+  doubaoModels: Map<string, string>;
   claudeModels: Map<string, string>;
 }
 
@@ -49,6 +52,7 @@ export function loadTeamModelCatalog(
 
   const devinModels = new Map<string, string>();
   const antigravityModels = new Map<string, string>();
+  const doubaoModels = new Map<string, string>();
   const claudeModels = new Map<string, string>();
   if (includeBuiltins) {
     addModels(devinModels, DEFAULT_DEVIN_MODELS);
@@ -63,6 +67,7 @@ export function loadTeamModelCatalog(
     .all()) {
     addModels(devinModels, row.capabilities?.devin?.models ?? []);
     addModels(antigravityModels, row.capabilities?.antigravity?.models ?? []);
+    addModels(doubaoModels, row.capabilities?.doubao?.models ?? []);
     addModels(claudeModels, row.claudeCodeReport?.models ?? []);
   }
 
@@ -80,6 +85,18 @@ export function loadTeamModelCatalog(
     .all()) {
     addModels(antigravityModels, row.models);
   }
+  let hasEnabledDoubao = false;
+  for (const row of db
+    .select({ models: doubaoSubscription.models, enabledAt: doubaoSubscription.enabledAt })
+    .from(doubaoSubscription)
+    .where(eq(doubaoSubscription.teamId, teamId))
+    .all()) {
+    if (row.enabledAt !== null) hasEnabledDoubao = true;
+    addModels(doubaoModels, row.models);
+  }
+  if (hasEnabledDoubao && doubaoModels.size === 0) {
+    addModels(doubaoModels, DEFAULT_DOUBAO_FALLBACK_MODELS);
+  }
   for (const row of db
     .select({ models: claudeSubscription.models })
     .from(claudeSubscription)
@@ -88,12 +105,13 @@ export function loadTeamModelCatalog(
     addModels(claudeModels, row.models ?? []);
   }
 
-  return { providers, devinModels, antigravityModels, claudeModels };
+  return { providers, devinModels, antigravityModels, doubaoModels, claudeModels };
 }
 
 function inferProviderFromModelId(catalog: TeamModelCatalog, modelId: string): string | null {
   if (catalog.devinModels.has(modelId) || /^swe-/i.test(modelId)) return 'devin';
   if (catalog.antigravityModels.has(modelId)) return 'antigravity';
+  if (catalog.doubaoModels.has(modelId)) return 'doubao';
   if (catalog.claudeModels.has(modelId)) return 'claude-code';
   return null;
 }
@@ -102,6 +120,7 @@ const RUNTIME_PROVIDER_LABELS: Record<string, string> = {
   'claude-code': 'Claude Code',
   devin: 'Devin',
   antigravity: 'Antigravity',
+  doubao: '豆包',
   pi: 'Cairn',
   gemini: 'Gemini',
 };
@@ -129,9 +148,11 @@ export function resolveTeamModelEntry(
       ? catalog.devinModels.get(modelId)
       : runtime === 'antigravity'
         ? catalog.antigravityModels.get(modelId)
-        : runtime === 'claude-code'
-          ? catalog.claudeModels.get(modelId)
-          : undefined);
+        : runtime === 'doubao'
+          ? catalog.doubaoModels.get(modelId)
+          : runtime === 'claude-code'
+            ? catalog.claudeModels.get(modelId)
+            : undefined);
   const modelName =
     catalogName !== undefined && catalogName !== '' && catalogName !== modelId
       ? catalogName

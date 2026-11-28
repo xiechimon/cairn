@@ -14,7 +14,8 @@ export function subscriptionUsageStats(
   column:
     | typeof step.claudeSubscriptionId
     | typeof step.devinSubscriptionId
-    | typeof step.antigravitySubscriptionId,
+    | typeof step.antigravitySubscriptionId
+    | typeof step.doubaoSubscriptionId,
   ids: readonly string[],
   since: number,
 ): Map<string, SubscriptionUsage> {

@@ -19,6 +19,10 @@ export function antigravitySubscriptionMissingMessage(): string {
   return '团队暂无可用的 Antigravity 订阅：请在桌面端登录本机 agy，或在「我的订阅」中填入 GEMINI_API_KEY 后重试。';
 }
 
+export function doubaoSubscriptionMissingMessage(): string {
+  return '团队暂无可用的豆包订阅或当前电脑尚未扫码登录：请在「设置 → 模型」添加豆包订阅，或在当前任务卡片中用豆包 App 扫码登录后重试。';
+}
+
 export function agentStepRefusal(input: {
   stepKind: string;
   agentTools: readonly string[] | undefined;
@@ -27,6 +31,7 @@ export function agentStepRefusal(input: {
   hasDevinToken?: boolean;
   hasAntigravityToken?: boolean;
   hasAntigravityHostAuth?: boolean;
+  hasDoubaoHostAuth?: boolean;
 }): string | null {
   const agentTools = input.agentTools;
   if (input.stepKind === 'merge' && agentTools !== undefined) {
@@ -47,6 +52,9 @@ export function agentStepRefusal(input: {
     input.hasAntigravityHostAuth !== true
   ) {
     return antigravitySubscriptionMissingMessage();
+  }
+  if (input.runtimeId === 'doubao' && input.hasDoubaoHostAuth !== true) {
+    return doubaoSubscriptionMissingMessage();
   }
   return null;
 }

@@ -216,6 +216,7 @@ interface CreateProviderDialogProps {
   onPickClaudeSubscription?: () => void;
   onPickDevinSubscription?: () => void;
   onPickAntigravitySubscription?: () => void;
+  onPickDoubaoSubscription?: () => void;
   onXaiSignIn?: () => void;
   onCodexSignIn?: () => void;
   signIn?: SignInParts | null;
@@ -236,6 +237,7 @@ export function CreateProviderDialog({
   onPickClaudeSubscription,
   onPickDevinSubscription,
   onPickAntigravitySubscription,
+  onPickDoubaoSubscription,
   onXaiSignIn,
   onCodexSignIn,
   signIn = null,
@@ -369,7 +371,12 @@ export function CreateProviderDialog({
               group === '订阅登录' &&
               onPickAntigravitySubscription !== undefined &&
               matchesQuery(t('Antigravity 订阅').toLowerCase(), query);
-            if (groupRows.length === 0 && !claudeRow && !devinRow && !antigravityRow) return null;
+            const doubaoRow =
+              group === '订阅登录' &&
+              onPickDoubaoSubscription !== undefined &&
+              matchesQuery(t('豆包订阅').toLowerCase(), query);
+            if (groupRows.length === 0 && !claudeRow && !devinRow && !antigravityRow && !doubaoRow)
+              return null;
             return (
               <fieldset key={group} className={PICKER_GROUP_CLS}>
                 <legend className={inline ? 'sr-only' : PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
@@ -410,6 +417,19 @@ export function CreateProviderDialog({
                       <MonoMark mark={LOBEHUB_MONO.antigravity} />
                     </span>
                     <span className="min-w-0 truncate">{t('Antigravity 订阅')}</span>
+                  </Button>
+                )}
+                {doubaoRow && (
+                  <Button
+                    variant="ghost"
+                    data-preset-id="doubao-subscription"
+                    className={PICKER_ROW_CLS}
+                    onClick={onPickDoubaoSubscription}
+                  >
+                    <span aria-hidden className={PICKER_TILE_CLS}>
+                      <MonoMark mark={LOBEHUB_MONO.doubao} />
+                    </span>
+                    <span className="min-w-0 truncate">{t('豆包订阅')}</span>
                   </Button>
                 )}
                 {groupRows.map((row) => (

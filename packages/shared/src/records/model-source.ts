@@ -9,6 +9,7 @@ export const MODEL_SOURCE_RUNTIMES = [
   'gemini',
   'devin',
   'antigravity',
+  'doubao',
 ] as const;
 export const modelSourceRuntimeSchema = z.enum(MODEL_SOURCE_RUNTIMES);
 export type ModelSourceRuntime = z.infer<typeof modelSourceRuntimeSchema>;
@@ -50,6 +51,7 @@ export const MODEL_SOURCE_RUNTIME_LABELS: Record<ModelSourceRuntime, string> = {
   gemini: 'Gemini',
   devin: 'Devin',
   antigravity: 'Antigravity',
+  doubao: '豆包',
 };
 
 export const DEFAULT_ANTIGRAVITY_MODELS: readonly ModelSourceModel[] = [

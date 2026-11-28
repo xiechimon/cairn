@@ -23,6 +23,7 @@ export * from './desktop-local-credentials.js';
 export * from './desktop-shell.js';
 export * from './devin-local.js';
 export * from './devin-subscription.js';
+export * from './doubao-subscription.js';
 export * from './failure-attribution.js';
 export * from './failure-review.js';
 export * from './genai-conventions.js';

@@ -48,6 +48,10 @@ import { recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
 import { stepRuntimeFor } from './dispatch-eligibility.js';
+import {
+  doubaoSubscriptionAllowsRunner,
+  enabledDoubaoSubscriptionId,
+} from './doubao-subscriptions.js';
 import { imTurnFinished } from './im/runtime.js';
 import {
   isChiefConversation,
@@ -77,7 +81,7 @@ type StepRow = typeof step.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
 
 export interface ChiefSubscriptionBind {
-  runtime: 'claude-code' | 'devin' | 'antigravity';
+  runtime: 'claude-code' | 'devin' | 'antigravity' | 'doubao';
   teamId: string;
 }
 
@@ -100,6 +104,7 @@ export function claimPendingChiefStep(
       ? { runtime: 'claude-code' as const, teamId: options.bind }
       : (options.bind ?? null);
   if (options.model?.provider === 'antigravity' && bind?.runtime !== 'antigravity') return null;
+  if (options.model?.provider === 'doubao' && bind?.runtime !== 'doubao') return null;
   const claimed = db.transaction(() => {
     const claimedAt = nextClaimGeneration(stepRow, nowMs());
     if (options.stillAuthorized !== undefined && !options.stillAuthorized()) return null;
@@ -115,11 +120,22 @@ export function claimPendingChiefStep(
     ) {
       return null;
     }
+    const doubaoSubscriptionId =
+      bind?.runtime === 'doubao' ? enabledDoubaoSubscriptionId({ db }, bind.teamId) : null;
+    if (
+      bind?.runtime === 'doubao' &&
+      (doubaoSubscriptionId === null ||
+        options.machineId === null ||
+        !doubaoSubscriptionAllowsRunner(db, bind.teamId, options.machineId))
+    ) {
+      return null;
+    }
     const lease = acquireChiefStepLease(db, stepRow, {
       machineId: options.machineId,
       claimedAt,
       bind,
       antigravitySubscriptionId,
+      doubaoSubscriptionId,
       model: options.model ?? null,
       ...(options.fallback !== undefined ? { fallback: options.fallback } : {}),
       mcpGrant: options.mcpGrant ?? null,

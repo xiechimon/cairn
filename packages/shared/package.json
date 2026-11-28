@@ -26,6 +26,7 @@
     "./private-address": "./src/node/private-address.ts",
     "./managed-bin": "./src/node/managed-bin.ts",
     "./antigravity-install": "./src/node/antigravity-install.ts",
+    "./doubao-install": "./src/node/doubao-install.ts",
     "./parent-watch": "./src/node/parent-watch.ts",
     "./host-identity": "./src/node/host-identity.ts",
     "./realpath-nearest": "./src/node/realpath-nearest.ts",

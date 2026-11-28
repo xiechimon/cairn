@@ -331,6 +331,7 @@ async function chiefStepToken(
       claudeSubscriptionId: stepRow?.claudeSubscriptionId ?? null,
       devinSubscriptionId: stepRow?.devinSubscriptionId ?? null,
       antigravitySubscriptionId: stepRow?.antigravitySubscriptionId ?? null,
+      doubaoSubscriptionId: stepRow?.doubaoSubscriptionId ?? null,
     },
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();

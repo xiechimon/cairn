@@ -45,17 +45,19 @@ const GRAPH_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'co
 const CLAUDE_CODE_TARGET = 'claude-code';
 const DEVIN_TARGET = 'devin';
 const ANTIGRAVITY_TARGET = 'antigravity';
+const DOUBAO_TARGET = 'doubao';
 
-const SUBSCRIPTION_TARGETS: Record<string, 'claude-code' | 'devin' | 'antigravity'> = {
+const SUBSCRIPTION_TARGETS: Record<string, 'claude-code' | 'devin' | 'antigravity' | 'doubao'> = {
   [CLAUDE_CODE_TARGET]: 'claude-code',
   [DEVIN_TARGET]: 'devin',
   [ANTIGRAVITY_TARGET]: 'antigravity',
+  [DOUBAO_TARGET]: 'doubao',
 };
 
 export interface RoutingTargetRow {
   id: string;
   name: string;
-  runtime: 'claude-code' | 'devin' | 'antigravity' | 'pi';
+  runtime: 'claude-code' | 'devin' | 'antigravity' | 'doubao' | 'pi';
   unavailable: boolean;
   record?: ProviderRecord;
 }
@@ -64,12 +66,14 @@ export function routingTargets({
   subscriptions,
   devinSubscriptions = [],
   antigravitySubscriptions = [],
+  doubaoSubscriptions = [],
   providers,
   routing,
 }: {
   subscriptions: readonly SubscriptionAccount[];
   devinSubscriptions?: readonly SubscriptionAccount[];
   antigravitySubscriptions?: readonly SubscriptionAccount[];
+  doubaoSubscriptions?: readonly SubscriptionAccount[];
   providers: readonly ProviderRecord[];
   routing: ModelRouting | undefined;
 }): RoutingTargetRow[] {
@@ -92,6 +96,16 @@ export function routingTargets({
       runtime: 'antigravity' as const,
       unavailable:
         account.state === 'expired' ||
+        account.runnerLogin === 'unavailable' ||
+        account.runnerLogin === 'missing_local_login',
+    })),
+    ...doubaoSubscriptions.map((account) => ({
+      id: `subscription:${account.id}`,
+      name: account.label,
+      runtime: 'doubao' as const,
+      unavailable:
+        account.enabled === false ||
+        account.runnerOffline === true ||
         account.runnerLogin === 'unavailable' ||
         account.runnerLogin === 'missing_local_login',
     })),
@@ -177,6 +191,12 @@ export function ruleGraphGroups(
       label: 'Antigravity',
       id: 'antigravity-models',
       name: t('所有 Antigravity 模型'),
+    },
+    {
+      runtime: DOUBAO_TARGET,
+      label: '豆包',
+      id: 'doubao-models',
+      name: t('所有豆包模型'),
     },
   ]) {
     if (!projectRuntimes.has(runtime)) continue;

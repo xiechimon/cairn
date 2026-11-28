@@ -227,7 +227,13 @@ export interface AgentBackend {
   ): Promise<ImageDescription | undefined>;
 }
 
-export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini', 'devin', 'antigravity'] as const;
+export const BACKEND_RUNTIME_IDS = [
+  'claude-code',
+  'gemini',
+  'devin',
+  'antigravity',
+  'doubao',
+] as const;
 export type BackendRuntimeId = (typeof BACKEND_RUNTIME_IDS)[number];
 
 export function isBackendRuntimeId(v: unknown): v is BackendRuntimeId {

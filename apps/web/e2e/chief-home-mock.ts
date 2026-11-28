@@ -303,6 +303,9 @@ export async function mockLive(
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);
     if (p === '/api/computers/steps') return json({ steps: [] });
+    if (p === '/api/teams/t1/doubao-subscriptions') {
+      return json({ subscriptions: [], runnerLogins: [] });
+    }
     if (p === '/api/teams/t1/providers') return json({ presets: [], providers: [READY_PROVIDER] });
     if (p === '/api/teams/t1/usage/daily') return json({ days: [], models: [], projects: [] });
     if (p === '/api/server/backup') return json(state.backup ?? { state: 'none' });

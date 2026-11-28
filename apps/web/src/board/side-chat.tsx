@@ -20,9 +20,10 @@ import {
 } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
-import { useApiMutations, usePrs } from '../api/hooks.js';
+import { useApiMutations, useProviders, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { dismissNotificationForEntity } from '../api/sse.js';
+import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { withoutReturnedText } from '../chief/outbox.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
@@ -44,7 +45,9 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { baseName, dirName } from '../lib/path-name.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { DoubaoQrLoginCard } from '../resources/doubao-qr-login.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
+import { settingsHref } from '../settings/settings-href.js';
 import { inlineArtifactKey, registerInlineArtifact } from './artifact/inline-artifact.js';
 import { type EngineRunView, engineTranscript, engineUsageSummary } from './engine-run.js';
 import { EngineQuestion, EngineRawView } from './engine-run-view.js';
@@ -573,6 +576,8 @@ function ThreadBody({
   const mentions = useThreadMentions(todo.projectId);
   const archived = todo.archivedAt != null;
   const { live, teamId } = useLiveData();
+  const providersQ = useProviders(teamId, live);
+  const canManageDoubao = !live || providersQ.data?.canTestConnection === true;
   const [draft, setDraft] = useServerDraft({
     teamId,
     scope: `todo:${todo.id}`,
@@ -619,6 +624,19 @@ function ThreadBody({
                 ? []
                 : engineTranscript(engine.run)),
             ]}
+            blockedActions={(kind, waitingFor) =>
+              kind === 'doubao-login-required' && waitingFor !== undefined ? (
+                <DoubaoQrLoginCard
+                  teamId={teamId}
+                  machineId={waitingFor.machineId}
+                  machineName={waitingFor.name}
+                  autoStart
+                  canManage={canManageDoubao}
+                />
+              ) : (
+                <CoordinatorFixLinks kind={kind} />
+              )
+            }
             lead={
               <ThreadLead
                 todo={todo}

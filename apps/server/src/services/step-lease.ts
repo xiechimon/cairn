@@ -41,6 +41,7 @@ export interface WorkerStepLeaseInput {
   claudeSubscriptionId: string | null;
   devinSubscriptionId: string | null;
   antigravitySubscriptionId: string | null;
+  doubaoSubscriptionId: string | null;
   ranModel: StepRanModel | null;
   fallback?: StepFallbackRow | null;
   mcpGrant: string[] | null;
@@ -67,6 +68,7 @@ export function acquireWorkerStepLease(
       claudeSubscriptionId: input.claudeSubscriptionId,
       devinSubscriptionId: input.devinSubscriptionId,
       antigravitySubscriptionId: input.antigravitySubscriptionId,
+      doubaoSubscriptionId: input.doubaoSubscriptionId,
       holdReason: null,
       holdUntil: null,
       ranModel: input.ranModel,
@@ -85,8 +87,9 @@ export function acquireWorkerStepLease(
 export interface ChiefStepLeaseInput {
   machineId: string | null;
   claimedAt: number;
-  bind: { runtime: 'claude-code' | 'devin' | 'antigravity'; teamId: string } | null;
+  bind: { runtime: 'claude-code' | 'devin' | 'antigravity' | 'doubao'; teamId: string } | null;
   antigravitySubscriptionId: string | null;
+  doubaoSubscriptionId: string | null;
   model: StepRanModel | null;
   fallback?: StepFallbackRow | null;
   mcpGrant: string[] | null;
@@ -117,6 +120,7 @@ export function acquireChiefStepLease(
             >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${input.bind.teamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${input.claimedAt}))`
           : null,
       antigravitySubscriptionId: input.antigravitySubscriptionId,
+      doubaoSubscriptionId: input.doubaoSubscriptionId,
       claimedAt: input.claimedAt,
       lastHeartbeatAt: input.claimedAt,
       holdReason: null,

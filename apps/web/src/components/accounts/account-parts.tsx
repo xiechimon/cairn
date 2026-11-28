@@ -12,6 +12,7 @@ import {
   ClaudeCodeMark,
   ClaudeMark,
   DevinMark,
+  DoubaoMark,
   GrokMark,
   OpenAIMark,
   PiMark,
@@ -30,6 +31,7 @@ export const VENDORS: Record<AccountVendor, { label: string; short: string; Mark
   grok: { label: 'Grok', short: 'Grok', Mark: GrokMark },
   devin: { label: 'Devin', short: 'Devin', Mark: DevinMark },
   antigravity: { label: 'Antigravity', short: 'Antigravity', Mark: AntigravityMark },
+  doubao: { label: '豆包', short: '豆包', Mark: DoubaoMark },
 };
 
 export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> = {
@@ -38,6 +40,7 @@ export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> =
   pi: { label: 'Pi', Mark: PiMark },
   devin: { label: 'Devin', Mark: DevinMark },
   antigravity: { label: 'Antigravity', Mark: AntigravityMark },
+  doubao: { label: '豆包', Mark: DoubaoMark },
 };
 
 export function useClock(): (ts: number, now: number) => string {
@@ -81,17 +84,19 @@ export function ProviderRow({ provider }: { provider: MachineProvider }) {
       </StatusChip>
       <span className="flex min-w-0 flex-auto items-center gap-3 text-meta text-content-tertiary">
         {meta.length > 0 && <span className="truncate font-mono">{meta.join(' · ')}</span>}
-        {provider.login === 'logged-out' && provider.loginCommand !== null && (
-          <span className="truncate">
-            {t('在这台执行机上运行')}{' '}
-            <code
-              data-testid="provider-login-command"
-              className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-code text-foreground"
-            >
-              {provider.loginCommand}
-            </code>
-          </span>
-        )}
+        {provider.login === 'logged-out' &&
+          provider.loginCommand !== null &&
+          provider.runtime !== 'doubao' && (
+            <span className="truncate">
+              {t('在这台执行机上运行')}{' '}
+              <code
+                data-testid="provider-login-command"
+                className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-code text-foreground"
+              >
+                {provider.loginCommand}
+              </code>
+            </span>
+          )}
       </span>
     </div>
   );

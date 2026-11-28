@@ -29,6 +29,7 @@ import {
   missingCapabilityItems,
   runnerCannotConnect,
 } from './dispatch-eligibility.js';
+import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import { getModelLiveness, mergedCatalogModels } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
 import { antigravityQuotaExhausted, listConnectedTierSources } from './source-tiers.js';
@@ -39,7 +40,7 @@ export type BuildStepRoute = {
   buildId: string;
   stepId: string;
   kind: StepKind;
-  harness: 'claude-code' | 'pi' | 'devin' | 'antigravity' | null;
+  harness: 'claude-code' | 'pi' | 'devin' | 'antigravity' | 'doubao' | null;
   provider: string | null;
   modelId: string | null;
   machineId: string | null;
@@ -145,6 +146,14 @@ function candidateAvailableOnMachine(
   }
   if (source.runtime === 'devin') {
     return { available: hasActiveDevinSubscription({ db }, row.teamId) };
+  }
+  if (source.runtime === 'doubao') {
+    const runnerModels = row.capabilities?.doubao?.models ?? [];
+    const hasModel = runnerModels.length === 0 || runnerModels.some((m) => m.id === modelId);
+    return {
+      available:
+        hasModel && doubaoSubscriptionAllowsRunner(db, row.teamId, row.id, row.capabilities),
+    };
   }
   return { available: true };
 }
@@ -290,6 +299,20 @@ export function primarySourceOnlyOffline(
                       },
                     }
                   : {}),
+                ...(source.runtime === 'doubao' &&
+                row.capabilities?.doubao !== undefined &&
+                row.capabilities.doubao.platformSupported !== false
+                  ? {
+                      capabilities: {
+                        ...row.capabilities,
+                        doubao: {
+                          ...row.capabilities.doubao,
+                          installed: true,
+                          authenticated: true,
+                        },
+                      },
+                    }
+                  : {}),
               },
               source,
               modelId,
@@ -361,10 +384,13 @@ export function decideStepRoute(
   );
 }
 
-function harnessOf(provider: string | null): 'claude-code' | 'pi' | 'devin' | 'antigravity' | null {
+function harnessOf(
+  provider: string | null,
+): 'claude-code' | 'pi' | 'devin' | 'antigravity' | 'doubao' | null {
   if (provider === 'claude-code') return 'claude-code';
   if (provider === 'devin') return 'devin';
   if (provider === 'antigravity') return 'antigravity';
+  if (provider === 'doubao') return 'doubao';
   if (provider === null || provider === 'gemini') return null;
   return 'pi';
 }

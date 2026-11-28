@@ -26,6 +26,7 @@ import {
   antigravitySubscription,
   claudeSubscription,
   devinSubscription,
+  doubaoSubscription,
   machine,
   provider,
   team,
@@ -34,6 +35,7 @@ import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { enabledClaudeSubscriptionModels } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionModels } from './devin-subscriptions.js';
 import { antigravityUsable, claudeCodeUsable, devinUsable } from './dispatch-eligibility.js';
+import { activeDoubaoSource, DEFAULT_DOUBAO_FALLBACK_MODELS } from './doubao-subscriptions.js';
 
 export interface ConnectedTierSource {
   key: string;
@@ -159,10 +161,36 @@ function devinTierModels(db: Pick<Db, 'select'>, teamId: string): CatalogTierMod
     });
 }
 
+function doubaoTierModels(db: Pick<Db, 'select'>, teamId: string): CatalogTierModel[] {
+  const source = activeDoubaoSource(db, teamId);
+  if (source.kind === 'none') return [];
+  const reported = db
+    .select({ capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all()
+    .flatMap((row) => row.capabilities?.doubao?.models ?? []);
+  const raw =
+    source.models.length > 0
+      ? source.models
+      : reported.length > 0
+        ? reported
+        : DEFAULT_DOUBAO_FALLBACK_MODELS;
+  return raw
+    .filter((m) => m.id !== '')
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      ...('thinkingLevels' in m && Array.isArray(m.thinkingLevels)
+        ? { thinkingLevels: m.thinkingLevels }
+        : {}),
+    }));
+}
+
 function subscriptionKeysFor(
   db: Pick<Db, 'select'>,
   teamId: string,
-): Record<'claude-code' | 'antigravity' | 'devin', string[]> {
+): Record<'claude-code' | 'antigravity' | 'devin' | 'doubao', string[]> {
   return {
     'claude-code': db
       .select({ id: claudeSubscription.id })
@@ -180,6 +208,12 @@ function subscriptionKeysFor(
       .select({ id: devinSubscription.id })
       .from(devinSubscription)
       .where(eq(devinSubscription.teamId, teamId))
+      .all()
+      .map((r) => `subscription:${r.id}`),
+    doubao: db
+      .select({ id: doubaoSubscription.id })
+      .from(doubaoSubscription)
+      .where(eq(doubaoSubscription.teamId, teamId))
       .all()
       .map((r) => `subscription:${r.id}`),
   };
@@ -259,6 +293,15 @@ export function listConnectedTierSources(
       provider: 'devin',
       runtime: 'devin',
       models: devinTierModels(db, teamId),
+    });
+  }
+  if (activeDoubaoSource(db, teamId).kind === 'host') {
+    rawSources.push({
+      keys: subKeys.doubao,
+      key: 'doubao',
+      provider: 'doubao',
+      runtime: 'doubao',
+      models: doubaoTierModels(db, teamId),
     });
   }
 

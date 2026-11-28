@@ -194,6 +194,8 @@ function isolatedConfigEnv(input: StepEnvInput): Record<string, string> {
       };
     case 'gemini':
       return { GEMINI_CLI_HOME: prepareGeminiHome({ cairnHome, realHome }) };
+    case 'doubao':
+      return { DOUBAO_CLI_NO_UPDATE_CHECK: '1' };
     default:
       return {};
   }
