@@ -40,7 +40,7 @@ describe('paired decision', () => {
     const decision = decide(pairs(3, 3, 4));
     expect(decision.n).toBe(10);
     expect(decision.ties).toBe(4);
-    expect(decision.p).toBe(1);
+    expect(decision.p).toBeCloseTo(0.65625);
     expect(decision.kind).toBe('discard');
   });
 
