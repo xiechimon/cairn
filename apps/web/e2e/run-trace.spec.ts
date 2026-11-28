@@ -133,7 +133,17 @@ test('the spiral opens the run window on the newest turn; 全部 adds other conv
   await expect(page).toHaveURL(/\/app\/runs\/build-r\?thread=thread-run-trace&scope=all/);
   await expect(task).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('run-page')).toContainText('去掉了设置列表的固定最小宽度');
-  await page.getByTestId('run-list-problems').click();
+  const filter = page.getByTestId('run-list-problems');
+  const look = () =>
+    filter.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return `${style.borderColor} ${style.color}`;
+    });
+  const offLook = await look();
+  await filter.click();
+  await expect(filter).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.move(0, 0);
+  expect(await look()).not.toBe(offLook);
   await expect(rows.first()).toHaveAttribute('data-run-row', 'turn-s');
   await expect(list.locator('a[data-run-row="build-r"]')).toHaveCount(0);
   await expect(list.locator('a[data-run-row="turn-b"] svg[role="img"]')).toHaveAttribute(

@@ -206,7 +206,7 @@ export function RunList({
           size="sm"
           aria-pressed={problems}
           data-testid="run-list-problems"
-          className="pointer-coarse:h-11 aria-pressed:bg-muted"
+          className="rounded-full text-content-secondary pointer-coarse:h-11 aria-pressed:border-foreground/60 aria-pressed:text-foreground dark:aria-pressed:border-foreground/60"
           onClick={() => onProblems(!problems)}
         >
           {t('出问题的')}
