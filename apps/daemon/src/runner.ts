@@ -364,6 +364,7 @@ async function runClaimedStep(
   stepCleanups.push(() => credentials.dispose());
   for (const entry of stepSecretEntries) credentials.remember(entry.value, entry.expiresAt);
   const redact = <T>(value: T): T => credentials.redact(value);
+  const relayClient = client;
   client = guardCredentialOutputs(client, redact);
   journal = guardCredentialOutputs(journal, redact);
   logger = guardCredentialOutputs(logger, redact);
@@ -569,7 +570,8 @@ async function runClaimedStep(
     localTools: localToolDefs,
     remoteTools,
     remoteExecutor: {
-      client,
+      client: relayClient,
+      redact,
       stepId,
       askChannel,
       attachFiles: !isChief,

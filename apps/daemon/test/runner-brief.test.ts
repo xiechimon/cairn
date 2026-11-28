@@ -409,6 +409,39 @@ test('runner prepares attach_file locally and relays only workspace bytes', asyn
   ]);
 });
 
+test('worker screenshot bytes survive credential redaction while tool text is still scrubbed', async () => {
+  const pngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAE2NhSVIA1//AAAAAAAAAAAAAAAAAAAAAtviKbgAAABFJREFUeJxj+PDhw38QZoAxAIjUDz2RoDa2AAAAAElFTkSuQmCC';
+  const fakeRefreshToken = `1//${'t'.repeat(20)}`;
+  const claimed = claimedStep({ repoBound: false });
+  claimed.remoteTools = [...WORKER_REMOTE_TOOLS];
+  const { backend } = stubBackend({
+    onSessionStart: async (cwd, session) => {
+      writeFileSync(join(cwd, 'shot.png'), Buffer.from(pngBase64, 'base64'));
+      await session.executeRemoteTool?.('attach_file', {
+        path: 'shot.png',
+        caption: `Screenshot ${fakeRefreshToken}`,
+      });
+      await session.executeRemoteTool?.('thread_report', {
+        line: `Captured screenshot ${fakeRefreshToken}`,
+      });
+    },
+  });
+  const { client } = await run({ claimed, backend });
+  expect(client.doneBodies[0]?.body.status).toBe('success');
+  expect(client.relayCalls.map(({ name, params }) => ({ name, params }))).toEqual([
+    {
+      name: 'attach_file',
+      params: {
+        fileName: 'shot.png',
+        caption: 'Screenshot [REDACTED]',
+        contentBase64: pngBase64,
+      },
+    },
+    { name: 'thread_report', params: { line: 'Captured screenshot [REDACTED]' } },
+  ]);
+});
+
 test('runtime guidance reaches the session while tracked workspace status stays empty', async () => {
   const { backend } = stubBackend({
     onSessionStart: (cwd, session) => {
