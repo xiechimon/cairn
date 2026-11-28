@@ -14,7 +14,14 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import webpush from 'web-push';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
-import { apnsDevice, pushDelivery, pushDigestItem, pushSubscription, todo } from '../db/schema.js';
+import {
+  apnsDevice,
+  project,
+  pushDelivery,
+  pushDigestItem,
+  pushSubscription,
+  todo,
+} from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type ApnsConfig, sendApns } from './apns.js';
 import {
@@ -294,11 +301,12 @@ export function isSilencedTodoPush(db: Db, teamId: string, href: string): boolea
   const match = /^\/app\/todo\/([^/?#]+)$/.exec(href);
   if (match?.[1] === undefined) return false;
   const row = db
-    .select({ archivedAt: todo.archivedAt })
+    .select({ todoArchivedAt: todo.archivedAt, projectArchivedAt: project.archivedAt })
     .from(todo)
+    .innerJoin(project, eq(project.id, todo.projectId))
     .where(and(eq(todo.id, match[1]), eq(todo.teamId, teamId)))
     .get();
-  return row !== undefined && row.archivedAt !== null;
+  return row?.todoArchivedAt != null || row?.projectArchivedAt != null;
 }
 
 interface WebPushPayload {

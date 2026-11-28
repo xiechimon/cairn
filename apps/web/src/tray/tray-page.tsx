@@ -100,6 +100,7 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
     () =>
       onOpened(() => {
         setNow(Date.now());
+        void client.invalidateQueries({ queryKey: ['tasks', teamId] });
         void client.invalidateQueries({ queryKey: ['machines', teamId] });
         void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
         if (live && teamId !== undefined) {

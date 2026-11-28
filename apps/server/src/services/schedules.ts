@@ -35,6 +35,7 @@ import { newWebhookToken, webhookSecretOf } from '../lib/webhook-token.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
+import { outsideArchivedProject } from './project-visibility.js';
 import type { VapidKeys } from './push.js';
 
 export interface ScheduleDeps extends CommitEffects {
@@ -241,7 +242,7 @@ export function listSchedules(deps: ScheduleDeps, teamId: string): ScheduleRecor
   return deps.db
     .select()
     .from(schedule)
-    .where(eq(schedule.teamId, teamId))
+    .where(and(eq(schedule.teamId, teamId), outsideArchivedProject(deps.db, schedule.projectId)))
     .all()
     .map((row) => toScheduleRecord(deps, row))
     .filter((r): r is ScheduleRecord => r !== null);

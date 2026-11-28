@@ -22,6 +22,7 @@ import { MadeCard, MadeCarousel, MadeSkeleton } from './made-carousel.js';
 import { primaryPage, sizeLabel } from './made-files.js';
 import { groupMade, MADE_GROUP_LABEL, madeGroupOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
+import { useArchivedProjectIds } from './project-archive.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { threadStatus } from './thread-copy.js';
 
@@ -123,6 +124,9 @@ export function WorkPanel({
   const title = t('成果');
   const { live: connected, teamId } = useLiveData();
   const projectNames = useProjectNames();
+  const { search } = useLocation();
+  const fixture = resolveScenario(new URLSearchParams(search));
+  const archivedProjects = useArchivedProjectIds(fixture);
   const [tab, setTab] = useState<MadeTab>('all');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
@@ -143,12 +147,11 @@ export function WorkPanel({
         .filter((todo) => projectId === null || todo.projectId === projectId),
     [archivedQ.data, projectId],
   );
-  const source =
-    tab === 'archived'
-      ? connected
-        ? archivedLive.filter(isMade)
-        : todos.filter((todo) => isMade(todo) && todo.archivedAt != null)
-      : todos.filter((todo) => isMade(todo) && todo.archivedAt == null);
+  const isArchived = (todo: TodoRecord) =>
+    todo.archivedAt != null || archivedProjects.has(todo.projectId);
+  const source = (tab === 'archived' && connected ? [...todos, ...archivedLive] : todos).filter(
+    (todo) => isMade(todo) && isArchived(todo) === (tab === 'archived'),
+  );
   const showProject = projectId === null;
   const projectOf = (todo: TodoRecord) =>
     showProject ? projectNames.get(todo.projectId) : undefined;

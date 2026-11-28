@@ -22,6 +22,7 @@ import {
   runEffectRow,
 } from './external-effects.js';
 import { imHasActiveOrigin, imSendAwayNotice } from './im/runtime.js';
+import { canDeliverNotification } from './project-visibility.js';
 import { type PushMessage, sendPushToUser, type VapidKeys } from './push.js';
 import { evaluatePresenceRouting } from './thread-presence.js';
 
@@ -154,7 +155,12 @@ function ensureAwayPushEffectRegistered(): void {
         .from(notification)
         .where(eq(notification.id, p.notificationId))
         .get();
-      return row === undefined || row.readAt !== null || row.deliveryId !== p.deliveryId;
+      return (
+        row === undefined ||
+        row.readAt !== null ||
+        row.deliveryId !== p.deliveryId ||
+        !canDeliverNotification(d, p.notificationId)
+      );
     },
     send: async (effectRow, db) => {
       const p = awayPushPayload(effectRow.payload);
@@ -227,6 +233,7 @@ function dispatchAwayInsideTx(
   record: NotificationRecord,
   deliveryId: string,
 ): string | null {
+  if (!canDeliverNotification(deps.db, record.id)) return null;
   const { title, body, href } = notificationDisplayText(record);
   const imResult = imSendAwayNotice(
     {
@@ -451,7 +458,12 @@ function promotePendingRowToLiveOrAway(
   row: typeof notification.$inferSelect,
   now: number,
 ): { rescheduleAt: number | null } {
-  if (row.readAt !== null || row.deliveryStatus !== 'pending_away' || row.deliveryId === null) {
+  if (
+    row.readAt !== null ||
+    row.deliveryStatus !== 'pending_away' ||
+    row.deliveryId === null ||
+    !canDeliverNotification(deps.db, row.id)
+  ) {
     return { rescheduleAt: null };
   }
   const deliveryId = row.deliveryId;

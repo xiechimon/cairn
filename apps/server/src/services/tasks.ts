@@ -3,6 +3,7 @@ import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { askQuestionContentOf } from './chief-question-store.js';
 import { heldByBlockers, ownershipOf, sectionOf, TASKS_RECENT_MS } from './owner.js';
+import { outsideArchivedProject } from './project-visibility.js';
 import { type TodoDeps, toTodoRecords } from './todos.js';
 
 export function listTasks(
@@ -16,6 +17,7 @@ export function listTasks(
     .where(
       and(
         eq(todo.teamId, teamId),
+        outsideArchivedProject(deps.db, todo.projectId),
         or(isNull(todo.archivedAt), gte(todo.archivedAt, now - TASKS_RECENT_MS)),
       ),
     )
@@ -38,6 +40,8 @@ export function listTasks(
       and(
         eq(chiefThread.teamId, teamId),
         isNull(chiefThread.archivedAt),
+        outsideArchivedProject(deps.db, chiefThread.projectId),
+        outsideArchivedProject(deps.db, chiefMessage.projectId),
         eq(chiefMessage.role, 'assistant'),
       ),
     )

@@ -44,6 +44,7 @@ export type StreamQueryEvent =
 export type QueryEffect = 'cancel' | 'stale' | 'ignore';
 
 const reconciled = new Set([
+  'projects',
   'todos',
   'todo',
   'tasks',

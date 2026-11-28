@@ -1,7 +1,14 @@
-import type { Phase, TasksQuery, TodoOwner } from '@cairn/shared';
+import type {
+  NeedsYouQuery,
+  Phase,
+  ScheduleRecord,
+  SearchResponse,
+  TasksQuery,
+  TodoOwner,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
-import { chiefMessage, chiefThread, project, team, todo } from '../src/db/schema.js';
+import { chiefMessage, chiefThread, project, schedule, team, todo } from '../src/db/schema.js';
 import { cancelQuestion } from '../src/services/chief-question-store.js';
 import { answerQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import * as ownership from '../src/services/owner.js';
@@ -184,6 +191,82 @@ test('one Tasks read includes open rows and recently archived rows; section uses
     ['recent', 'resolved'],
   ]);
   expect((await req(s.app, 'GET', '/api/todos?archived=1')).status).toBe(200);
+});
+
+test('archiving a project removes its tasks from Tasks and needs-you without changing them', async () => {
+  const s = bootServer();
+  const projectId = await postProject(s.app);
+  const activeProjectId = await postProject(s.app, 'Active project');
+  for (const [id, parent, phase] of [
+    ['waiting', projectId, 'confirm'],
+    ['working', projectId, 'building'],
+    ['queued', projectId, 'todo'],
+    ['active-waiting', activeProjectId, 'confirm'],
+  ] as const) {
+    s.db
+      .insert(todo)
+      .values({
+        id,
+        teamId: s.team.id,
+        projectId: parent,
+        title: id,
+        spec: '',
+        phase,
+        phaseAt: Date.now(),
+        seqNum: 1,
+      })
+      .run();
+  }
+  s.db
+    .insert(schedule)
+    .values({
+      id: 'daily',
+      teamId: s.team.id,
+      projectId,
+      todoId: 'queued',
+      kind: 'daily',
+      tz: 'UTC',
+      createdBy: s.user.id,
+      nextRunAt: Date.now() + WEEK,
+    })
+    .run();
+  const read = async () => {
+    const tasks = (await (await req(s.app, 'GET', '/api/tasks?sectioned=1')).json()) as TasksQuery;
+    const needsYou = (await (await req(s.app, 'GET', '/api/needs-you')).json()) as NeedsYouQuery;
+    const search = (await (
+      await req(s.app, 'GET', '/api/search?q=is%3Awaiting')
+    ).json()) as SearchResponse;
+    const schedules = (await (
+      await req(s.app, 'GET', '/api/schedules')
+    ).json()) as ScheduleRecord[];
+    return {
+      waitingCount: tasks.entries.filter((row) => row.section === 'needs_input').length,
+      taskIds: tasks.entries.flatMap((row) => (row.kind === 'todo' ? [row.id] : [])),
+      waitingIds: needsYou.current.map((row) => row.todo.id).sort(),
+      searchIds: search.todos.map((row) => row.id).sort(),
+      schedules: schedules.map((row) => row.id),
+    };
+  };
+  const before = await read();
+  expect(before).toEqual({
+    waitingCount: 2,
+    taskIds: ['active-waiting', 'queued', 'waiting', 'working'],
+    waitingIds: ['active-waiting', 'waiting'],
+    searchIds: ['active-waiting', 'waiting'],
+    schedules: ['daily'],
+  });
+  expect((await req(s.app, 'POST', `/api/projects/${projectId}/archive`)).status).toBe(200);
+  expect(await read()).toEqual({
+    waitingCount: 1,
+    taskIds: ['active-waiting'],
+    waitingIds: ['active-waiting'],
+    searchIds: ['active-waiting'],
+    schedules: [],
+  });
+  expect(getTodo(s.svc, 'waiting')).toMatchObject({ phase: 'confirm', archivedAt: null });
+  expect((await req(s.app, 'POST', `/api/projects/${projectId}/unarchive`)).status).toBe(200);
+  expect(await read()).toEqual(before);
+  s.dispose();
 });
 
 test('Tasks scopes both sources to the team and lists parked pending standalone questions until answered or cancelled', async () => {

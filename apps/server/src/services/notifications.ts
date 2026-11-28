@@ -7,7 +7,13 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
-import { chiefThread, noticeMark, notification, todo as todoTable } from '../db/schema.js';
+import {
+  chiefMessage,
+  chiefThread,
+  noticeMark,
+  notification,
+  todo as todoTable,
+} from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
@@ -16,6 +22,7 @@ import {
   cancelPendingNotificationDelivery,
   routeNotificationDelivery,
 } from './notification-router.js';
+import { activeNotificationProject, canDeliverNotification } from './project-visibility.js';
 import type { VapidKeys } from './push.js';
 
 export interface NotificationDeps extends CommitEffects {
@@ -117,7 +124,9 @@ function upsertAndPublish(
     const row = deps.db.select().from(notification).where(eq(notification.id, id)).get();
     if (!row) throw new Error(`notification ${id} missing after upsert`);
     const record = toNotificationRecord(row);
-    deps.hub.publishNotification(record.teamId, record, { id: '', targetClientId: null });
+    if (canDeliverNotification(deps.db, id)) {
+      deps.hub.publishNotification(record.teamId, record, { id: '', targetClientId: null });
+    }
     return record;
   }
 
@@ -165,6 +174,7 @@ function upsertAndPublish(
   const row = deps.db.select().from(notification).where(eq(notification.id, id)).get();
   if (!row) throw new Error(`notification ${id} missing after upsert`);
   const record = toNotificationRecord(row);
+  if (!canDeliverNotification(deps.db, id)) return record;
   const routed = routeNotificationDelivery(deps, record, deliveryId, options);
   deps.hub.publishNotification(routed.record.teamId, routed.record, routed.delivery);
   return routed.record;
@@ -252,6 +262,7 @@ export function listUnreadEntityIds(deps: NotificationDeps, teamId: string): str
         eq(notification.teamId, teamId),
         eq(notification.userId, deps.user.id),
         isNull(notification.readAt),
+        activeNotificationProject(deps.db),
       ),
     )
     .all()
@@ -339,26 +350,43 @@ export function notifyChiefMessage(
     message: string;
     agent: { name: string; avatarUrl: string | null };
     card?: { requestId: string };
+    projectId?: string | null;
     skipAwayDispatch?: boolean;
   },
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
   if (!thread) throw notFound(`chief thread ${input.threadId}`);
+  const questionProject =
+    input.card === undefined
+      ? null
+      : deps.db
+          .select({ id: chiefMessage.projectId })
+          .from(chiefMessage)
+          .where(
+            and(eq(chiefMessage.id, input.card.requestId), eq(chiefMessage.threadId, thread.id)),
+          )
+          .get()?.id;
   const record = upsertAndPublish(
     deps,
     {
       teamId: thread.teamId,
       type: 'chief_message',
       entityId: thread.id,
-      entityRef: { title: thread.title, projectId: null, seqNum: null },
+      entityRef: {
+        title: thread.title,
+        projectId: questionProject ?? input.projectId ?? thread.projectId,
+        seqNum: null,
+      },
       agent: input.agent,
       snippet: input.message,
     },
     { skipAwayDispatch: input.skipAwayDispatch },
   );
-  runAfterCommit(deps, 'imNotice', () =>
-    imNotice(input.threadId, input.message, input.card, deps.db),
-  );
+  if (canDeliverNotification(deps.db, record.id)) {
+    runAfterCommit(deps, 'imNotice', () =>
+      imNotice(input.threadId, input.message, input.card, deps.db),
+    );
+  }
   return record;
 }
 

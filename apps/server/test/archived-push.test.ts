@@ -5,6 +5,7 @@ import webpush from 'web-push';
 import {
   build,
   message,
+  notification,
   project,
   pushDelivery,
   pushDigestItem,
@@ -12,6 +13,8 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
+import { processNotificationAwayDue } from '../src/services/notification-router.js';
+import { listUnreadEntityIds, notifyTodo } from '../src/services/notifications.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { pushToUserSafely, queuePushDigest, sweepPushDigest } from '../src/services/push.js';
 import { createTodo, setTodoPhase } from '../src/services/todos.js';
@@ -92,6 +95,49 @@ test('the owner sweep sends nothing for a task archived before its phase changed
   reconcileOwners(s.svc);
   expect(s.send).not.toHaveBeenCalled();
   expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
+});
+
+test('archiving the parent hides unread attention and stops new or pending desktop and push delivery', async () => {
+  const s = await world();
+  const publish = vi.spyOn(s.hub, 'publishNotification');
+  for (const screenLocked of [false, true]) {
+    const response = await req(s.app, 'POST', `/api/teams/${s.team.id}/presence`, {
+      clientId: 'macbook',
+      kind: 'desktop',
+      focused: false,
+      activeThreadId: null,
+      screenLocked,
+      systemIdleSec: 1,
+      canNotify: true,
+      seq: screenLocked ? 2 : 1,
+    });
+    expect(response.status).toBe(200);
+  }
+  const notice = notifyTodo(s.svc, s.record, 'plan_ready');
+  expect(
+    s.db.select().from(notification).where(eq(notification.id, notice.id)).get(),
+  ).toMatchObject({ deliveryStatus: 'pending_away' });
+  expect(listUnreadEntityIds(s.svc, s.team.id)).toEqual([s.record.id]);
+  expect(publish).toHaveBeenCalledTimes(1);
+  queuePushDigest(s.db, s.user.id, s.team.id, s.payload);
+
+  expect((await req(s.app, 'POST', `/api/projects/${s.record.projectId}/archive`)).status).toBe(
+    200,
+  );
+  expect(listUnreadEntityIds(s.svc, s.team.id)).toEqual([]);
+  processNotificationAwayDue(s.svc, notice.id, Date.now() + 60_000);
+  await sweepPushDigest(s.db, s.vapidKeys);
+  notifyTodo(s.svc, s.record, 'build_review');
+  pushToUserSafely(s.db, s.vapidKeys, s.user.id, s.team.id, s.payload);
+  expect(publish).toHaveBeenCalledTimes(1);
+  expect(s.send).not.toHaveBeenCalled();
+  expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
+
+  expect((await req(s.app, 'POST', `/api/projects/${s.record.projectId}/unarchive`)).status).toBe(
+    200,
+  );
+  expect(listUnreadEntityIds(s.svc, s.team.id)).toEqual([s.record.id]);
+  s.dispose();
 });
 
 test('archived PR review entries create neither a push claim nor a digest entry', async () => {

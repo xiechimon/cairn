@@ -141,6 +141,7 @@ import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { listedProjects } from './personal-space.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
+import { outsideArchivedProject } from './project-visibility.js';
 import { researchProjectId } from './projects.js';
 import {
   type ReportRef,
@@ -2401,6 +2402,7 @@ function taskStateLines(db: Db, teamId: string): string[] {
       and(
         eq(todo.teamId, teamId),
         isNull(todo.archivedAt),
+        outsideArchivedProject(db, todo.projectId),
         isNotNull(todo.latestBuildId),
         notInArray(todo.phase, ['todo', 'done', 'closed']),
       ),
@@ -2788,6 +2790,7 @@ export function notifyChiefTurn(
   notifyChiefMessage(deps, {
     threadId,
     message: text,
+    projectId: last?.projectId ?? null,
     agent: agentRow
       ? { name: agentRow.displayName, avatarUrl: null }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },

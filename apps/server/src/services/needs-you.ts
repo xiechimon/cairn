@@ -7,6 +7,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, NotFoundError } from './builds.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
+import { outsideArchivedProject } from './project-visibility.js';
 import {
   automaticRetryDueAt,
   automaticRetryOwed,
@@ -32,7 +33,13 @@ export function listNeedsYou(
   const entries = deps.db
     .select()
     .from(todo)
-    .where(and(eq(todo.teamId, teamId), OWNED_CANDIDATE))
+    .where(
+      and(
+        eq(todo.teamId, teamId),
+        OWNED_CANDIDATE,
+        outsideArchivedProject(deps.db, todo.projectId),
+      ),
+    )
     .all()
     .flatMap((row) => {
       const ownership = ownershipOf(deps.db, row);

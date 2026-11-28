@@ -81,7 +81,7 @@ describe('an archived project refuses every todo write path', () => {
     s.dispose();
   });
 
-  test('the project, its tasks and its todo lists stay readable while archived', async () => {
+  test('archived work remains directly readable without looking active in Tasks', async () => {
     const s = world();
     await archive(s);
     const projects = (await (await req(s.app, 'GET', '/api/projects')).json()) as {
@@ -98,7 +98,7 @@ describe('an archived project refuses every todo write path', () => {
     const tasks = (await (await req(s.app, 'GET', '/api/tasks')).json()) as {
       entries: { kind: string; id?: string }[];
     };
-    expect(tasks.entries.some((entry) => entry.kind === 'todo' && entry.id === CARD)).toBe(true);
+    expect(tasks.entries.some((entry) => entry.kind === 'todo' && entry.id === CARD)).toBe(false);
     s.dispose();
   });
 

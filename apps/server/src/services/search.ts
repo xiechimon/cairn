@@ -18,6 +18,7 @@ import type { Db } from '../db/client.js';
 import { build, chiefMessage, chiefThread, project, todo, tokenUsage, user } from '../db/schema.js';
 import { foldSearchText, snippetAround } from './chief-history.js';
 import { listedProjects } from './personal-space.js';
+import { outsideArchivedProject } from './project-visibility.js';
 
 const SEARCH_THREAD_SCAN_CAP = 2000;
 const SEARCH_TOTAL_SCAN_CAP = 10_000;
@@ -192,7 +193,9 @@ function searchWithSyntax(
     })
     .from(todo)
     .innerJoin(project, eq(todo.projectId, project.id))
-    .where(and(eq(todo.teamId, teamId), ...conditions, ...wordConditions))
+    .where(
+      and(eq(todo.teamId, teamId), isNull(project.archivedAt), ...conditions, ...wordConditions),
+    )
     .orderBy(asc(todo.seqNum))
     .all();
   return { todos, projects: [], filters };
@@ -244,6 +247,7 @@ function searchMessages(
         eq(chiefThread.teamId, teamId),
         userId !== undefined ? eq(chiefThread.userId, userId) : undefined,
         isNull(chiefThread.archivedAt),
+        isNull(project.archivedAt),
         notLike(chiefThread.id, 'chief-digest-%'),
         notLike(chiefThread.id, 'chief-memory-%'),
       ),
@@ -272,7 +276,12 @@ function searchMessages(
         rowid: sql<number>`rowid`,
       })
       .from(chiefMessage)
-      .where(eq(chiefMessage.threadId, thread.id))
+      .where(
+        and(
+          eq(chiefMessage.threadId, thread.id),
+          outsideArchivedProject(deps.db, chiefMessage.projectId),
+        ),
+      )
       .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
       .limit(threadLimit)
       .all();
@@ -344,14 +353,26 @@ export function search(
     })
     .from(todo)
     .innerJoin(project, eq(todo.projectId, project.id))
-    .where(and(eq(todo.teamId, input.teamId), containsLike(todo.title, pattern)))
+    .where(
+      and(
+        eq(todo.teamId, input.teamId),
+        isNull(project.archivedAt),
+        containsLike(todo.title, pattern),
+      ),
+    )
     .orderBy(asc(todo.seqNum))
     .all();
 
   const projects = deps.db
     .select({ id: project.id, name: project.name })
     .from(project)
-    .where(and(listedProjects(input.teamId), containsLike(project.name, pattern)))
+    .where(
+      and(
+        listedProjects(input.teamId),
+        isNull(project.archivedAt),
+        containsLike(project.name, pattern),
+      ),
+    )
     .orderBy(asc(project.name))
     .all();
 

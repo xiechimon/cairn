@@ -18,6 +18,7 @@ import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { PhaseTransitionError } from './phase.js';
+import { outsideArchivedProject } from './project-visibility.js';
 import { answerTaskQuestion, messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { json, optStr, requireTeamTodo, str } from './tool-guards.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
@@ -155,6 +156,7 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
       and(
         eq(todo.teamId, ctx.teamId),
         isNull(todo.archivedAt),
+        outsideArchivedProject(db, todo.projectId),
         isNotNull(todo.latestBuildId),
         notInArray(todo.phase, hidden),
         or(ne(todo.phase, 'todo'), isNotNull(build.stop)),
@@ -195,7 +197,14 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
   const items = db
     .select()
     .from(todo)
-    .where(and(eq(todo.teamId, ctx.teamId), OWNED_CANDIDATE, isNotNull(todo.latestBuildId)))
+    .where(
+      and(
+        eq(todo.teamId, ctx.teamId),
+        OWNED_CANDIDATE,
+        isNotNull(todo.latestBuildId),
+        outsideArchivedProject(db, todo.projectId),
+      ),
+    )
     .orderBy(desc(todo.phaseAt))
     .all()
     .flatMap((row) => {

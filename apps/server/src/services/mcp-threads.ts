@@ -6,7 +6,7 @@ import {
   isChiefConversationId,
   isChiefSideThreadId,
 } from '@cairn/shared';
-import { and, asc, desc, eq, exists, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import {
@@ -28,6 +28,7 @@ import { steerChiefMessage, stopChiefTurn } from './chief-turns.js';
 import { readConversationPage } from './conversation-page.js';
 import { OWNED_CANDIDATE, ownerOf } from './owner.js';
 import { listedProjects } from './personal-space.js';
+import { outsideArchivedProject } from './project-visibility.js';
 import { assertProjectWritable } from './project-writable.js';
 import { containsLike, escapeLike } from './search.js';
 import { drainTaskMessageQueue, queueTaskMessage } from './task-message-queue.js';
@@ -130,11 +131,22 @@ function threadProjectId(db: Db, teamId: string, threadId: string): string | nul
   );
 }
 
-function pendingQuestions(db: Db, threadId: string) {
+function pendingQuestions(
+  db: Db,
+  threadId: string,
+  activeScope?: { projectId: string | undefined; legacyProjectId: string | null },
+) {
+  const scope = sql`coalesce(${chiefMessage.projectId}, ${activeScope?.legacyProjectId ?? null})`;
   return db
     .select({ content: chiefMessage.content })
     .from(chiefMessage)
-    .where(eq(chiefMessage.threadId, threadId))
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        activeScope !== undefined ? outsideArchivedProject(db, scope) : undefined,
+        activeScope?.projectId !== undefined ? eq(scope, activeScope.projectId) : undefined,
+      ),
+    )
     .orderBy(asc(chiefMessage.createdAt))
     .all()
     .flatMap((row) => {
@@ -146,8 +158,8 @@ function pendingQuestions(db: Db, threadId: string) {
 function coordinatorSummary(
   db: Db,
   row: Pick<typeof chiefThread.$inferSelect, 'id' | 'chiefId' | 'teamId' | 'title' | 'updatedAt'>,
+  questions = pendingQuestions(db, row.id),
 ) {
-  const questions = pendingQuestions(db, row.id);
   const turns = db
     .select({ status: step.status })
     .from(step)
@@ -319,15 +331,26 @@ export async function executeThreadMcpTool(
       const coordinator = db
         .select()
         .from(chiefThread)
-        .where(and(eq(chiefThread.teamId, teamId), eq(chiefThread.userId, deps.user.id)))
+        .where(
+          and(
+            eq(chiefThread.teamId, teamId),
+            eq(chiefThread.userId, deps.user.id),
+            isNull(chiefThread.archivedAt),
+            outsideArchivedProject(db, chiefThread.projectId),
+          ),
+        )
         .orderBy(desc(chiefThread.updatedAt))
         .all()
         .filter((row) => !isChiefSideThreadId(row.id))
-        .map((row) => coordinatorSummary(db, row))
-        .filter(
-          (row) =>
-            row.questions.length > 0 && (projectId === undefined || row.projectId === projectId),
-        );
+        .flatMap((row) => {
+          const questions = pendingQuestions(db, row.id, {
+            projectId,
+            legacyProjectId: row.projectId ?? threadProjectId(db, teamId, row.id),
+          });
+          if (questions.length === 0) return [];
+          const summary = coordinatorSummary(db, row, questions);
+          return [{ ...summary, projectId: projectId ?? summary.projectId }];
+        });
       const work = db
         .select({ row: todo })
         .from(todo)
@@ -337,6 +360,7 @@ export async function executeThreadMcpTool(
             eq(todo.teamId, teamId),
             eq(project.teamId, teamId),
             OWNED_CANDIDATE,
+            isNull(project.archivedAt),
             or(eq(todo.ownerId, deps.user.id), sql`${todo.ownerId} is null`),
             projectId === undefined ? undefined : eq(todo.projectId, projectId),
           ),

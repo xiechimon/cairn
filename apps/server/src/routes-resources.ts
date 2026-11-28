@@ -171,6 +171,7 @@ import {
   startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
+import { outsideArchivedProject } from './services/project-visibility.js';
 import {
   listUpstreamModels,
   ProviderTestLimiter,
@@ -492,7 +493,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const rows = ctx.db
       .select({ phase: todo.phase })
       .from(todo)
-      .where(and(eq(todo.teamId, id), isNull(todo.archivedAt)))
+      .where(
+        and(
+          eq(todo.teamId, id),
+          isNull(todo.archivedAt),
+          outsideArchivedProject(ctx.db, todo.projectId),
+        ),
+      )
       .all();
     const byPhase: Record<string, number> = Object.fromEntries(PHASE_VALUES.map((p) => [p, 0]));
     for (const r of rows) byPhase[r.phase] = (byPhase[r.phase] ?? 0) + 1;
