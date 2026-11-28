@@ -228,10 +228,8 @@ describe('chief envelope; PATCH /chief is gone', () => {
     const tool = (name: string) => definition(name).description;
     expect(tool('create_todo')).toContain('You write no task text');
     expect(tool('create_todo')).toContain('search todos with query');
-    expect(JSON.stringify(definition('create_todo').parameters)).toContain(
-      "the owner's frequently used models",
-    );
-    expect(tool('models')).toContain('Only the owner changes');
+    expect(JSON.stringify(definition('create_todo').parameters)).toContain('chosen from models');
+    expect(tool('models')).toContain('other rows are also valid for create_todo');
     expect(tool('create_todo')).toContain(
       'One message about several projects becomes one todo per project',
     );

@@ -7,6 +7,7 @@ import {
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
   devinInferredThinking,
+  MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSourceModel,
   type ModelSourcesEnvelope,
   orderByKeys,
@@ -51,7 +52,10 @@ import {
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { activeAntigravitySource } from './antigravity-subscriptions.js';
-import { enabledClaudeSubscriptionModels } from './claude-subscriptions.js';
+import {
+  enabledClaudeSubscriptionModels,
+  hasActiveClaudeSubscription,
+} from './claude-subscriptions.js';
 import {
   enabledDevinSubscriptionModels,
   hasActiveDevinSubscription,
@@ -71,6 +75,8 @@ export interface ProviderDeps {
   db: Db;
   box: SecretBox;
 }
+
+type CatalogDeps = Pick<ProviderDeps, 'db'> & Partial<Pick<ProviderDeps, 'box'>>;
 
 type ProviderRow = typeof provider.$inferSelect;
 
@@ -142,7 +148,7 @@ function assertProviderIdFree(
   if (dup) throw conflict(`provider ${providerId} already exists`);
 }
 
-export function listProviders(deps: ProviderDeps, teamId: string): ProviderRecord[] {
+export function listProviders(deps: CatalogDeps, teamId: string): ProviderRecord[] {
   return deps.db
     .select()
     .from(provider)
@@ -439,7 +445,7 @@ function subscriptionKeys(db: Db, teamId: string) {
 
 type ModelSource = ModelSourcesEnvelope['sources'][number];
 
-export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {
+export function getModelSources(deps: CatalogDeps, teamId: string): ModelSourcesEnvelope {
   const piSources = listProviders(deps, teamId).map((p): { key: string; source: ModelSource } => {
     const stored = p.models.filter((m) => m.id !== '');
     const models =
@@ -491,6 +497,34 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
       readProviderOrder(deps.db, teamId),
     ),
   };
+}
+
+export function taskModelCandidates(deps: CatalogDeps, teamId: string) {
+  const claudeActive = hasActiveClaudeSubscription(deps, teamId);
+  const devinActive = hasActiveDevinSubscription(deps, teamId);
+  const antigravityActive = activeAntigravitySource(deps.db, teamId).kind !== 'none';
+  const seen = new Set<string>();
+  const rows: { provider: string; providerLabel: string; modelId: string; modelName: string }[] =
+    [];
+  for (const source of getModelSources(deps, teamId).sources) {
+    if (source.runtime === 'claude-code' && !claudeActive) continue;
+    if (source.runtime === 'devin' && !devinActive) continue;
+    if (source.runtime === 'antigravity' && !antigravityActive) continue;
+    const provider = source.provider ?? source.runtime;
+    for (const model of source.models) {
+      if (model.id === '') continue;
+      const key = `${provider}/${model.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({
+        provider,
+        providerLabel: source.providerLabel ?? MODEL_SOURCE_RUNTIME_LABELS[source.runtime],
+        modelId: model.id,
+        modelName: model.name,
+      });
+    }
+  }
+  return rows;
 }
 
 function normalizeProviderModels(models: NonNullable<ProviderBody['models']>): ProviderModel[] {

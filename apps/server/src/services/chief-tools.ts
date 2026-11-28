@@ -19,7 +19,6 @@ import {
   isMailSecretName,
   isRegisteredMachine,
   isWaitingPhase,
-  MODEL_SOURCE_RUNTIME_LABELS,
   parseStoredCapabilities,
   SECRET_NAME_PATTERN,
   SECRET_NAME_RULE,
@@ -101,7 +100,7 @@ import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { listedProjects } from './personal-space.js';
 import { assertGithubRepoReachable, createProject, ensureResearchProject } from './projects.js';
-import { getModelSources } from './providers.js';
+import { taskModelCandidates } from './providers.js';
 import type { VapidKeys } from './push.js';
 import {
   acceptReport,
@@ -476,40 +475,13 @@ export async function executeChiefTool(
       return json(response);
     }
     case 'models': {
-      const keysvc = { db, box: deps.box };
-      const rows: {
-        provider: string;
-        providerLabel: string;
-        modelId: string;
-        modelName: string;
-        frequent?: true;
-      }[] = [];
       const frequent = new Set(
         (readTopModels(db, ctx.teamId).models ?? []).map((m) => `${m.provider}/${m.modelId}`),
       );
-      const seen = new Set<string>();
-      const push = (row: (typeof rows)[number]) => {
-        const key = row.provider === 'claude-code' ? `${row.provider}/${row.modelId}` : row.modelId;
-        if (seen.has(key)) return;
-        seen.add(key);
-        rows.push(row);
-      };
-      for (const source of getModelSources(keysvc, ctx.teamId).sources) {
-        const providerLabel = MODEL_SOURCE_RUNTIME_LABELS[source.runtime] ?? source.runtime;
-        for (const m of source.models) {
-          if (m.id === '') continue;
-          push({
-            provider: source.runtime,
-            providerLabel,
-            modelId: m.id,
-            modelName: m.name,
-            ...(frequent.has(`${source.provider ?? source.runtime}/${m.id}`) ||
-            frequent.has(`${source.runtime}/${m.id}`)
-              ? { frequent: true as const }
-              : {}),
-          });
-        }
-      }
+      const rows = taskModelCandidates({ db }, ctx.teamId).map((row) => ({
+        ...row,
+        ...(frequent.has(`${row.provider}/${row.modelId}`) ? { frequent: true as const } : {}),
+      }));
       return json(rows);
     }
     case 'machines': {

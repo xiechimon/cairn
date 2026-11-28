@@ -381,7 +381,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'models',
     description:
-      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models, the only valid values for create_todo model. Only the owner changes that list, in Settings > Model — you cannot add, remove or reorder entries; if a task needs a model that is not marked frequent, ask the owner to add it.",
+      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models; other rows are also valid for create_todo. Availability and credentials are checked separately at dispatch.",
     parameters: obj({}),
     replaySafe: true,
   },
@@ -582,7 +582,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Task difficulty for automatic model selection: "easy" (one-file edit, typo/copy tweak, simple lookup), "standard" (typical feature, multi-file fix, moderate research), or "hard" (architecture change, ambiguous debugging, cross-module refactor, deep multi-step work). Always judge and pass this yourself without mentioning tiers or models to the user.',
         ),
         model: str(
-          "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Pass this only when the user explicitly names a model for the task; omit it and Cairn picks the right model automatically for the task difficulty.",
+          'Optional model for this task, chosen from models: pass its modelId, or provider/modelId when two providers share it. Qualified IDs take precedence over bare IDs. Dispatch still requires an eligible runner and credentials. Pass this only when the user explicitly names a model for the task; omit it and Cairn picks the right model automatically for the task difficulty.',
         ),
         output: str(
           'Always choose the deliverable kind: "info" for a reply in the task conversation (e.g. answer 1+1, run hostname and report, or report research findings without changing files); "code" if the task asks to change any repo or file, even conditionally or along with a report (default, no merging); "report", "dataset", or "link" for separate non-code artifacts; attach the finished artifact to the task conversation. A plain answer is the deliverable for "info". For recurring requests use schedule_todo instead.',

@@ -283,7 +283,7 @@ Reach:
 
 ### routing
 
-**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (the Coordinator with model and thinking level, which tasks follow by default, and the frequently used models the Coordinator picks from per task), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
+**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (the Coordinator with model and thinking level, which tasks follow by default, and a frequently used shortlist that does not restrict explicit per-task model requests), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
 States: A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.
 

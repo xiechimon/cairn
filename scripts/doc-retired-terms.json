@@ -13,6 +13,12 @@
       "reason": "plan body changes use confirmation only, not another full review"
     },
     {
+      "id": "favorites-task-model-gate",
+      "pattern": "frequentModelFor|the frequently used models the Coordinator picks from per task",
+      "canary": "the frequently used models the Coordinator picks from per task",
+      "reason": "explicit task model selection now uses the configured catalog, not the favorites shortlist"
+    },
+    {
       "id": "desktop-release-whole-run-lock",
       "pattern": "one workflow-level concurrency (?:group|slot)",
       "canary": "desktop-release uses one workflow-level concurrency group",
@@ -319,6 +325,7 @@
     "snapshot-gc-due-event": {},
     "tailscale-users-env": {},
     "tailnet-allowed-logins": {},
-    "tsnet-socket-mode": {}
+    "tsnet-socket-mode": {},
+    "favorites-task-model-gate": {}
   }
 }

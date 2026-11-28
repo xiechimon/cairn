@@ -31,7 +31,8 @@ import { askQuestionContentOf, isOwnerAnswered } from './chief-question-store.js
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
-import { frequentModelFor } from './top-models.js';
+import { taskModelCandidates } from './providers.js';
+import { readTopModels } from './top-models.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -422,8 +423,30 @@ export function createRequestTodo(
   provenance: { createdBy: string | null; ownerId: string; withoutSelfIssue?: boolean },
 ): TodoRecord & { uncovered?: string[]; continued?: ContinuedRequest } {
   const { db } = deps;
-  const model =
-    params.model === undefined ? undefined : frequentModelFor(db, ctx.teamId, params.model);
+  let model: TaskRequest['model'];
+  if (params.model !== undefined) {
+    const candidates = taskModelCandidates({ db }, ctx.teamId);
+    const qualified = candidates.filter((row) => `${row.provider}/${row.modelId}` === params.model);
+    const matches =
+      qualified.length > 0 ? qualified : candidates.filter((row) => row.modelId === params.model);
+    if (matches.length !== 1 || matches[0] === undefined) {
+      throw new HttpError(
+        400,
+        matches.length > 1
+          ? `model ${params.model} is ambiguous; pass provider/modelId: ${matches.map((row) => `${row.provider}/${row.modelId}`).join(', ')}`
+          : `model ${params.model} is not a configured model; consult models or omit model.`,
+      );
+    }
+    const selected = matches[0];
+    const favorite = (readTopModels(db, ctx.teamId).models ?? []).find(
+      (row) => row.provider === selected.provider && row.modelId === selected.modelId,
+    );
+    model = {
+      provider: selected.provider,
+      modelId: selected.modelId,
+      thinkingLevel: favorite?.thinkingLevel ?? null,
+    };
+  }
   const messageIds = params.messageIds ?? defaultQuoteIds(db, ctx);
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);

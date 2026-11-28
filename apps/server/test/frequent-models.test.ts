@@ -6,7 +6,12 @@ import {
   profileForStep,
   routeForStep,
 } from '../src/services/routing-rules.js';
-import { writeTopModels } from '../src/services/top-models.js';
+import {
+  createDoubaoSubscription,
+  disableDoubaoSubscription,
+} from '../src/services/doubao-subscriptions.js';
+import { createProvider } from '../src/services/providers.js';
+import { readTopModels, writeTopModels } from '../src/services/top-models.js';
 import {
   AGENT2_ID,
   H,
@@ -15,7 +20,7 @@ import {
   relay,
   seedMachineReport,
 } from './chief-harness.js';
-import { insertMachine, req, seedRoute } from './helpers.js';
+import { insertClaudeSubscription, insertMachine, req, seedRoute } from './helpers.js';
 
 registerChiefHarness();
 
@@ -31,8 +36,72 @@ function todoRow(id: string) {
   return H.s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()!;
 }
 
-describe('the Coordinator picks a task model from the frequently used models', () => {
+function provider(providerId: string, ...models: string[]) {
+  createProvider(
+    { db: H.s.db, box: H.s.secretBox },
+    {
+      teamId: H.teamId,
+      createdBy: H.userId,
+      body: {
+        providerId,
+        label: providerId,
+        baseUrl: `http://127.0.0.1:9/${providerId}`,
+        api: 'openai-completions',
+        models: models.map((id) => ({ id, name: id })),
+      },
+    },
+  );
+}
+
+function doubaoMachine() {
+  return insertMachine(H.s, {
+    name: 'mac-mini',
+    capabilities: {
+      mcpServers: [],
+      skills: [],
+      executor: 'host',
+      doubao: {
+        installed: true,
+        authenticated: true,
+        platformSupported: true,
+        version: '2.38.4',
+        probedAt: Date.now(),
+        models: [{ id: 'auto', name: 'Auto' }],
+      },
+    },
+  });
+}
+
+describe('the Coordinator picks a task model from the configured models', () => {
+  test('a named Mac mini runs a qualified Doubao model outside the sole favorite', async () => {
+    const machineId = doubaoMachine();
+    createDoubaoSubscription({ db: H.s.db }, H.teamId, { label: 'Doubao', runnerId: machineId });
+    frequent({ provider: 'devin', modelId: 'swe-2-1-medium' });
+    const favorites = readTopModels(H.s.db, H.teamId);
+    const catalog = (await relay('models', {})) as { provider: string; modelId: string }[];
+    expect(catalog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: 'doubao', modelId: 'auto', modelName: 'Auto' }),
+      ]),
+    );
+    const created = (await relay('create_todo', {
+      ...ownerTodo('在 Mac mini 上用 Doubao Auto 整理文档'),
+      machine: machineId,
+      model: 'doubao/auto',
+    })) as { id: string; phase: string };
+    expect(created.phase).toBe('queued');
+    expect(todoRow(created.id).request?.model).toEqual({
+      provider: 'doubao',
+      modelId: 'auto',
+      thinkingLevel: null,
+    });
+    expect(todoRow(created.id).routeOverride).toEqual({ machineId });
+    expect(readTopModels(H.s.db, H.teamId)).toEqual(favorites);
+  });
+
   test('create_todo with a frequent model stores it on the request and every session step runs it', async () => {
+    provider('stub-gw', 'fast-model');
+    provider('strong-gw', 'deep-model');
     frequent(
       { provider: 'stub-gw', modelId: 'fast-model' },
       { provider: 'strong-gw', modelId: 'deep-model', thinkingLevel: 'high' },
@@ -62,6 +131,7 @@ describe('the Coordinator picks a task model from the frequently used models', (
   });
 
   test('the project task model field is refused; the task pick still routes', async () => {
+    provider('strong-gw', 'deep-model');
     frequent({ provider: 'strong-gw', modelId: 'deep-model' });
     const refused = await req(H.s.app, 'PATCH', `/api/projects/${H.projectId}`, {
       modelOverrides: {
@@ -79,15 +149,74 @@ describe('the Coordinator picks a task model from the frequently used models', (
     });
   });
 
-  test('a model outside the frequent list is refused and no task is created', async () => {
+  test('an unknown model is refused and no task is created', async () => {
+    provider('stub-gw', 'fast-model');
     frequent({ provider: 'stub-gw', modelId: 'fast-model' });
     await expect(
       relay('create_todo', { ...ownerTodo('写文档'), model: 'other-model' }),
-    ).rejects.toThrow(/fast-model/);
+    ).rejects.toThrow(/other-model/);
+    expect(H.s.db.select().from(todoTable).all()).toEqual([]);
+  });
+
+  test('configured providers with the same bare model are both discoverable; bare selection is ambiguous', async () => {
+    provider('alpha', 'shared');
+    provider('vendor', 'shared');
+    const rows = (await relay('models', {})) as { provider: string; modelId: string }[];
+    expect(
+      rows
+        .filter((row) => row.modelId === 'shared')
+        .map((row) => row.provider)
+        .sort(),
+    ).toEqual(['alpha', 'vendor']);
+    await expect(relay('create_todo', { ...ownerTodo('写文档'), model: 'shared' })).rejects.toThrow(
+      /ambiguous/i,
+    );
+    expect(H.s.db.select().from(todoTable).all()).toEqual([]);
+  });
+
+  test('qualified names win over bare names containing a slash and preserve the full model ID', async () => {
+    provider('alpha', 'shared', 'vendor/shared');
+    provider('vendor', 'shared');
+    const selected = (await relay('create_todo', {
+      ...ownerTodo('写文档'),
+      model: 'vendor/shared',
+    })) as { id: string };
+    expect(todoRow(selected.id).request?.model).toEqual({
+      provider: 'vendor',
+      modelId: 'shared',
+      thinkingLevel: null,
+    });
+    const slash = (await relay('create_todo', {
+      ...ownerTodo('整理文档'),
+      model: 'alpha/vendor/shared',
+    })) as { id: string };
+    expect(todoRow(slash.id).request?.model).toEqual({
+      provider: 'alpha',
+      modelId: 'vendor/shared',
+      thinkingLevel: null,
+    });
+  });
+
+  test('a disabled Doubao subscription cannot authorize a stale reported model or favorite', async () => {
+    const machineId = doubaoMachine();
+    const sub = createDoubaoSubscription({ db: H.s.db }, H.teamId, {
+      label: 'Doubao',
+      runnerId: machineId,
+    });
+    disableDoubaoSubscription({ db: H.s.db }, H.teamId, sub.id);
+    frequent({ provider: 'doubao', modelId: 'auto' });
+    await expect(
+      relay('create_todo', {
+        ...ownerTodo('写文档'),
+        machine: machineId,
+        model: 'doubao/auto',
+      }),
+    ).rejects.toThrow();
     expect(H.s.db.select().from(todoTable).all()).toEqual([]);
   });
 
   test('without a pick the task keeps the team route', async () => {
+    provider('strong-gw', 'deep-model');
     frequent({ provider: 'strong-gw', modelId: 'deep-model' });
     const created = (await relay('create_todo', ownerTodo('写文档'))) as { id: string };
     expect(todoRow(created.id).request?.model).toBeUndefined();
@@ -98,6 +227,7 @@ describe('the Coordinator picks a task model from the frequently used models', (
   });
 
   test('the models tool marks the frequent models', async () => {
+    insertClaudeSubscription(H.s);
     seedMachineReport('exec-1', {
       installed: true,
       hostname: 'exec-host-1',
