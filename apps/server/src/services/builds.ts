@@ -1,7 +1,6 @@
 import type {
   BuildRecord,
   GitIdentity,
-  MergeReadiness,
   SecretBox,
   StepJournalRow,
   StepPromptOrigin,
@@ -88,7 +87,6 @@ export interface BuildDeps extends CommitEffects {
   oauthClient?: OAuthClientConfig | null;
   attachmentsDir?: string;
   gitOps?: typeof systemGitOps;
-  mergeVerdict?: (buildId: string) => Promise<MergeReadiness | null>;
 }
 
 type BuildRow = typeof build.$inferSelect;
