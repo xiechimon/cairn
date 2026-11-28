@@ -21,7 +21,6 @@ const CASE_FAMILIES = [
     file: 'src/sum.mjs',
     broken: 'export const add = (a, b) => a - b;\n',
     fixed: 'export const add = (a, b) => a + b;\n',
-    check: 'a + b',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -36,7 +35,6 @@ const CASE_FAMILIES = [
     file: 'src/slug.mjs',
     broken: 'export const slug = (s) => s;\n',
     fixed: "export const slug = (s) => s.trim().toLowerCase().replace(/\\s+/g, '-');\n",
-    check: "replace(/\\s+/g, '-')",
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -51,7 +49,6 @@ const CASE_FAMILIES = [
     file: 'src/parse.mjs',
     broken: 'export const parse = (v) => Number(v);\n',
     fixed: 'export const parse = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);\n',
-    check: 'isFinite',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -66,7 +63,6 @@ const CASE_FAMILIES = [
     file: 'src/capitalize.mjs',
     broken: 'export const capitalize = (s) => s;\n',
     fixed: 'export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);\n',
-    check: 'toUpperCase',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -81,7 +77,6 @@ const CASE_FAMILIES = [
     file: 'src/clamp.mjs',
     broken: 'export const clamp = (n) => n;\n',
     fixed: 'export const clamp = (n) => Math.min(10, Math.max(0, n));\n',
-    check: 'Math.min(10',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -96,7 +91,6 @@ const CASE_FAMILIES = [
     file: 'src/unique.mjs',
     broken: 'export const unique = (xs) => xs;\n',
     fixed: 'export const unique = (xs) => [...new Set(xs)];\n',
-    check: 'new Set',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -111,7 +105,6 @@ const CASE_FAMILIES = [
     file: 'src/count.mjs',
     broken: 'export const count = (s, ch) => 0;\n',
     fixed: 'export const count = (s, ch) => s.split(ch).length - 1;\n',
-    check: 'split(ch).length',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -126,7 +119,6 @@ const CASE_FAMILIES = [
     file: 'src/trim.mjs',
     broken: 'export const trim = (s) => s;\n',
     fixed: 'export const trim = (s) => s.trim();\n',
-    check: 's.trim()',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
@@ -201,7 +193,7 @@ function makeCase(family: (typeof CASE_FAMILIES)[number]): PilotCase {
       existingTestFiles: [],
     },
     checks: {
-      files: [{ path: family.file, contains: family.check }],
+      files: [],
       commands: [`node --test test/${family.id}.test.mjs`],
     },
     gate: true,

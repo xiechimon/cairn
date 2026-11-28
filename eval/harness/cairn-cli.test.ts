@@ -70,10 +70,7 @@ function fixture(): { repoRoot: string; task: JourneyTask } {
       testFiles: ['test/sum.test.mjs'],
       existingTestFiles: [],
     },
-    checks: {
-      files: [{ path: 'src/sum.mjs', contains: 'a + b' }],
-      commands: ['node --test test/sum.test.mjs'],
-    },
+    checks: { files: [], commands: ['node --test test/sum.test.mjs'] },
     gate: true,
   };
   return { repoRoot, task };
@@ -91,7 +88,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 const args = process.argv.slice(2);
 const dir = args[args.indexOf('-C') + 1];
-writeFileSync(join(dir, 'src', 'sum.mjs'), 'export const add = (a, b) => a + b;\\n');
+writeFileSync(join(dir, 'src', 'sum.mjs'), 'export const add = (a, b) => b + a;\\n');
 `;
 
 const noopScript = `
@@ -135,7 +132,7 @@ describe('cli arm', () => {
       },
     });
     expect(result.passed).toBe(false);
-    expect(result.fileChecks[0]?.ok).toBe(false);
+    expect(result.commandChecks).toEqual([{ command: 'node --test test/sum.test.mjs', ok: false }]);
   });
 
   test('the pilot counts each model launch and keeps the no-patch control free', async () => {
