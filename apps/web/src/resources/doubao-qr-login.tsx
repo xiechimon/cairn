@@ -7,9 +7,12 @@ import {
   useDoubaoLoginSession,
   useStartDoubaoLogin,
 } from '../api/doubao-subscriptions.js';
+import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { machineDisplayName } from '../components/machine-label.js';
 import { SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
@@ -83,6 +86,7 @@ export function DoubaoQrLoginCard({
   fixtureSession,
   onSucceeded,
   onCancel,
+  onLater,
 }: {
   teamId: string | undefined;
   machineId: string;
@@ -93,6 +97,7 @@ export function DoubaoQrLoginCard({
   fixtureSession?: DoubaoLoginSession | null;
   onSucceeded?: () => void;
   onCancel?: () => void;
+  onLater?: () => void;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -186,35 +191,39 @@ export function DoubaoQrLoginCard({
     );
   }
 
-  return (
+  const cancelButton = !(session?.status === 'succeeded' && !awaitingSwitchStart) && (
+    <Button
+      type="button"
+      variant={onLater === undefined ? 'ghost' : 'outline'}
+      size="sm"
+      data-testid="doubao-qr-cancel"
+      disabled={cancel.isPending}
+      onClick={() => {
+        if (liveReady && session !== null) {
+          cancel.mutate(session.loginId, { onSuccess: () => onCancel?.() });
+          return;
+        }
+        onCancel?.();
+      }}
+    >
+      {t('取消')}
+    </Button>
+  );
+
+  const content = (
     <div
       data-testid="doubao-qr-login-card"
       data-machine-id={machineId}
       className="mt-2 flex flex-col gap-2.5 rounded-lg border border-border bg-card px-3.5 py-3 text-ui text-foreground"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium text-foreground">
-          {t('{machine} 豆包扫码登录', { machine: machineName })}
-        </span>
-        {!(session?.status === 'succeeded' && !awaitingSwitchStart) && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid="doubao-qr-cancel"
-            disabled={cancel.isPending}
-            onClick={() => {
-              if (liveReady && session !== null) {
-                cancel.mutate(session.loginId, { onSuccess: () => onCancel?.() });
-                return;
-              }
-              onCancel?.();
-            }}
-          >
-            {t('取消')}
-          </Button>
-        )}
-      </div>
+      {onLater === undefined && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-medium text-foreground">
+            {t('{machine} 豆包扫码登录', { machine: machineName })}
+          </span>
+          {cancelButton}
+        </div>
+      )}
 
       {initialLogoutFirst && !(session?.status === 'succeeded' && !awaitingSwitchStart) && (
         <p data-testid="doubao-switch-notice" className="m-0 text-meta text-content-tertiary">
@@ -415,6 +424,25 @@ export function DoubaoQrLoginCard({
         })()}
     </div>
   );
+  if (onLater === undefined) return content;
+  return (
+    <DialogShell
+      title={t('{machine} 豆包扫码登录', { machine: machineName })}
+      open
+      onClose={onLater}
+      size="s"
+      footer={
+        <>
+          {cancelButton}
+          <Button type="button" variant="outline" onClick={onLater}>
+            {t('稍后扫码')}
+          </Button>
+        </>
+      }
+    >
+      {content}
+    </DialogShell>
+  );
 }
 
 function runnerStateText(
@@ -446,6 +474,8 @@ export function DoubaoRunnerLoginsSection({
   autoExpandQr?: boolean;
 }) {
   const { t } = useI18n();
+  const { live } = useLiveData();
+  const machines = useMachines(teamId, live);
   const logins = account.doubaoRunnerLogins ?? [];
   const defaultMissing = logins.find(
     (entry) => entry.status === 'missing_local_login' || entry.status === 'not_installed',
@@ -470,7 +500,8 @@ export function DoubaoRunnerLoginsSection({
     <SettingsSection title={t('各电脑登录状态')} testId="doubao-runner-logins">
       <SettingsCard>
         {logins.map((entry) => {
-          const machineName = entry.name;
+          const machine = machines.data?.find((row) => row.id === entry.runnerId);
+          const machineName = machine === undefined ? entry.name : machineDisplayName(machine);
           const isOk = entry.status === 'ok';
           const canLogin =
             canManage &&

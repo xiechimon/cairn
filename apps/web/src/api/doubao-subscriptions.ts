@@ -63,8 +63,10 @@ export function useStartDoubaoLogin(teamId: string | undefined, machineId: strin
         body,
       ),
     gcTime: 0,
-    onSuccess: (data) => {
-      client.setQueryData(doubaoLoginQueryKey(teamId, machineId), data);
+    onSuccess: async (data) => {
+      const key = doubaoLoginQueryKey(teamId, machineId);
+      await client.cancelQueries({ queryKey: key, exact: true });
+      client.setQueryData(key, data);
     },
   });
 }

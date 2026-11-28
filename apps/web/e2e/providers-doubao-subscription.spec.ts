@@ -651,7 +651,11 @@ test('adds Doubao subscription on clean runner -> shows QR dialog -> handles exp
   ];
   await mount(page, {
     subscriptions: [],
-    machines: [RUNNER_MINI_UNAUTHED],
+    machines: [{
+      ...RUNNER_MINI_UNAUTHED,
+      name: 'mac-mini.local',
+      capabilities: { ...RUNNER_MINI_UNAUTHED.capabilities, hostname: 'mac-mini.local', computerName: 'Studio Mac' },
+    }],
     runnerLogins,
     loginSessions: sessions,
     extraRoutes: (path, route) => {
@@ -699,8 +703,11 @@ test('adds Doubao subscription on clean runner -> shows QR dialog -> handles exp
   await expect(addDialog).not.toContainText('doubao login');
   await addDialog.getByRole('button', { name: '保存并扫码登录' }).click();
 
-  const qrDialog = page.getByRole('dialog', { name: 'mac-mini 豆包扫码登录' });
+  const qrDialog = page.getByRole('dialog', { name: 'Studio Mac 豆包扫码登录' });
   await expect(qrDialog).toBeVisible();
+  await expect(qrDialog.getByText('Studio Mac 豆包扫码登录', { exact: true })).toHaveCount(1);
+  await expect(qrDialog.getByTestId('dialog-foot').getByTestId('doubao-qr-cancel')).toBeVisible();
+  await expect(qrDialog).not.toContainText('mac-mini.local');
   await expect(qrDialog).toContainText('二维码已过期');
   const addToast = page.locator('[data-sonner-toast]').filter({ hasText: '已添加服务商' });
   await expect(addToast).toHaveCount(1);
@@ -758,6 +765,48 @@ test('adds Doubao subscription on clean runner -> shows QR dialog -> handles exp
   });
   await expect(detail(page).getByTestId('doubao-qr-login-card')).toHaveCount(0);
   await expect(detail(page).getByTestId('doubao-runner-switch-account')).toBeVisible();
+});
+
+test('refreshing an expired QR survives an older empty status response', async ({ page }) => {
+  let releaseStatus: (() => void) | undefined;
+  let holdStatus = false;
+  let starts = 0;
+  await mount(page, {
+    extraRoutes: (path, route, json) => {
+      if (path === '/api/teams/t1/machines/m-mini/doubao-login' && route.request().method() === 'GET' && holdStatus) {
+        return new Promise<void>((resolve) => { releaseStatus = resolve; }).then(() => json({ session: null }));
+      }
+      return undefined;
+    },
+    onStartLogin: (machineId) => {
+      starts += 1;
+      return { session: {
+        loginId: `login-${starts}`,
+        machineId,
+        machineName: 'mac-mini',
+        status: starts === 1 ? 'expired' : 'qr',
+        ...(starts === 1 ? { reason: 'expired' } : { qrPngBase64: PNG_B }),
+        revision: 1,
+        startedAt: NOW,
+        updatedAt: NOW,
+      } };
+    },
+  });
+  await page.goto('/app/resources/providers');
+  await detail(page).getByTestId('doubao-runner-qr-login').click();
+  await expect(detail(page).getByTestId('doubao-qr-retry')).toBeVisible();
+  holdStatus = true;
+  await page.evaluate(() => {
+    const stream = window.__es.find((es) => es.url.includes('/api/teams/t1/stream')) as unknown as { emit: (event: unknown) => void };
+    stream.emit({ type: 'doubao.login', machineId: 'm-mini', loginId: 'login-1', status: 'expired', revision: 1 });
+  });
+  await expect.poll(() => releaseStatus !== undefined).toBe(true);
+  await detail(page).getByTestId('doubao-qr-retry').click();
+  await expect(detail(page).getByTestId('doubao-qr-image')).toHaveAttribute('src', `data:image/png;base64,${PNG_B}`);
+  releaseStatus?.();
+  await expect(detail(page).getByTestId('doubao-qr-reconnect')).toHaveCount(0);
+  await expect(detail(page).getByTestId('doubao-qr-image')).toHaveAttribute('src', `data:image/png;base64,${PNG_B}`);
+  expect(starts).toBe(2);
 });
 
 test('keeps switch-account card open despite cached prior succeeded, preserves QR on stale cancel response, and shows refresh on QR without image', async ({

@@ -48,8 +48,11 @@ function translatedCopy(copy: TurnErrorCopy, t: TFunc) {
 }
 
 export function turnErrorDetail(error: TurnErrorFacts, t: TFunc): NoticeDetail {
-  const text = translatedCopy(turnErrorCopy(error, ON_MAC), t);
-  return { lines: [text.title, text.why], raw: error.message };
+  const copy = turnErrorCopy(error, ON_MAC);
+  const text = translatedCopy(copy, t);
+  const why =
+    copy.kind === 'unknown' ? t('请重试；如果持续出现，请复制下方错误并联系支持。') : text.why;
+  return { lines: [text.title, why], raw: error.message };
 }
 
 function useCopyText() {

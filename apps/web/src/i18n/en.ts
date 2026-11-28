@@ -1513,6 +1513,8 @@ export const EN: Record<string, string> = {
   这一轮的步数用完了: 'This turn ran out of steps',
   'Coordinator 连续执行了很多步仍未完成，已暂停。点击「继续」让它继续执行。':
     'The Coordinator took many steps without finishing and paused. Click Continue to let it carry on.',
+  '请重试；如果持续出现，请复制下方错误并联系支持。':
+    'Try again. If the problem continues, copy the error below and contact support.',
   '未能识别具体原因。通常重试即可；持续出现时，点击「详情」查看原始错误。':
     'The exact cause was not recognized. A retry usually works; if it keeps happening, open Details for the original error.',
   继续: 'Continue',

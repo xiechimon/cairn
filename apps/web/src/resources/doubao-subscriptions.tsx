@@ -5,7 +5,7 @@ import type { CreateDoubaoSubscription } from '../api/doubao-subscriptions.js';
 import { useMachines, useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
-import { Button } from '../components/ui/button.js';
+import { machineDisplayName } from '../components/machine-label.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import {
@@ -85,11 +85,18 @@ export function AddDoubaoSubscriptionDialog({
   const formContent = (
     <AddDoubaoSubscriptionForm
       anyLoggedIn={anyLoggedIn}
-      loggedInRunnerName={loggedInRunners[0]?.name}
-      selectedQrRunnerName={selectedQrRunner?.name}
+      loggedInRunnerName={
+        loggedInRunners[0] === undefined ? undefined : machineDisplayName(loggedInRunners[0])
+      }
+      selectedQrRunnerName={
+        selectedQrRunner === undefined ? undefined : machineDisplayName(selectedQrRunner)
+      }
       label={label}
       onLabelChange={setLabel}
-      supportedOnlineRunners={supportedOnlineRunners}
+      supportedOnlineRunners={supportedOnlineRunners.map((machine) => ({
+        ...machine,
+        name: machineDisplayName(machine),
+      }))}
       qrRunnerId={qrRunnerId}
       onQrRunnerChange={setQrRunnerId}
       error={error}
@@ -98,28 +105,16 @@ export function AddDoubaoSubscriptionDialog({
 
   if (savedQr !== null) {
     return (
-      <DialogShell
-        title={t('{machine} 豆包扫码登录', { machine: savedQr.runner.name })}
-        open
-        onClose={() => onFinish(savedQr.sub)}
-        size="s"
-        footer={
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" onClick={() => onFinish(savedQr.sub)}>
-              {t('稍后扫码')}
-            </Button>
-          </div>
-        }
-      >
-        <DoubaoQrLoginCard
-          teamId={resolvedTeamId}
-          machineId={savedQr.runner.id}
-          machineName={savedQr.runner.name}
-          autoStart
-          canManage
-          onSucceeded={() => onFinish(savedQr.sub)}
-        />
-      </DialogShell>
+      <DoubaoQrLoginCard
+        teamId={resolvedTeamId}
+        machineId={savedQr.runner.id}
+        machineName={savedQr.runner.name}
+        autoStart
+        canManage
+        onSucceeded={() => onFinish(savedQr.sub)}
+        onCancel={() => onFinish(savedQr.sub)}
+        onLater={() => onFinish(savedQr.sub)}
+      />
     );
   }
 
@@ -142,7 +137,10 @@ export function AddDoubaoSubscriptionDialog({
                   ? (created) =>
                       setSavedQr({
                         sub: created,
-                        runner: { id: selectedQrRunner.id, name: selectedQrRunner.name },
+                        runner: {
+                          id: selectedQrRunner.id,
+                          name: machineDisplayName(selectedQrRunner),
+                        },
                       })
                   : undefined,
               ),
