@@ -229,3 +229,26 @@ test('pick from this machine: three picks with one failure keep the two that wor
   await dialog.getByRole('button', { name: '取消' }).click();
   await expect(page.getByTestId('resource-row')).toHaveCount(2);
 });
+
+test('pick from this machine: opening the dialog asks the computer again, so a skill added meanwhile is listed', async ({ page }) => {
+  await stubBoot(page);
+  await stubImport(page);
+  const list = [candidate('alpha')];
+  let fetches = 0;
+  await page.route('**/api/teams/*/skills/import-candidates', (route) => {
+    fetches += 1;
+    return route.fulfill({ json: { candidates: list, skippedSources: [] } });
+  });
+  await page.goto(SKILLS);
+  const dialog = page.getByRole('dialog', { name: '导入技能' });
+  await page.getByTestId('resource-import').click();
+  await expect(dialog.getByTestId('skill-candidate')).toHaveCount(1);
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toBeHidden();
+
+  list.push(candidate('beta'));
+
+  await page.getByTestId('resource-import').click();
+  await expect(dialog.getByTestId('skill-candidate')).toHaveCount(2);
+  expect(fetches).toBeGreaterThanOrEqual(2);
+});
