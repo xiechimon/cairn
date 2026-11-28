@@ -19,7 +19,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import * as builds from '../src/services/builds.js';
-import { createOrGetQuestion } from '../src/services/chief-questions.js';
+import { announceQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
 import {
   drainEffects,
@@ -27,9 +27,14 @@ import {
   reconcileEffects,
 } from '../src/services/external-effects.js';
 import { createImService } from '../src/services/im/core.js';
+import { ImSendError } from '../src/services/im/errors.js';
 import { setImRuntime } from '../src/services/im/runtime.js';
 import type { ImAdapter, ImOutboundMessage } from '../src/services/im/types.js';
-import { notifyChiefMessage, sweepIdleChiefUnread } from '../src/services/notifications.js';
+import {
+  notifyChiefMessage,
+  notifyScheduleRun,
+  sweepIdleChiefUnread,
+} from '../src/services/notifications.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
 import { writeSchedule } from '../src/services/step-groups/schedule.js';
@@ -76,6 +81,7 @@ async function setupImConnection(
   s: Awaited<ReturnType<typeof setupWorld>>,
   platform: 'telegram' | 'slack' = 'telegram',
   chatKey = 'chat-owner-1',
+  opts: { onSend?: (msg: ImOutboundMessage) => Promise<void> } = {},
 ) {
   const sent: Array<{ platform: string; msg: ImOutboundMessage }> = [];
   const makeAdapter = (plat: 'telegram' | 'slack'): ImAdapter => ({
@@ -83,6 +89,10 @@ async function setupImConnection(
     check: async () => ({ ok: true, accountLabel: `@bot-${plat}` }),
     connect: async () => ({
       send: async (msg) => {
+        if (opts.onSend !== undefined) {
+          await opts.onSend(msg);
+          return;
+        }
         sent.push({ platform: plat, msg });
       },
       stop: async () => {},
@@ -1074,5 +1084,127 @@ describe('notify-once presence routing', () => {
       ).status,
     ).toBe(200);
     expect(isDesktopActive(s.db, s.user.id, nowMs())).toBe(true);
+  });
+});
+
+function seedChiefThread(
+  s: Awaited<ReturnType<typeof setupWorld>>,
+  title = '',
+  id: string | null = null,
+): string {
+  const threadId = id ?? `chief-${newUuidv7()}`;
+  const chiefId = `chief-${s.user.id}-${s.team.id}`;
+  const now = nowMs();
+  s.db
+    .insert(chief)
+    .values({ id: chiefId, teamId: s.team.id, userId: s.user.id, createdAt: now })
+    .onConflictDoNothing()
+    .run();
+  s.db
+    .insert(chiefThread)
+    .values({
+      id: threadId,
+      chiefId,
+      userId: s.user.id,
+      teamId: s.team.id,
+      title,
+      createdAt: now,
+      updatedAt: now,
+      sessionId: newUuidv7(),
+      sessionOpenedAt: now,
+    })
+    .run();
+  return threadId;
+}
+
+describe('one WeChat message per task state change', () => {
+  test("a task the owner was away for sends one explained line, and the Coordinator's own line about it stays in the app", async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    moveToReview(s.svc, s.todoId);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.msg.text.split('\n')[0]).toBe('任务「Daily digest check」等你审核');
+
+    const threadId = seedChiefThread(s);
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId,
+        message: '任务 [Daily digest check](todo:test-todo) 已进入待审核，等你确认。',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent).toHaveLength(1);
+    const row = s.db.select().from(notification).where(eq(notification.entityId, threadId)).get();
+    expect(row?.readAt).toBeNull();
+  });
+
+  test('a second notification for the same task and state inside the window sends nothing', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const source = {
+      id: s.todoId,
+      teamId: s.team.id,
+      title: 'Daily digest check',
+      projectId: s.projectId,
+      seqNum: 1,
+    };
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished again');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent).toHaveLength(1);
+  });
+
+  test('a message whose notification was read on the Mac before delivery sends nothing', async () => {
+    const s = await setupWorld();
+    const delivered: ImOutboundMessage[] = [];
+    let holding = true;
+    await setupImConnection(s, 'telegram', 'chat-owner-1', {
+      onSend: async (msg) => {
+        if (holding) throw new ImSendError('retry', 'connection busy', { retryAfterMs: 0 });
+        delivered.push(msg);
+      },
+    });
+    moveToReview(s.svc, s.todoId);
+    await vi.waitFor(() =>
+      expect(s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).all()).toHaveLength(1),
+    );
+    s.db
+      .update(notification)
+      .set({ readAt: nowMs(), deliveryStatus: 'read' })
+      .where(eq(notification.entityId, s.todoId))
+      .run();
+    holding = false;
+    await drainEffects(s.db, effectRegistry, { now: nowMs() + 120_000 });
+    expect(delivered).toHaveLength(0);
+  });
+
+  test('a question waiting for the owner arrives once, with its buttons and one line saying what it is', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const threadId = seedChiefThread(s, '验证频道');
+    createOrGetQuestion(
+      { db: s.db, convHub: s.convHub, hub: s.hub, user: s.user },
+      {
+        threadId,
+        requestId: 'ask-away-1',
+        questions: [
+          { header: 'Pick', question: '选哪一项', options: [{ label: '选项 A' }, { label: '选项 B' }] },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.msg.text.split('\n')[0]).toBe('「验证频道」需要你回答');
+    expect(sent[0]?.msg.buttons?.[0]?.map((b) => b.label)).toEqual(['选项 A', '选项 B']);
+    announceQuestion(
+      { db: s.db, convHub: s.convHub, hub: s.hub, user: s.user },
+      threadId,
+      'ask-away-1',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent).toHaveLength(1);
   });
 });

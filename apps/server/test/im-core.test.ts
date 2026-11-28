@@ -1581,3 +1581,70 @@ describe('Wave 4B UX fixes', () => {
     expect(otherStep.prompt).toContain('different chat turn');
   });
 });
+
+describe('one message per chat turn', () => {
+  test('the closing narration after a message already sent in the same turn is dropped', async () => {
+    await connectAndPair('55');
+    const session = sessions[0]!;
+    session.handlers.onMessage(inbound('55', 'handle this attachment'));
+    const turn = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, turn.id))
+      .run();
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId: turn.buildId,
+        message: '收到，我看一下这个附件。',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId: turn.buildId,
+        message: '已通过 notify_user 回复，本轮结束。',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(session.sent).toHaveLength(1);
+    expect(session.sent[0]?.text).toBe('收到，我看一下这个附件。');
+  });
+
+  test('a question card already in the chat is not repeated by the thread notification that follows it', async () => {
+    await connectAndPair('55');
+    const session = sessions[0]!;
+    session.handlers.onMessage(inbound('55', 'ask me something'));
+    const turn = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, turn.id))
+      .run();
+    createOrGetQuestion(
+      { db: s.db, convHub: s.convHub, hub: s.hub, user: s.user },
+      {
+        threadId: turn.buildId,
+        requestId: 'ask-dup-1',
+        questions: [
+          { header: 'Pick', question: '选哪一项', options: [{ label: '选项 A' }, { label: '选项 B' }] },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    expect(session.sent[0]?.buttons?.[0]?.map((b) => b.label)).toEqual(['选项 A', '选项 B']);
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, turn.id)).run();
+    announceQuestion(
+      { db: s.db, convHub: s.convHub, hub: s.hub, user: s.user },
+      turn.buildId,
+      'ask-dup-1',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(session.sent).toHaveLength(1);
+  });
+});
