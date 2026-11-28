@@ -1,4 +1,5 @@
 import { isPrivateIpv4Endpoint } from '@cairn/shared';
+import { cn } from 'cn';
 import { Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { useApiMutations, usePhones } from '../api/hooks.js';
@@ -189,26 +190,46 @@ export function PhonePairDialog({
   );
 }
 
-export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
+function capabilityText(view: PhoneView, t: TFunc): string {
+  return view.state === 'not_paired' ? t('配对后可供 Agent 查看和操作') : t('Agent 可查看和操作');
+}
+
+function stateDotClass(state: PhoneView['state']): string {
+  switch (state) {
+    case 'ready':
+    case 'busy':
+      return 'bg-running';
+    case 'pairing':
+    case 'locked':
+    case 'handoff':
+      return 'bg-pebble-waiting';
+    case 're_pair':
+    case 'signing_expired':
+      return 'bg-tint-fail-ink';
+    case 'not_paired':
+    case 'unreachable':
+      return 'bg-content-dim';
+  }
+}
+
+export function MachinePhoneRows({
+  machine,
+  onOpenPair,
+}: {
+  machine: MachineRow;
+  onOpenPair: (target: { phoneId: string | null; endpoint: string; name: string }) => void;
+}) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
-  const machineName = machine.name ?? machineId;
   const macHost =
     machine.id != null && machine.kind === 'local' && machine.capabilities?.osPlatform === 'darwin';
   const hostable = macHost && machine.online !== false;
   const phonesQ = usePhones(machine.id, live && macHost);
   const rows = live ? (phonesQ.data ?? []) : (machine.phonesFixture?.phones ?? []);
-  const reported = machine.online === false ? [] : (machine.capabilities?.phones ?? []);
+  const reported = hostable ? (machine.capabilities?.phones ?? []) : [];
   const views = mergePhoneViews(reported, rows);
-  const pairingInFlight = views.some((view) => view.state === 'pairing');
-  const showAdd = hostable && !pairingInFlight;
-  const [pairOpen, setPairOpen] = useState<{
-    phoneId: string | null;
-    endpoint: string;
-    name: string;
-  } | null>(null);
   const [forgetTarget, setForgetTarget] = useState<PhoneView | null>(null);
 
   const forget = (view: PhoneView) => {
@@ -224,6 +245,8 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
     );
   };
 
+  if (views.length === 0 && forgetTarget === null) return null;
+
   return (
     <>
       {views.map((view) => (
@@ -233,24 +256,47 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
           data-state={view.state}
           className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-2 last:border-b-0 pointer-coarse:pb-3"
         >
-          <Smartphone
-            aria-hidden
-            strokeWidth={1.75}
-            className="size-4 flex-none text-content-tertiary"
-          />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span
-              className="min-w-0 truncate text-ui font-medium text-foreground"
-              data-testid="phone-name"
-            >
-              {view.name}
-            </span>
-            <span className="truncate text-meta text-content-secondary" data-testid="phone-state">
-              {stateText(view, t)}
-              {view.row?.lastError != null && view.row.lastError !== '' && (
-                <span className="text-destructive"> · {view.row.lastError}</span>
-              )}
-            </span>
+            <div className="flex min-w-0 items-center gap-2 text-ui font-medium text-foreground">
+              <Smartphone
+                aria-hidden
+                strokeWidth={1.75}
+                className="size-4 flex-none text-content-secondary"
+              />
+              <span className="min-w-0 wrap-anywhere" data-testid="phone-name">
+                {view.name}
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-meta">
+              <span data-testid="phone-kind" className="whitespace-nowrap text-content-secondary">
+                {t('安卓手机')}
+              </span>
+              <span aria-hidden className="text-content-dim">
+                ·
+              </span>
+              <span
+                data-testid="phone-capability"
+                className="whitespace-nowrap text-content-secondary"
+              >
+                {capabilityText(view, t)}
+              </span>
+              <span aria-hidden className="text-content-dim">
+                ·
+              </span>
+              <span
+                aria-hidden
+                className={cn(
+                  'grow-light size-1.5 flex-none rounded-full',
+                  stateDotClass(view.state),
+                )}
+              />
+              <span className="min-w-0 truncate text-content-secondary" data-testid="phone-state">
+                {stateText(view, t)}
+                {view.row?.lastError != null && view.row.lastError !== '' && (
+                  <span className="text-destructive"> · {view.row.lastError}</span>
+                )}
+              </span>
+            </div>
           </div>
           <span className="flex flex-none items-center gap-1">
             {view.state === 'not_paired' && (
@@ -262,7 +308,7 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
                   const prefill = ENDPOINT_RE.test(view.deviceId)
                     ? `${view.deviceId.slice(0, view.deviceId.lastIndexOf(':'))}:`
                     : '';
-                  setPairOpen({ phoneId: null, endpoint: prefill, name: '' });
+                  onOpenPair({ phoneId: null, endpoint: prefill, name: '' });
                 }}
               >
                 {t('配对')}
@@ -277,7 +323,7 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
                   data-testid="phone-retry"
                   onClick={() => {
                     if (view.row === null) return;
-                    setPairOpen({ phoneId: view.row.id, endpoint: '', name: view.name });
+                    onOpenPair({ phoneId: view.row.id, endpoint: '', name: view.name });
                   }}
                 >
                   {t('重试')}
@@ -297,39 +343,6 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
           </span>
         </div>
       ))}
-      {showAdd && (
-        <div className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-2 last:border-b-0 pointer-coarse:pb-3">
-          <Smartphone
-            aria-hidden
-            strokeWidth={1.75}
-            className="size-4 flex-none text-content-tertiary"
-          />
-          <span className="min-w-0 flex-1 truncate text-ui text-content-secondary">
-            {t('安卓手机')}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="phone-add"
-            onClick={() => {
-              setPairOpen({ phoneId: null, endpoint: '', name: '' });
-            }}
-          >
-            {t('添加安卓手机')}
-          </Button>
-        </div>
-      )}
-      {pairOpen !== null && (
-        <PhonePairDialog
-          open
-          machineId={machineId}
-          machineName={machineName}
-          phoneId={pairOpen.phoneId}
-          prefillEndpoint={pairOpen.endpoint}
-          prefillName={pairOpen.name}
-          onClose={() => setPairOpen(null)}
-        />
-      )}
       {forgetTarget !== null && (
         <DeleteConfirm
           open

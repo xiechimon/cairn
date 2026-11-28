@@ -16,7 +16,13 @@ test('a machine row carries no phone disclosure or empty-state text', async ({ p
   await expect(settings(page).getByTestId('phones-empty')).toHaveCount(0);
 });
 
-test('a phone host with no phones shows no phone row', async ({ page }) => {
+test('a phone host with no phones shows no phone row and no placeholder row', async ({ page }) => {
+  await page.goto(MACHINES_NO_SUPPORT);
+  await expect(settings(page).locator(ITEM)).toHaveCount(1);
+  await expect(settings(page).locator(PHONE_ROW)).toHaveCount(0);
+  await expect(settings(page).getByTestId('phone-add')).toHaveCount(0);
+  await expect(settings(page).getByText('安卓手机')).toHaveCount(0);
+
   await page.goto(MACHINES_PHONES);
   const empty = settings(page).locator(ITEM).filter({ hasText: 'empty-mac' });
   await expect(empty).toBeVisible();
@@ -29,13 +35,19 @@ test('a phone host with no phones shows no phone row', async ({ page }) => {
   expect(names).not.toContain(expect.stringContaining('empty'));
 });
 
-test('paired and discovered phones appear as device rows with their state, while unpaired offline probes stay hidden', async ({
+test('paired and discovered phones appear as device rows with kind, capability, and state, while unpaired offline probes stay hidden', async ({
   page,
 }) => {
   await page.goto(MACHINES_PHONES);
   const phones = settings(page).locator(PHONE_ROW);
   await expect(phones).toHaveCount(9);
   await expect(phones.filter({ hasText: '离线未配对手机' })).toHaveCount(0);
+  await expect(phones.filter({ hasText: 'Pixel 8a' }).getByTestId('phone-kind')).toHaveText(
+    '安卓手机',
+  );
+  await expect(phones.filter({ hasText: 'Pixel 8a' }).getByTestId('phone-capability')).toHaveText(
+    'Agent 可查看和操作',
+  );
   await expect(phones.filter({ hasText: 'Pixel 8a' }).getByTestId('phone-state')).toHaveText(
     '就绪',
   );
@@ -44,6 +56,12 @@ test('paired and discovered phones appear as device rows with their state, while
   );
   await expect(phones.filter({ hasText: 'USB 手机' }).getByTestId('phone-state')).toHaveText(
     '配对中',
+  );
+  await expect(phones.filter({ hasText: '新手机' }).getByTestId('phone-kind')).toHaveText(
+    '安卓手机',
+  );
+  await expect(phones.filter({ hasText: '新手机' }).getByTestId('phone-capability')).toHaveText(
+    '配对后可供 Agent 查看和操作',
   );
   await expect(phones.filter({ hasText: '新手机' }).getByTestId('phone-state')).toHaveText('未配对');
   await expect(
@@ -54,6 +72,72 @@ test('paired and discovered phones appear as device rows with their state, while
   ).toHaveText('无法连接');
 });
 
+test('remote runners reporting phones do not surface phone rows under settings', async ({
+  page,
+}) => {
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'team-1',
+          name: 'Team',
+          createdAt: 0,
+          plan: 'free',
+          avatarStyle: null,
+          defaultMachineId: 'm-remote',
+        },
+      ],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
+  );
+  await page.route('**/api/teams/team-1/machines', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'm-remote',
+          name: 'remote-laptop',
+          teamId: 'team-1',
+          online: true,
+          latestCliVersion: null,
+          kind: 'remote',
+          enabledRuntimes: ['pi'],
+          capabilities: {
+            osPlatform: 'darwin',
+            mcpServers: [],
+            skills: [],
+            phoneHost: true,
+            phones: [
+              {
+                deviceId: 'emulator-5554',
+                platform: 'android',
+                name: 'sdk gphone64 arm64',
+                link: 'ready',
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  );
+  await page.route('**/api/teams/team-1/members', (route) => route.fulfill({ json: [] }));
+  try {
+    await page.goto('/app/settings/machines');
+    await expect(settings(page).locator(ITEM)).toHaveCount(1);
+    await expect(settings(page).locator(PHONE_ROW)).toHaveCount(0);
+    await expect(settings(page).getByText('sdk gphone64 arm64')).toHaveCount(0);
+    await settings(page).locator(ITEM).first().getByTestId('machine-menu').click();
+    await expect(page.getByTestId('machine-menu-pair-phone')).toHaveCount(0);
+  } finally {
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+});
+
 test('phone rows carry their own actions: pair, retry, forget', async ({ page }) => {
   await page.goto(MACHINES_PHONES);
   const phones = settings(page).locator(PHONE_ROW);
@@ -62,13 +146,18 @@ test('phone rows carry their own actions: pair, retry, forget', async ({ page })
   await expect(phones.filter({ hasText: 'Pixel 8a' }).getByTestId('phone-forget')).toBeVisible();
 });
 
-test('each machine row offers phone pairing; the add-machine shortcut does not guess among several hosts', async ({
+test('each hostable machine menu offers phone pairing; the add-machine shortcut does not guess among several hosts', async ({
   page,
 }) => {
   await page.goto(MACHINES_PHONES);
-  const entries = settings(page).getByTestId('phone-add');
-  await expect(entries).toHaveCount(2);
-  await entries.first().click();
+  await expect(settings(page).getByTestId('phone-add')).toHaveCount(0);
+  await settings(page)
+    .locator(ITEM)
+    .filter({ hasText: 'runner-mac' })
+    .getByTestId('machine-menu')
+    .click();
+  await expect(page.getByTestId('machine-menu-pair-phone')).toContainText('配对安卓手机…');
+  await page.getByTestId('machine-menu-pair-phone').click();
   await expect(page.getByRole('dialog', { name: '配对手机' })).toContainText('IP:端口');
   await page.keyboard.press('Escape');
   await settings(page).getByRole('button', { name: '添加执行机' }).click();
@@ -80,7 +169,8 @@ test('the pair dialog keeps submit disabled until a private endpoint, code and c
   page,
 }) => {
   await page.goto(MACHINES_NO_SUPPORT);
-  await settings(page).getByTestId('phone-add').click();
+  await settings(page).locator(ITEM).first().getByTestId('machine-menu').click();
+  await page.getByTestId('machine-menu-pair-phone').click();
   await expect(page.getByRole('dialog', { name: '配对手机' })).toContainText('安卓 11');
   const endpoint = page.getByTestId('phone-pair-endpoint');
   const code = page.getByTestId('phone-pair-code');
@@ -171,7 +261,8 @@ test('a pending pair submission cannot be cancelled or dismissed, then closes on
   });
   try {
     await page.goto('/app/settings/machines');
-    await settings(page).getByTestId('phone-add').click();
+    await settings(page).locator(ITEM).first().getByTestId('machine-menu').click();
+    await page.getByTestId('machine-menu-pair-phone').click();
     await page.getByTestId('phone-pair-endpoint').fill('192.168.1.20:37001');
     await page.getByTestId('phone-pair-code').fill('123456');
     await page.getByTestId('phone-pair-consent').click();
@@ -188,16 +279,20 @@ test('a pending pair submission cannot be cancelled or dismissed, then closes on
   }
 });
 
-test('an online local Mac shows the phone entry even before phone support finishes preparing', async ({
+test('an online local Mac shows the phone entry in its menu and add-machine without an empty phone row', async ({
   page,
 }) => {
   await page.goto(MACHINES_NO_SUPPORT);
   await expect(page.locator(ITEM).first()).toBeVisible();
   await expect(page.locator(PHONE_ROW)).toHaveCount(0);
-  await expect(settings(page).getByTestId('phone-add')).toHaveCount(1);
+  await expect(settings(page).getByTestId('phone-add')).toHaveCount(0);
+  await expect(settings(page).getByText('安卓手机')).toHaveCount(0);
+  await settings(page).locator(ITEM).first().getByTestId('machine-menu').click();
+  await expect(page.getByTestId('machine-menu-pair-phone')).toContainText('配对安卓手机…');
+  await page.keyboard.press('Escape');
   await settings(page).getByRole('button', { name: '添加执行机' }).click();
   const dialog = page.getByRole('dialog', { name: '添加执行机' });
-  await expect(dialog.getByTestId('phone-pair-entry')).toHaveText('配对手机');
+  await expect(dialog.getByTestId('phone-pair-entry')).toHaveText('配对安卓手机');
 });
 
 test('an offline local Mac still loads paired phones and lets the owner remove them', async ({
@@ -270,11 +365,15 @@ test('an offline local Mac still loads paired phones and lets the owner remove t
   try {
     await page.goto('/app/settings/machines');
     const row = settings(page).locator(PHONE_ROW).filter({ hasText: 'Offline Pixel' });
+    await expect(row.getByTestId('phone-kind')).toHaveText('安卓手机');
+    await expect(row.getByTestId('phone-capability')).toHaveText('Agent 可查看和操作');
     await expect(row.getByTestId('phone-state')).toHaveText('无法连接');
     await expect(settings(page).getByTestId('phone-add')).toHaveCount(0);
     await row.getByTestId('phone-forget').click();
     await page.getByRole('alertdialog', { name: '移除手机' }).getByRole('button', { name: '删除' }).click();
     await expect(settings(page).locator(PHONE_ROW)).toHaveCount(0);
+    await settings(page).locator(ITEM).first().getByTestId('machine-menu').click();
+    await expect(page.getByTestId('machine-menu-pair-phone')).toHaveCount(0);
   } finally {
     await page.unrouteAll({ behavior: 'wait' });
   }

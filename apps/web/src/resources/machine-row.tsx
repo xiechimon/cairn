@@ -95,11 +95,13 @@ export function MachineRowView({
   machines,
   isDefault,
   highlighted = false,
+  onPairPhone,
 }: {
   machine: MachineRow;
   machines: MachineRow[];
   isDefault: boolean;
   highlighted?: boolean;
+  onPairPhone?: (() => void) | undefined;
 }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -313,6 +315,18 @@ export function MachineRowView({
               >
                 {confirmRotate ? t('确认更换令牌') : t('更换令牌')}
               </KeyedMenuItem>
+              {onPairPhone !== undefined && (
+                <KeyedMenuItem
+                  shortcut="P"
+                  data-testid="machine-menu-pair-phone"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onPairPhone();
+                  }}
+                >
+                  {t('配对安卓手机…')}
+                </KeyedMenuItem>
+              )}
               <KeyedMenuItem
                 shortcut="D"
                 confirms

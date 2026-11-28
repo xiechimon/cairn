@@ -1,8 +1,13 @@
 import type { MachinePhoneReport, PhoneRow } from '@cairn/shared';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { MachineRow } from '../src/fixtures/records.js';
+import { I18nProvider } from '../src/i18n/provider.js';
 import { orderMachines } from '../src/resources/machine-order.js';
 import { mergePhoneViews } from '../src/resources/phone-views.js';
+import { MachinePhoneRows } from '../src/resources/phones-panel.js';
 
 function row(id: string, patch: Partial<MachineRow> = {}): MachineRow {
   return {
@@ -166,5 +171,93 @@ describe('mergePhoneViews', () => {
       [{ ...rows[0]!, pairing: true }],
     );
     expect(pairing[0]?.state).toBe('pairing');
+  });
+});
+
+function renderPhoneRows(machine: MachineRow): string {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderToStaticMarkup(
+    createElement(
+      QueryClientProvider,
+      { client: qc },
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(MachinePhoneRows, { machine, onOpenPair: () => {} }),
+      }),
+    ),
+  );
+}
+
+describe('MachinePhoneRows self-explanatory rendering', () => {
+  it('renders nothing when a hostable Mac has no paired or discovered phones', () => {
+    const html = renderPhoneRows(
+      row('local-mac', {
+        kind: 'local',
+        online: true,
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin', phones: [] },
+        phonesFixture: { phones: [] },
+      }),
+    );
+    expect(html).toBe('');
+  });
+
+  it('shows phone kind, agent capability, and state on each phone row', () => {
+    const html = renderPhoneRows(
+      row('m-1', {
+        kind: 'local',
+        online: true,
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          osPlatform: 'darwin',
+          phones: [
+            {
+              deviceId: 'android:aaaa1111bbbb2222',
+              platform: 'android',
+              name: 'Pixel 8a',
+              link: 'ready',
+            },
+            {
+              deviceId: '192.168.1.33:5555',
+              platform: 'android',
+              name: 'Pixel 7',
+              link: 'seen',
+            },
+          ],
+        },
+        phonesFixture: { phones: [phone('p1', 'android:aaaa1111bbbb2222', 'Pixel 8a')] },
+      }),
+    );
+    expect(html).toContain('data-testid="phone-kind"');
+    expect(html).toContain('安卓手机');
+    expect(html).toContain('data-testid="phone-capability"');
+    expect(html).toContain('Agent 可查看和操作');
+    expect(html).toContain('配对后可供 Agent 查看和操作');
+    expect(html).toContain('就绪');
+    expect(html).toContain('未配对');
+  });
+
+  it('suppresses discovered phones reported by remote runners', () => {
+    const html = renderPhoneRows(
+      row('remote-mac', {
+        kind: 'remote',
+        online: true,
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          osPlatform: 'darwin',
+          phones: [
+            {
+              deviceId: 'emulator-5554',
+              platform: 'android',
+              name: 'sdk gphone64 arm64',
+              link: 'seen',
+            },
+          ],
+        },
+        phonesFixture: { phones: [] },
+      }),
+    );
+    expect(html).toBe('');
   });
 });

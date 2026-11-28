@@ -477,7 +477,7 @@ export function CreateMachineDialog({
                 data-testid="phone-pair-entry"
                 onClick={() => setPairOpen(true)}
               >
-                {t('配对手机')}
+                {t('配对安卓手机')}
               </Button>
             </div>
           )}

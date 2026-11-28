@@ -486,8 +486,8 @@ Reach:
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners)
-- Keyboard shortcuts in its code: `D`, `F`, `R`
-- Test ids in its code: `machine-default`, `machine-hostname`, `machine-item`, `machine-item-name`, `machine-item-status`, `machine-list`, `machine-menu`, `machine-menu-default`, `machine-menu-delete`, `machine-menu-rotate-token`, `machine-os`, `machine-token-reauth-drawer`, `machine-token-reauth-status`, `machines-scroll`, `resource-empty`
+- Keyboard shortcuts in its code: `D`, `F`, `P`, `R`
+- Test ids in its code: `machine-default`, `machine-hostname`, `machine-item`, `machine-item-name`, `machine-item-status`, `machine-list`, `machine-menu`, `machine-menu-default`, `machine-menu-delete`, `machine-menu-pair-phone`, `machine-menu-rotate-token`, `machine-os`, `machine-token-reauth-drawer`, `machine-token-reauth-status`, `machines-scroll`, `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md)
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](../../../docs/research/t3code-devices-and-scope-2026-11-06.md) (not on main), [docs/research/runner-token-rotation-2026-11-27.md](../../../docs/research/runner-token-rotation-2026-11-27.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/design/runner-token-rotation.md](../../../docs/design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
@@ -526,7 +526,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `phone-add`, `phone-forget`, `phone-name`, `phone-pair`, `phone-pair-code`, `phone-pair-consent`, `phone-pair-dialog`, `phone-pair-endpoint`, `phone-pair-name`, `phone-pair-submit`, `phone-retry`, `phone-row`, `phone-state`
+- Test ids in its code: `phone-capability`, `phone-forget`, `phone-kind`, `phone-name`, `phone-pair`, `phone-pair-code`, `phone-pair-consent`, `phone-pair-dialog`, `phone-pair-endpoint`, `phone-pair-name`, `phone-pair-submit`, `phone-retry`, `phone-row`, `phone-state`
 - Research: [docs/research/phone-agents-2026-11-20.md](../../../docs/research/phone-agents-2026-11-20.md)
 - Frontend design: [docs/design/phone-computer.md](../../../docs/design/phone-computer.md)
 - Backend design: [docs/design/phone-computer.md](../../../docs/design/phone-computer.md)

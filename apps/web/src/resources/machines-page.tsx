@@ -17,7 +17,7 @@ import { DesktopHostPanel } from './desktop-host-panel.js';
 import { MACHINES_HREF } from './hrefs.js';
 import { orderMachines } from './machine-order.js';
 import { MachineRowView } from './machine-row.js';
-import { MachinePhoneRows } from './phones-panel.js';
+import { MachinePhoneRows, PhonePairDialog } from './phones-panel.js';
 
 export function MachinesPage() {
   const { t } = useI18n();
@@ -35,6 +35,13 @@ export function MachinesPage() {
     : (rawMachines.find((machine) => machine.isDefault === true)?.id ?? null);
   const machines = orderMachines(rawMachines, defaultMachineId);
   const [addOpen, setAddOpen] = useState(false);
+  const [pairTarget, setPairTarget] = useState<{
+    machineId: string;
+    machineName: string;
+    phoneId: string | null;
+    endpoint: string;
+    name: string;
+  } | null>(null);
   const targetMachineId = searchParams.get('machine');
   useEffect(() => {
     if (targetMachineId === null || targetMachineId === '') return;
@@ -43,13 +50,12 @@ export function MachinesPage() {
     );
     node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [targetMachineId, machines.length]);
-  const hostablePhones = machines.filter(
-    (machine) =>
-      machine.kind === 'local' &&
-      machine.online !== false &&
-      machine.capabilities?.osPlatform === 'darwin' &&
-      machine.id != null,
-  );
+  const isHostablePhoneHost = (machine: (typeof machines)[number]) =>
+    machine.id != null &&
+    machine.kind === 'local' &&
+    machine.online !== false &&
+    machine.capabilities?.osPlatform === 'darwin';
+  const hostablePhones = machines.filter(isHostablePhoneHost);
   const phoneHost = hostablePhones.length === 1 ? (hostablePhones[0] ?? null) : null;
 
   const noMachines = (
@@ -100,17 +106,43 @@ export function MachinesPage() {
             }
           >
             <div data-testid="machine-list" className="flex min-w-0 flex-col">
-              {machines.map((machine) => (
-                <Fragment key={machine.id ?? machine.name}>
-                  <MachineRowView
-                    machine={machine}
-                    machines={machines}
-                    isDefault={machine.id != null && machine.id === defaultMachineId}
-                    highlighted={machine.id != null && machine.id === targetMachineId}
-                  />
-                  <MachinePhoneRows machine={machine} />
-                </Fragment>
-              ))}
+              {machines.map((machine) => {
+                const machineId = machine.id ?? '';
+                const machineName = machine.name ?? machineId;
+                const hostable = isHostablePhoneHost(machine);
+                return (
+                  <Fragment key={machine.id ?? machine.name}>
+                    <MachineRowView
+                      machine={machine}
+                      machines={machines}
+                      isDefault={machine.id != null && machine.id === defaultMachineId}
+                      highlighted={machine.id != null && machine.id === targetMachineId}
+                      onPairPhone={
+                        hostable
+                          ? () =>
+                              setPairTarget({
+                                machineId,
+                                machineName,
+                                phoneId: null,
+                                endpoint: '',
+                                name: '',
+                              })
+                          : undefined
+                      }
+                    />
+                    <MachinePhoneRows
+                      machine={machine}
+                      onOpenPair={(target) =>
+                        setPairTarget({
+                          machineId,
+                          machineName,
+                          ...target,
+                        })
+                      }
+                    />
+                  </Fragment>
+                );
+              })}
             </div>
           </SettingsPanel>
         </QueryBoundary>
@@ -127,6 +159,18 @@ export function MachinesPage() {
             : { id: phoneHost.id ?? '', name: phoneHost.name ?? phoneHost.id ?? '' }
         }
       />
+      {pairTarget !== null && (
+        <PhonePairDialog
+          open
+          key={`${pairTarget.machineId}:${pairTarget.phoneId ?? ''}:${pairTarget.endpoint}`}
+          machineId={pairTarget.machineId}
+          machineName={pairTarget.machineName}
+          phoneId={pairTarget.phoneId}
+          prefillEndpoint={pairTarget.endpoint}
+          prefillName={pairTarget.name}
+          onClose={() => setPairTarget(null)}
+        />
+      )}
     </PageShell>
   );
 }
