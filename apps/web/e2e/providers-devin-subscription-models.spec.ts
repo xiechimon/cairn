@@ -60,6 +60,9 @@ const mount = (
 ) =>
   mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/devin-subscriptions') return json([record]);
+    if (path === '/api/teams/t1/subscription-quota/devin/sub-d1') return json({ windows: [], activity: {
+      fiveHour: { runs: 1, limited: 0 }, sevenDay: { runs: 2, limited: 0 }, resetsAt: null,
+    } });
     if (path === '/api/teams/t1/claude-subscriptions') return json([]);
     if (path === '/api/teams/t1/model-sources')
       return json({
@@ -94,8 +97,8 @@ test('picked models render as chips with free badge, tier and context', async ({
   await mount(page, subscription(picked()));
   await page.goto('/app/resources/providers');
   await expect(detail(page)).toBeVisible();
-  await expect(detail(page).getByTestId('subscription-usage')).toContainText('2 次运行');
-  await expect(detail(page).getByTestId('subscription-usage-note')).toHaveText('Devin 不提供剩余用量');
+  await expect(detail(page).getByTestId('subscription-quota')).toContainText('2 次运行');
+  await expect(detail(page).getByTestId('subscription-quota')).toContainText('Cairn 记录');
   await expect(detail(page).getByTestId('subscription-models-summary')).toHaveText('2 个');
   await expect(pickedChip(page, 'swe-2-flash-medium')).toContainText('免费');
   await expect(pickedChip(page, 'swe-2-flash-medium')).toContainText('262K');

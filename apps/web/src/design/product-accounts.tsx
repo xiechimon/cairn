@@ -18,11 +18,11 @@ import { OnlineStatus } from '../resources/parts.js';
 import { TeamProviderEditor } from '../resources/provider-editors.js';
 import {
   providerRowStatus,
-  QuotaMark,
   SubscriptionDetail,
   subscriptionStatusView,
   subscriptionSummary,
 } from '../resources/subscription-detail.js';
+import { QuotaMark } from '../resources/subscription-quota.js';
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);

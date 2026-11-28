@@ -173,7 +173,7 @@ describe('doubao subscriptions UI and QR login flow', () => {
     expect(html).toContain('扫码登录');
     expect(html).toContain('近 24 小时');
     expect(html).toContain('3 次运行');
-    expect(html).toContain('豆包 不提供剩余用量');
+    expect(html).toContain('Cairn 记录');
     expect(html).toContain('停用');
     expect(html).not.toContain('doubao login');
 

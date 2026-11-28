@@ -205,6 +205,9 @@ function mount(
         return json({ session: sessions[mid] ?? null });
       }
     }
+    if (path === '/api/teams/t1/subscription-quota/doubao/sub-db-1') return json({ windows: [], activity: {
+      fiveHour: { runs: 1, limited: 0 }, sevenDay: { runs: 2, limited: 0 }, resetsAt: null,
+    } });
     if (path === '/api/teams/t1/doubao-subscriptions' && route.request().method() === 'GET') {
       return json({
         subscriptions: subs.map((s) => ({ ...s, runnerLogins: [...runnerLogins] })),
@@ -307,9 +310,9 @@ test('renders Doubao usage, verify outcomes, toggle enabled, 409 delete toast, a
   });
   await page.goto('/app/resources/providers');
   await expect(detail(page)).toBeVisible();
-  await expect(detail(page)).toContainText('近 24 小时');
-  await expect(detail(page)).toContainText('2 次运行');
-  await expect(detail(page)).toContainText('豆包 不提供剩余用量');
+  await expect(detail(page).getByTestId('subscription-quota')).toContainText('近 7 天');
+  await expect(detail(page).getByTestId('subscription-quota')).toContainText('2 次运行');
+  await expect(detail(page).getByTestId('subscription-quota')).toContainText('Cairn 记录');
   await expect(detail(page).getByTestId('doubao-runner-logins')).toContainText('ian-mbp');
   await expect(detail(page).getByTestId('doubao-runner-logins')).toContainText('mac-mini');
   await expect(detail(page)).not.toContainText('doubao login');

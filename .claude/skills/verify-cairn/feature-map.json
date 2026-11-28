@@ -1138,13 +1138,14 @@
     {
       "id": "providers",
       "name": "Model providers and subscriptions",
-      "summary": "The user connects their own provider keys, OAuth presets and Claude or Codex subscriptions; cairn lists live models per source.",
+      "summary": "The user connects provider keys and subscriptions; Cairn lists live models per source and shows provider quota or Cairn-recorded activity in each subscription.",
       "states": "An empty list, providers with their models, a subscription being verified, verified or failing with a reason. Antigravity first-time host login: not installed (managed install runs first), installed but not logged in (login action shown), installing/authenticating progress, succeeded (verify turns green), cancelled or failed (plain reason plus retry), and a signed-out runner bringing the board banner back.",
       "centrality": 2,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/resources/providers-page.tsx",
+          "apps/web/src/resources/subscription-quota.tsx",
           "apps/web/src/resources/claude-subscriptions.tsx",
           "apps/web/src/resources/devin-subscriptions.tsx",
           "apps/web/src/resources/antigravity-subscriptions.tsx",
@@ -1190,6 +1191,7 @@
         "server": [
           "/api/teams/:id/providers**",
           "/api/teams/:id/provider-order",
+          "/api/teams/:id/subscription-quota/:kind/:accountId",
           "/api/teams/:id/claude-subscriptions**",
           "/api/teams/:id/devin-subscriptions**",
           "/api/teams/:id/antigravity-subscriptions**",
@@ -1229,6 +1231,7 @@
         "docs/design/doubao-runtime.md"
       ],
       "evidence": [
+        "apps/web/e2e/providers-subscription-quota.spec.ts",
         "apps/web/e2e/providers-claude-subscription.spec.ts",
         "apps/web/e2e/provider-add-dialog.spec.ts",
         "apps/web/e2e/devin-local-login.spec.ts",

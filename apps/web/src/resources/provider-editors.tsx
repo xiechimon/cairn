@@ -42,6 +42,7 @@ import {
   startModelChecks,
 } from './provider-check-state.js';
 import { presetMarkOf } from './provider-preset-icon.js';
+import { QuotaSection } from './subscription-quota.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const PROTOCOL_LABELS: Record<ProviderApi, string> = {
@@ -760,6 +761,9 @@ export function TeamProviderEditor({
               ? t('更新未能通过验证，仍在使用当前版本。')
               : t('有新版本 v{version} 可用', { version: runtimeUpdate.availableVersion ?? '' })}
         </p>
+      )}
+      {SUBSCRIPTION_PRESET_IDS.includes(record.providerId) && (
+        <QuotaSection id={record.id} kind="codex" now={Date.now()} revision={record.updatedAt} />
       )}
       <div className="@container">
         <div

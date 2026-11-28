@@ -480,14 +480,17 @@ it.each(['claude', 'antigravity', 'devin'] as const)(
 );
 
 it.each(['claude', 'antigravity', 'devin'] as const)(
-  'preserves the 24-hour count for every %s quota-window combination',
+  'keeps the last 24-hour run count when %s reports a balance',
   (vendor) => {
-    for (const windows of [[], [windowOf('seven_day_sonnet', 0.4, null)], [windowOf('seven_day', 0.4, null)], [windowOf('seven_day', 0.4, null), windowOf('seven_day_sonnet', 0.7, null)]]) {
-      const { detail } = renderAccount({ ...CLAUDE, vendor, windows, stepsLast24h: 17 });
-      expect(detail, `${vendor}: ${windows.map((window) => window.name).join(',')}`).toContain('近 24 小时');
-      expect(detail).toContain('17 次运行');
-      expect(detail.match(/17 次运行/g)).toHaveLength(1);
-    }
+    const { detail: activity } = renderAccount({ ...CLAUDE, vendor, windows: [], stepsLast24h: 17 });
+    expect(activity).toContain('Cairn 记录');
+    expect(activity).toContain('近 24 小时');
+    expect(activity.match(/17 次运行/g)).toHaveLength(1);
+    expect(activity).not.toContain('role="progressbar"');
+    const { detail: quota } = renderAccount({ ...CLAUDE, vendor, windows: [windowOf('seven_day', 0.4, null)], stepsLast24h: 17 });
+    expect(quota).toContain('订阅额度');
+    expect(quota).toContain('剩 60%');
+    expect(quota.match(/17 次运行/g)).toHaveLength(1);
   },
 );
 
@@ -890,7 +893,7 @@ it('A3: gives every row status a unique glyph without relying on color', () => {
   expect(new Set(glyphs).size, JSON.stringify(glyphs)).toBe(rows.length);
 });
 
-it('leaves Devin without a badge and keeps its usage note in the detail', () => {
+it('leaves Devin without a balance badge and attributes its usage to Cairn', () => {
   const { row, detail } = renderAccount({
     ...CLAUDE,
     id: 'devin-work',
@@ -899,11 +902,11 @@ it('leaves Devin without a badge and keeps its usage note in the detail', () => 
   });
   expect(row).toContain('>订阅 · 0 个模型<');
   expect(row).not.toContain('subscription-quota-mini');
-  expect(detail).toContain('Devin 不提供剩余用量');
+  expect(detail).toContain('Cairn 记录');
   expect(detail).not.toContain('role="progressbar"');
 });
 
-it('renders Antigravity quota windows with labels and hides the unsupported note', () => {
+it('renders Antigravity quota pools and falls back to Cairn activity without them', () => {
   const withWindows = renderAccount({
     ...CLAUDE,
     id: 'agy-work',
@@ -924,7 +927,7 @@ it('renders Antigravity quota windows with labels and hides the unsupported note
   expect(withWindows.detail).toContain('Gemini · 每周');
   expect(withWindows.detail).toContain('Claude / GPT · 5 小时');
   expect(withWindows.detail).toContain('Claude / GPT · 每周');
-  expect(withWindows.detail).not.toContain('Antigravity 不提供剩余用量');
+  expect(withWindows.detail).toContain('订阅额度');
 
   const withoutWindows = renderAccount({
     ...CLAUDE,
@@ -934,5 +937,5 @@ it('renders Antigravity quota windows with labels and hides the unsupported note
     hasToken: true,
     windows: [],
   });
-  expect(withoutWindows.detail).not.toContain('Antigravity 不提供剩余用量');
+  expect(withoutWindows.detail).toContain('Cairn 记录');
 });

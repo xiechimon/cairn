@@ -414,7 +414,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### providers
 
-**Model providers and subscriptions** (shipped). The user connects their own provider keys, OAuth presets and Claude or Codex subscriptions; cairn lists live models per source.
+**Model providers and subscriptions** (shipped). The user connects provider keys and subscriptions; Cairn lists live models per source and shows provider quota or Cairn-recorded activity in each subscription.
 
 - Research: [docs/research/r16-model-catalog-liveness.md](research/r16-model-catalog-liveness.md), [docs/research/2330-claude-entrypoint-and-setup-token-quota.md](research/2330-claude-entrypoint-and-setup-token-quota.md), [docs/design/devin-subscription-source.md](design/devin-subscription-source.md), [docs/design/antigravity-subscription-source.md](design/antigravity-subscription-source.md)
 - Frontend design: [docs/design/references/settings](design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)

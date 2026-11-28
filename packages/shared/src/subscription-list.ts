@@ -14,6 +14,15 @@ export interface ClaudeSubscriptionQuotaWindow {
   observedAt: number;
 }
 
+export interface SubscriptionQuota {
+  windows: ClaudeSubscriptionQuotaWindow[];
+  activity: {
+    fiveHour: { runs: number; limited: number };
+    sevenDay: { runs: number; limited: number };
+    resetsAt: number | null;
+  };
+}
+
 export interface ClaudeSubscriptionListEntry extends ClaudeSubscription {
   state?: 'exhausted';
   cooldownUntil?: number | null;

@@ -112,7 +112,6 @@ import {
 import {
   needsSubscriptionSignIn,
   providerRowStatus,
-  QuotaMark,
   type RuntimeUpdateSummary,
   runtimeUpdateSummary,
   type SubscriptionActions,
@@ -122,6 +121,7 @@ import {
   subscriptionSummary,
   teamProviderStatusView,
 } from './subscription-detail.js';
+import { currentQuotaWindows, QuotaMark } from './subscription-quota.js';
 import {
   groupAntigravityUpstream,
   groupDevinUpstream,
@@ -261,7 +261,7 @@ function subscriptionEntries(
         Mark: VENDORS[account.vendor].Mark,
         status: subscriptionSummary(shown.length, deps.t),
         ...status,
-        aside: <QuotaMark windows={account.windows} />,
+        aside: <QuotaMark windows={currentQuotaWindows(account.windows, deps.now)} />,
       },
       editor: (
         <SubscriptionDetail

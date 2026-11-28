@@ -119,6 +119,16 @@ function secretOf(raw: string): CodexOAuthSecret | null {
   }
 }
 
+export function readCodexQuotaCredential(
+  box: SecretBox,
+  cipher: string,
+  now: number,
+): Pick<CodexOAuthSecret, 'access' | 'accountId'> | null {
+  const secret = secretOf(box.open(cipher));
+  if (!secret?.access || !secret.accountId || !(secret.expires > now)) return null;
+  return { access: secret.access, accountId: secret.accountId };
+}
+
 function sealedTokens(body: Record<string, unknown>, previousRefresh?: string) {
   const access = requiredString(body, 'access_token');
   const refresh =

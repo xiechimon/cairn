@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 import { findLowContrast } from './contrast-probe';
 
-const NOW = Date.UTC(2026, 10, 16, 16);
+const NOW = Date.now();
 const MODELS = [{ id: 'current-model', name: 'Current model' }];
 const LONG_NAME = 'Claude subscription — International Design and Engineering Workspace';
 const ACCOUNTS = [
@@ -123,7 +123,7 @@ for (const width of [1440, 390]) {
         }
         if (id === 'devin') {
           await expect(row('subscription:devin').getByTestId('subscription-quota-mini')).toHaveCount(0);
-          await expect(detail.getByTestId('subscription-usage-note')).toHaveText('Devin 不提供剩余用量');
+          await expect(detail.getByTestId('subscription-quota')).toContainText('Cairn 记录');
         }
         if (id === 'update') await expect(detail).toContainText('1 个模型需要新版 Cairn');
         await detail.screenshot({ path: `${prefix}-${id}-detail.png` });

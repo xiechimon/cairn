@@ -214,7 +214,9 @@ test('logged-in Mac imports through the privileged bridge without posting a cred
   await expect(detail).toContainText('尚未勾选模型');
   await expect(detail.getByTestId('subscription-pick-upstream')).toBeVisible();
   await expect(detail.getByTestId('subscription-model')).toHaveCount(0);
-  await expect(detail).not.toContainText('额度');
+  const quota = detail.getByTestId('subscription-quota');
+  await expect(quota).toContainText('Cairn 记录');
+  await expect(quota.getByRole('progressbar')).toHaveCount(0);
 });
 
 test('logged-out Mac runs browser login and continues automatically', async ({ page }) => {

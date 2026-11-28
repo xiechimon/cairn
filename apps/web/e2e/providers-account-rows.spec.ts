@@ -459,8 +459,8 @@ test('the Devin subscription lists its catalog models and shows no quota section
   await expect(detail.getByTestId('subscription-model')).toHaveCount(5);
   await expect(detail.getByTestId('subscription-model').first()).toContainText('SWE-2');
   await expect(detail.getByTestId('subscription-model').first()).toContainText('swe-2-high');
-  await expect(detail).not.toContainText('额度');
-  await expect(detail.getByTestId('subscription-usage-note')).toHaveText('Devin 不提供剩余用量');
+  await expect(detail.getByTestId('subscription-quota')).toContainText('Cairn 记录');
+  await expect(detail.getByTestId('subscription-quota').getByRole('progressbar')).toHaveCount(0);
   await expect(detail).not.toContainText('—');
 });
 
@@ -510,6 +510,6 @@ test('an account nobody has used says so once, and still has a quota line of its
   await expect(detail).toContainText('尚未勾选模型。从上游获取模型清单后勾选。');
   await expect(detail.getByTestId('subscription-status')).toHaveCount(0);
   await expect(detail.getByTestId('subscription-verify-feedback')).toHaveCount(0);
-  await expect(detail.getByTestId('subscription-quota')).toHaveCount(0);
+  await expect(detail.getByTestId('subscription-quota').getByRole('progressbar')).toHaveCount(0);
   await expect(detail).not.toContainText('—');
 });

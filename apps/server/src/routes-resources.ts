@@ -237,6 +237,7 @@ import {
   updateLocalSkill,
 } from './services/skills.js';
 import { queuedThreadsByMachine } from './services/step-queue.js';
+import { getSubscriptionQuota } from './services/subscription-quota.js';
 import { pollXaiDeviceLogin, startXaiDeviceLogin } from './services/xai-device-login.js';
 
 export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
@@ -1030,6 +1031,21 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
           machineId: c.req.param('mid'),
           ...(loginId !== undefined && loginId !== '' ? { loginId } : {}),
         },
+      ),
+    );
+  });
+
+  app.get('/api/teams/:id/subscription-quota/:kind/:accountId', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    c.header('Cache-Control', 'no-store');
+    return c.json(
+      await getSubscriptionQuota(
+        { ...keysvc, fetch: ctx.oauthFetch ?? globalThis.fetch },
+        teamId,
+        c.req.param('kind'),
+        c.req.param('accountId'),
+        c.req.raw.signal,
       ),
     );
   });

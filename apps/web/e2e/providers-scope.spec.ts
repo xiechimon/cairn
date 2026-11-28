@@ -326,6 +326,6 @@ test('a subscription shows no standing sentences: the test cost sits on Test all
   await expect(page.getByRole('alertdialog')).toContainText('移除后，后续步骤不再使用这个订阅。');
   await page.keyboard.press('Escape');
   await page.locator('[data-instance-id="subscription:sub-old-laptop"]').click();
-  await expect(detail.getByTestId('subscription-quota')).toHaveCount(0);
+  await expect(detail.getByTestId('subscription-quota').getByRole('progressbar')).toHaveCount(0);
   await expect(detail).not.toContainText('5 小时和每周额度');
 });

@@ -19,12 +19,11 @@ import { type ReactNode, useRef, useState } from 'react';
 import type { Verification, VerifyFailure, VerifyNotRun } from '../api/account-verification.js';
 import type {
   AccountVendor,
-  QuotaWindow,
   SubscriptionAccount,
   SubscriptionModel,
 } from '../api/claude-accounts.js';
 import { relativeTime } from '../board/rel-time.js';
-import { useClock, VENDORS } from '../components/accounts/account-parts.js';
+import { VENDORS } from '../components/accounts/account-parts.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import {
   PROVIDER_STATUS,
@@ -34,8 +33,7 @@ import {
   SignInAgainButton,
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
-import { isLowQuota } from '../components/settings/quota-row.js';
-import { SettingsCard, SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
+import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
@@ -50,17 +48,8 @@ import {
   ModelTestReport,
   useModelTests,
 } from './provider-editors.js';
+import { QuotaSection } from './subscription-quota.js';
 import { COST_TIER_LABEL } from './upstream-model-picker.js';
-
-const WINDOW_LABELS = new Map([
-  ['five_hour', '5 小时'],
-  ['seven_day', '每周'],
-  ['billing_period', '计费周期'],
-  ['gemini-5h', 'Gemini · 5 小时'],
-  ['gemini-weekly', 'Gemini · 每周'],
-  ['3p-5h', 'Claude / GPT · 5 小时'],
-  ['3p-weekly', 'Claude / GPT · 每周'],
-]);
 
 const AUTH_RENEWAL: Record<AccountVendor, string> = {
   claude:
@@ -460,166 +449,6 @@ export function providerRowStatus(
 
 export function subscriptionSummary(modelCount: number, t: TFunc): string {
   return [t('订阅'), t('{n} 个模型', { n: modelCount })].join(' · ');
-}
-
-function quotaWindows(windows: readonly QuotaWindow[]): QuotaWindow[] {
-  return [
-    ...Array.from(WINDOW_LABELS.keys()).flatMap((name) => windows.filter((w) => w.name === name)),
-    ...windows.filter((w) => !WINDOW_LABELS.has(w.name)),
-  ];
-}
-
-function quotaReading(window: QuotaWindow, t: TFunc) {
-  const knownLabel = WINDOW_LABELS.get(window.name);
-  const name = window.name
-    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .trim()
-    .toLowerCase();
-  const label =
-    knownLabel === undefined ? name.charAt(0).toUpperCase() + name.slice(1) : t(knownLabel);
-  const left = Math.min(100, Math.max(0, Math.round((1 - window.utilization) * 100)));
-  const remaining = t('{window} 剩 {left}%', { window: label, left });
-  return {
-    label,
-    left,
-    remaining,
-    value: t('剩 {left}%', { left }),
-  };
-}
-
-export function QuotaMark({ windows }: { windows: readonly QuotaWindow[] }) {
-  const { t } = useI18n();
-  let tightest: QuotaWindow | undefined;
-  for (const window of quotaWindows(windows)) {
-    if (tightest === undefined || window.utilization > tightest.utilization) tightest = window;
-  }
-  if (tightest === undefined) return null;
-  const { left, remaining, value } = quotaReading(tightest, t);
-  return (
-    <span
-      data-testid="subscription-quota-mini"
-      data-window={tightest.name}
-      role="img"
-      aria-label={remaining}
-      title={remaining}
-      className={cn(
-        'flex-none whitespace-nowrap pt-1 text-caption text-content-secondary tabular-nums',
-        isLowQuota(left) && 'text-tint-wait-ink',
-      )}
-    >
-      {value}
-    </span>
-  );
-}
-
-const HOUR = 3_600_000;
-
-export function resetsIn(
-  ts: number,
-  now: number,
-  t: TFunc,
-  clock: (ts: number, now: number) => string,
-): string {
-  const left = ts - now;
-  if (left <= 0) return t('即将重置');
-  const minutes = Math.max(1, Math.round(left / 60_000));
-  if (minutes < 90) return t('{n} 分钟后重置', { n: minutes });
-  if (left < DAY) return t('{n} 小时后重置', { n: Math.round(left / HOUR) });
-  return t('{time} 重置', { time: clock(ts, now) });
-}
-
-function QuotaSection({ account, now }: { account: SubscriptionAccount; now: number }) {
-  const { t } = useI18n();
-  const clock = useClock();
-  const ordered = quotaWindows(account.windows);
-  return (
-    <>
-      <SettingsSection title={t('用量')} testId="subscription-usage">
-        <SettingsCard>
-          <div className="settings-row grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 text-meta tabular-nums">
-            <span className="text-content-secondary">{t('近 24 小时')}</span>
-            <span className="text-foreground">
-              {t('{n} 次运行', { n: account.stepsLast24h ?? 0 })}
-            </span>
-            {ordered.length === 0 &&
-              account.vendor !== 'claude' &&
-              account.vendor !== 'antigravity' && (
-                <span
-                  data-testid="subscription-usage-note"
-                  className="col-span-2 text-caption text-content-tertiary"
-                >
-                  {t('{vendor} 不提供剩余用量', { vendor: VENDORS[account.vendor].short })}
-                </span>
-              )}
-          </div>
-        </SettingsCard>
-      </SettingsSection>
-      {ordered.length > 0 && (
-        <SettingsSection title={t('额度')} testId="subscription-quota">
-          <SettingsCard className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_max-content_max-content] gap-x-2">
-            {ordered.map((window) => {
-              const { label, left, remaining, value } = quotaReading(window, t);
-              const reset =
-                window.resetsAt === null ? null : resetsIn(window.resetsAt, now, t, clock);
-              const low = isLowQuota(left);
-              return (
-                <div
-                  key={window.name}
-                  data-testid="subscription-quota-window"
-                  className="settings-row col-span-full grid min-h-11 min-w-0 grid-cols-subgrid items-center gap-x-2 py-2 text-meta tabular-nums"
-                >
-                  <span
-                    data-testid="subscription-quota-name"
-                    title={label}
-                    className="min-w-0 truncate text-content-secondary"
-                  >
-                    {label}
-                  </span>
-                  <span
-                    role="progressbar"
-                    aria-label={t('{window} 剩余', { window: label })}
-                    aria-valuenow={left}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    className="h-1 min-w-0 overflow-hidden rounded-full bg-secondary"
-                  >
-                    <span
-                      className={cn(
-                        'block h-full rounded-full',
-                        low ? 'bg-(--card-button)' : 'bg-content-secondary',
-                      )}
-                      style={{ width: `${left}%` }}
-                    />
-                  </span>
-                  <span
-                    data-testid="subscription-quota-remaining"
-                    role="img"
-                    aria-label={remaining}
-                    className={cn(
-                      'flex-none whitespace-nowrap text-foreground',
-                      low && 'text-tint-wait-ink',
-                    )}
-                  >
-                    {value}
-                  </span>
-                  {reset !== null && (
-                    <span
-                      data-testid="subscription-quota-reset"
-                      title={reset}
-                      className="flex-none whitespace-nowrap text-caption text-content-tertiary"
-                    >
-                      {`· ${reset}`}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </SettingsCard>
-        </SettingsSection>
-      )}
-    </>
-  );
 }
 
 function isApiVerificationCheck(check: SubscriptionCheck): boolean {
@@ -1046,7 +875,13 @@ export function SubscriptionDetail({
         </div>
       )}
       {relogin}
-      <QuotaSection account={account} now={now} />
+      <QuotaSection
+        id={account.id}
+        kind={account.vendor}
+        windows={account.windows}
+        stepsLast24h={account.stepsLast24h}
+        now={now}
+      />
       <VerifyResultPopover
         vendor={account.vendor}
         expired={account.state === 'expired'}
