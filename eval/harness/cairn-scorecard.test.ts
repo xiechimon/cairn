@@ -34,6 +34,10 @@ const result: PilotResult = {
   capProof: { attempted: 65, admitted: 64, refused: 'start cap 64 reached' },
   cases: 3,
   arms: [{ arm: 'none', passed: 3, graded: 3 }],
+  launches: [
+    { caseId: 'pilot-sum', arm: 'none', wallMs: 30_000, passed: true, exitCode: 0 },
+    { caseId: 'pilot-sum', arm: 'none', wallMs: 31_000, passed: true, exitCode: 0 },
+  ],
   aa: decision('discard'),
   damage: decision('discard'),
   aaDiscordance: 0,

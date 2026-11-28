@@ -11,7 +11,6 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { startBuilds } from '../../apps/server/src/services/builds.js';
 import { claimStep } from '../../apps/server/src/services/machines.js';
-import { activateInServer, deactivateInServer } from './world.js';
 import { insertMessageRow } from '../../apps/server/src/services/transcript.js';
 import {
   bootServer,
@@ -34,8 +33,10 @@ import {
   initBaselineRepo,
   materializeCommitTree,
   overlayCommitFiles,
+  workspaceChanges,
 } from './snapshot.js';
 import type { JourneyTask, TurnRecord } from './types.js';
+import { activateInServer, deactivateInServer } from './world.js';
 
 const ACCEPTANCE_BLOCK_PREFIX = 'acceptance-blocked-';
 
@@ -64,7 +65,11 @@ export interface ChangedFile {
 }
 
 function git(repoRoot: string, args: string[]): string {
-  const res = spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const res = spawnSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
   if (res.status !== 0) throw new Error(`git ${args.join(' ')}: ${res.stderr.trim()}`);
   return res.stdout;
 }
@@ -126,25 +131,6 @@ function writeTrivialTests(workDir: string, hidden: ReadonlySet<string>): string
     written.push(path);
   }
   return written;
-}
-
-function workspaceChanges(workDir: string): string[] {
-  const committed = spawnSync('git', ['diff', '--name-only', '-z', 'HEAD'], {
-    cwd: workDir,
-    encoding: 'utf8',
-  });
-  const dirty = spawnSync('git', ['status', '--porcelain', '-z'], { cwd: workDir, encoding: 'utf8' });
-  const names = new Set<string>();
-  for (const name of committed.stdout.split('\0')) if (name !== '') names.add(name);
-  const entries = dirty.stdout.split('\0');
-  for (let i = 0; i < entries.length; i += 1) {
-    const line = entries[i];
-    if (line === undefined || line === '') continue;
-    if (line.startsWith('R ') || line.startsWith('C ')) i += 1;
-    const name = line.slice(3);
-    if (name !== '') names.add(name);
-  }
-  return [...names];
 }
 
 export interface JourneyOutcome {
@@ -345,7 +331,8 @@ export async function runJourneyTask(
         timeoutMs: options.commandTimeoutMs ?? 120_000,
         maxBufferBytes: 16 * 1024 * 1024,
       });
-      const ok = !res.timedOut && res.signal === null && res.error === undefined && res.status === 0;
+      const ok =
+        !res.timedOut && res.signal === null && res.error === undefined && res.status === 0;
       journey.commandChecks.push({ command, ok });
       if (!ok)
         diagnostics = `grading ${command} failed: ${[res.stderr, res.stdout]
