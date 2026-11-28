@@ -6,6 +6,7 @@ import {
   claudeCodeUpdateRequired,
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
+  devinCatalogFamilies,
   devinInferredThinking,
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSourceModel,
@@ -271,7 +272,7 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
     const inferred = devinInferredThinking(model.id);
     return inferred.thinkingLevels === undefined ? model : { ...model, ...inferred };
   });
-  const models: ModelSourceModel[] = merged.length > 0 ? merged : [...DEFAULT_DEVIN_MODELS];
+  const models = devinCatalogFamilies(merged.length > 0 ? merged : DEFAULT_DEVIN_MODELS);
   return machines.map((row) => ({
     runtime: 'devin' as const,
     installed: row.capabilities?.devin?.installed === true,

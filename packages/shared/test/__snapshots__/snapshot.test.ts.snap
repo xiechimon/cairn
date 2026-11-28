@@ -3559,6 +3559,25 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "type": "string",
         },
         "type": {
+          "const": "provider.model-test",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "requestId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "requestId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "type": {
           "const": "antigravity.usage",
           "type": "string",
         },
@@ -12344,6 +12363,14 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/providers",
   },
   {
+    "method": "POST",
+    "path": "/api/teams/{id}/devin-subscriptions/{cid}/test",
+  },
+  {
+    "method": "POST",
+    "path": "/api/teams/{id}/antigravity-subscriptions/{cid}/test",
+  },
+  {
     "method": "GET",
     "path": "/api/teams/{id}/mcp-servers",
   },
@@ -14380,6 +14407,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "type": "string",
               },
               "type": "array",
+            },
+            "modelTurnProbe": {
+              "const": true,
+              "type": "boolean",
             },
             "osDistribution": {
               "maxLength": 64,

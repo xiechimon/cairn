@@ -256,9 +256,9 @@ describe('fetchDevinSubscriptionModels', () => {
   });
 
   test.each([
-    ['no-update', ['swe-2-high', 'swe-2-flash-medium', 'claude-x']],
-    ['update-only', ['swe-2-high', 'gpt-5.5']],
-    ['early-update', ['swe-2-high', 'gpt-5.5']],
+    ['no-update', ['swe-2', 'swe-2-flash', 'claude-x']],
+    ['update-only', ['swe-2', 'gpt-5.5']],
+    ['early-update', ['swe-2', 'gpt-5.5']],
   ] as const)(
     'collects the %s catalog within the configured bound even while the ACP session stays open',
     async (acp, ids) => {
@@ -273,10 +273,7 @@ describe('fetchDevinSubscriptionModels', () => {
     async (partialUpdateDelaySeconds) => {
       fakeDevinModels({ acp: 'partial-then-update', partialUpdateDelaySeconds });
       const result = await fetchDevinSubscriptionModels(TOKEN);
-      expect(result.ok && result.models.map((model) => model.id)).toEqual([
-        'swe-2-high',
-        'gpt-5.5',
-      ]);
+      expect(result.ok && result.models.map((model) => model.id)).toEqual(['swe-2', 'gpt-5.5']);
     },
   );
 
@@ -289,13 +286,19 @@ describe('fetchDevinSubscriptionModels', () => {
     });
     const elapsed = performance.now() - start;
     expect(result.ok && result.models.map((model) => model.id)).toEqual([
-      'swe-2-high',
-      'swe-2-flash-medium',
+      'swe-2',
+      'swe-2-flash',
       'claude-x',
       'gpt-5.5',
     ]);
     if (result.ok)
-      expect(result.models[0]).toEqual({ id: 'swe-2-high', name: 'SWE-2', supportsImages: true });
+      expect(result.models[0]).toEqual({
+        id: 'swe-2',
+        name: 'SWE-2',
+        thinkingDefault: 'high',
+        thinkingLevels: ['high'],
+        supportsImages: true,
+      });
     expect(elapsed, `waited ${elapsed.toFixed(0)} ms`).toBeLessThan(1_500);
     const pid = Number(readFileSync(join(dir, 'metadata.pid'), 'utf8'));
     await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
@@ -308,7 +311,9 @@ describe('fetchDevinSubscriptionModels', () => {
       ok: true,
       models: [
         {
-          id: 'swe-2-high',
+          id: 'swe-2',
+          thinkingDefault: 'high',
+          thinkingLevels: ['high'],
           name: 'SWE-2',
           family: 'SWE-2',
           costTier: 'Free',
@@ -318,8 +323,10 @@ describe('fetchDevinSubscriptionModels', () => {
           supportsImages: true,
         },
         {
-          id: 'swe-2-flash-medium',
-          name: 'swe-2-flash-medium',
+          id: 'swe-2-flash',
+          thinkingDefault: 'medium',
+          thinkingLevels: ['medium'],
+          name: 'SWE-2 Flash',
           family: 'SWE-2',
           costTier: 'High cost',
           costSummary: '$1 / 1M Input · $0.1 / 1M Cached input · $5 / 1M Output',
@@ -348,8 +355,20 @@ describe('fetchDevinSubscriptionModels', () => {
     expect(degraded).toEqual({
       ok: true,
       models: [
-        { id: 'swe-2-high', name: 'SWE-2', supportsImages: true },
-        { id: 'swe-2-flash-medium', name: 'swe-2-flash-medium', supportsImages: false },
+        {
+          id: 'swe-2',
+          name: 'SWE-2',
+          thinkingDefault: 'high',
+          thinkingLevels: ['high'],
+          supportsImages: true,
+        },
+        {
+          id: 'swe-2-flash',
+          name: 'SWE-2 Flash',
+          thinkingDefault: 'medium',
+          thinkingLevels: ['medium'],
+          supportsImages: false,
+        },
         { id: 'claude-x', name: 'Claude X' },
       ],
     });
@@ -535,7 +554,7 @@ describe('devin subscription upstream-models endpoint', () => {
     expect(body.status).toBe('ok');
     expect(body.models).toHaveLength(4);
     expect(body.models[0]).toMatchObject({
-      id: 'swe-2-high',
+      id: 'swe-2',
       name: 'SWE-2',
       family: 'SWE-2',
       costTier: 'Free',
@@ -780,6 +799,26 @@ describe('devin subscription upstream-models endpoint', () => {
 });
 
 describe('patching devin subscription models', () => {
+  test('a legacy curated SWE variant is read as a model plus its original default effort', async () => {
+    const s = bootServer();
+    try {
+      const path = `/api/teams/${s.team.id}/devin-subscriptions`;
+      const created = await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN });
+      const { id } = (await created.json()) as { id: string };
+      await req(s.app, 'PATCH', `${path}/${id}`, {
+        models: [{ id: 'swe-2-flash-medium', name: 'SWE-2 Flash' }],
+      });
+      const listed = await req(s.app, 'GET', path);
+      expect(await listed.json()).toMatchObject([
+        {
+          id,
+          models: [{ id: 'swe-2-flash', name: 'SWE-2 Flash', thinkingDefault: 'medium' }],
+        },
+      ]);
+    } finally {
+      s.dispose();
+    }
+  });
   test('models replace wholesale, dedupe by id first-wins, and the label is untouched when absent', async () => {
     const s = bootServer();
     const path = `/api/teams/${s.team.id}/devin-subscriptions`;
@@ -796,7 +835,7 @@ describe('patching devin subscription models', () => {
       id,
       label: 'Personal',
       models: [
-        { id: 'swe-2-high', name: 'SWE-2', costTier: 'Free', supportsImages: true },
+        { id: 'swe-2', name: 'SWE-2', costTier: 'Free', supportsImages: true },
         { id: 'gpt-5.5', name: 'GPT-5.5' },
       ],
     });
@@ -804,17 +843,17 @@ describe('patching devin subscription models', () => {
     const row = ((await listed.json()) as { id: string; models: { id: string }[] }[]).find(
       (entry) => entry.id === id,
     );
-    expect(row?.models.map((model) => model.id)).toEqual(['swe-2-high', 'gpt-5.5']);
+    expect(row?.models.map((model) => model.id)).toEqual(['swe-2', 'gpt-5.5']);
     const shrunk = await req(s.app, 'PATCH', `${path}/${id}`, {
-      models: [{ id: 'swe-2-high', name: 'SWE-2' }],
+      models: [{ id: 'swe-2', name: 'SWE-2' }],
     });
     expect(await shrunk.json()).toMatchObject({
-      models: [{ id: 'swe-2-high', name: 'SWE-2' }],
+      models: [{ id: 'swe-2', name: 'SWE-2' }],
     });
     const renamed = await req(s.app, 'PATCH', `${path}/${id}`, { label: 'Work' });
     expect(await renamed.json()).toMatchObject({
       label: 'Work',
-      models: [{ id: 'swe-2-high', name: 'SWE-2' }],
+      models: [{ id: 'swe-2', name: 'SWE-2' }],
     });
     const cleared = await req(s.app, 'PATCH', `${path}/${id}`, { models: [] });
     expect(await cleared.json()).toMatchObject({ label: 'Work', models: [] });
@@ -878,7 +917,7 @@ describe('patching devin subscription models', () => {
       ok: true,
       models: [
         {
-          id: 'swe-2-1-medium',
+          id: 'swe-2-1',
           name: 'SWE-2.1',
           family: 'SWE-2.1',
           costTier: 'Med cost',

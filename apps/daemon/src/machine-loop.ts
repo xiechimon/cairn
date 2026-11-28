@@ -57,6 +57,7 @@ import { createDoubaoManaged, type DoubaoManaged } from './backend/doubao-manage
 import type { DoubaoController } from './backend/doubao-probe.js';
 import { runnerHostShellConfinement } from './backend/host-shell-confinement.js';
 import type { ManagedRuntime } from './backend/managed-runtime.js';
+import { runModelTurnProbe } from './backend/model-turn-probe.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
@@ -837,6 +838,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       })(),
       executor: 'host' as const,
       antigravityOAuthProfile: true,
+      ...(client.claimModelTurn && client.finishModelTurn ? { modelTurnProbe: true as const } : {}),
       ...(client.claimAntigravityModelProbe && client.finishAntigravityModelProbe
         ? { antigravitySubscriptionModels: true as const }
         : {}),
@@ -1756,6 +1758,36 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (!signal.aborted) logger.machine('workspace file reply failed');
     }
   };
+  const deliverModelTurn = async (id: string, connectionId: string, signal: AbortSignal) => {
+    if (!client.claimModelTurn || !client.finishModelTurn) return;
+    try {
+      const claim = await client.claimModelTurn(
+        id,
+        connectionId,
+        AbortSignal.any([signal, AbortSignal.timeout(3_000)]),
+      );
+      const install =
+        claim.mode === 'devin' ? devinManaged.current() : antigravityManaged.current();
+      const result =
+        install === null
+          ? ({ status: 'failed', failure: 'network' } as const)
+          : await runModelTurnProbe(
+              install,
+              claim,
+              paths.home,
+              signal,
+              process.env[ENV_VARS.agentImportHome] ?? homedir(),
+            );
+      await client.finishModelTurn(
+        id,
+        connectionId,
+        result,
+        AbortSignal.any([signal, AbortSignal.timeout(2_000)]),
+      );
+    } catch {
+      if (!signal.aborted) logger.machine('Provider model test delivery failed');
+    }
+  };
   const deliverAntigravityModelProbe = async (
     requestId: string,
     connectionId: string,
@@ -2086,6 +2118,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'antigravity.models' && connectionId !== null) {
               void deliverAntigravityModelProbe(ev.requestId, connectionId, probeSignal);
+            }
+            if (ev.type === 'provider.model-test' && connectionId !== null) {
+              void deliverModelTurn(ev.requestId, connectionId, streamCtrl.signal);
+              return;
             }
             if (ev.type === 'antigravity.usage' && connectionId !== null) {
               void deliverAntigravityUsageProbe(ev.requestId, connectionId, probeSignal);

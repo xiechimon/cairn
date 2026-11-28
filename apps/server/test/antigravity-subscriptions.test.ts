@@ -24,6 +24,7 @@ import { requestAntigravityVerify } from '../src/services/machine-antigravity-ve
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { markPresence } from '../src/services/machines.js';
 import { getModelSources } from '../src/services/providers.js';
+import { runnerProbeQueue } from '../src/services/runner-probe-queue.js';
 import {
   bootServer,
   insertMachine,
@@ -76,6 +77,7 @@ const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function deferred<T>() {
@@ -86,7 +88,286 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+describe('model turn runner queue boundaries', () => {
+  test('wrong machine and stale connection cannot claim or finish another request', async () => {
+    const hub = new MachineWakeHub();
+    const ids: string[] = [];
+    const queue = runnerProbeQueue<string, { status: 'ok' }>((_hub, _machine, id) => {
+      ids.push(id);
+      return true;
+    });
+    const close = hub.subscribeMachine('team', 'runner', () => {});
+    const connection = hub.connectionId('runner')!;
+    const result = queue.dispatch(
+      hub,
+      ['runner'],
+      () => 'private claim',
+      () => true,
+    );
+    expect(queue.claim(hub, ids[0]!, 'other-runner', connection)).toBeUndefined();
+    expect(queue.claim(hub, ids[0]!, 'runner', 'stale')).toBeUndefined();
+    expect(queue.finish(hub, ids[0]!, 'runner', connection, { status: 'ok' })).toBe('missing');
+    expect(queue.claim(hub, ids[0]!, 'runner', connection)).toBe('private claim');
+    expect(queue.finish(hub, ids[0]!, 'runner', 'stale', { status: 'ok' })).toBe('missing');
+    expect(queue.finish(hub, ids[0]!, 'runner', connection, { status: 'ok' })).toBe('accepted');
+    expect(await result).toEqual({ status: 'ok' });
+    close();
+  });
+
+  test('account revocation before claim or result prevents disclosure and success', async () => {
+    const hub = new MachineWakeHub();
+    const ids: string[] = [];
+    const queue = runnerProbeQueue<string, { status: 'ok' }>((_hub, _machine, id) => {
+      ids.push(id);
+      return true;
+    });
+    const close = hub.subscribeMachine('team', 'runner', () => {});
+    const connection = hub.connectionId('runner')!;
+    let authorized = true;
+    const read = vi.fn(() => 'secret');
+    const first = queue.dispatch(hub, ['runner'], read, () => authorized);
+    authorized = false;
+    expect(queue.claim(hub, ids[0]!, 'runner', connection)).toBeUndefined();
+    expect(read).not.toHaveBeenCalled();
+    expect(await first).toEqual({ status: 'failed', failure: 'auth' });
+    authorized = true;
+    const second = queue.dispatch(hub, ['runner'], read, () => authorized);
+    expect(queue.claim(hub, ids[1]!, 'runner', connection)).toBe('secret');
+    authorized = false;
+    expect(queue.finish(hub, ids[1]!, 'runner', connection, { status: 'ok' })).toBe('revoked');
+    expect(await second).toEqual({ status: 'failed', failure: 'auth' });
+    close();
+  });
+
+  test('disconnect releases the slot and a late reply cannot finish the replacement request', async () => {
+    const hub = new MachineWakeHub();
+    const ids: string[] = [];
+    const queue = runnerProbeQueue<string, { status: 'ok' }>((_hub, _machine, id) => {
+      ids.push(id);
+      return true;
+    });
+    const close = hub.subscribeMachine('team', 'runner', () => {});
+    const oldConnection = hub.connectionId('runner')!;
+    const first = queue.dispatch(
+      hub,
+      ['runner'],
+      () => 'first',
+      () => true,
+    );
+    expect(queue.claim(hub, ids[0]!, 'runner', oldConnection)).toBe('first');
+    close();
+    expect(await first).toEqual({ status: 'failed', failure: 'network' });
+    const closeReplacement = hub.subscribeMachine('team', 'runner', () => {});
+    const connection = hub.connectionId('runner')!;
+    const second = queue.dispatch(
+      hub,
+      ['runner'],
+      () => 'second',
+      () => true,
+    );
+    expect(queue.finish(hub, ids[0]!, 'runner', oldConnection, { status: 'ok' })).toBe('missing');
+    expect(queue.claim(hub, ids[1]!, 'runner', oldConnection)).toBeUndefined();
+    expect(queue.claim(hub, ids[1]!, 'runner', connection)).toBe('second');
+    expect(queue.finish(hub, ids[1]!, 'runner', connection, { status: 'ok' })).toBe('accepted');
+    expect(await second).toEqual({ status: 'ok' });
+    closeReplacement();
+  });
+
+  test('no candidate or offline Runner fails without sending a request', async () => {
+    const hub = new MachineWakeHub();
+    const send = vi.fn(() => true);
+    const queue = runnerProbeQueue<string, { status: 'ok' }>(send);
+    expect(
+      await queue.dispatch(
+        hub,
+        [],
+        () => 'claim',
+        () => true,
+      ),
+    ).toEqual({
+      status: 'failed',
+      failure: 'network',
+    });
+    expect(
+      await queue.dispatch(
+        hub,
+        ['offline'],
+        () => 'claim',
+        () => true,
+      ),
+    ).toEqual({
+      status: 'failed',
+      failure: 'network',
+    });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test('total queue deadline starts at dispatch, not when the Runner claims the prompt', async () => {
+    vi.useFakeTimers();
+    const hub = new MachineWakeHub();
+    const ids: string[] = [];
+    const queue = runnerProbeQueue<string, { status: 'ok' }>((_hub, _machine, id) => {
+      ids.push(id);
+      return true;
+    });
+    const close = hub.subscribeMachine('team', 'runner', () => {});
+    const connection = hub.connectionId('runner')!;
+    const result = queue.dispatch(
+      hub,
+      ['runner'],
+      () => 'claim',
+      () => true,
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(queue.claim(hub, ids[0]!, 'runner', connection)).toBe('claim');
+    await vi.advanceTimersByTimeAsync(24_999);
+    let settled = false;
+    void result.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await result).toEqual({ status: 'failed', failure: 'timeout' });
+    expect(queue.finish(hub, ids[0]!, 'runner', connection, { status: 'ok' })).toBe('missing');
+    const replacement = queue.dispatch(
+      hub,
+      ['runner'],
+      () => 'new',
+      () => true,
+    );
+    expect(queue.claim(hub, ids[1]!, 'runner', connection)).toBe('new');
+    expect(queue.finish(hub, ids[1]!, 'runner', connection, { status: 'ok' })).toBe('accepted');
+    expect(await replacement).toEqual({ status: 'ok' });
+    close();
+  });
+});
+
 describe('antigravity subscriptions REST & model sources', () => {
+  test('a model test reports an unavailable Runner rather than passing from the saved catalog', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Antigravity' });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    const model = 'gemini-4-carbon';
+    expect(
+      (
+        await req(s.app, 'PATCH', `${path}/${id}`, {
+          models: [{ id: model, name: 'Gemini 4 Carbon' }],
+        })
+      ).status,
+    ).toBe(200);
+    const result = await req(s.app, 'POST', `${path}/${id}/test`, { model });
+    expect(result.status).toBe(200);
+    expect(await result.json()).toMatchObject({ status: 'failed', detail: null, latencyMs: null });
+  });
+  test('duplicate host model checks from separate requests are throttled rather than sharing the first result', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const name = 'host-turn-runner';
+    const model = { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' };
+    const id = insertMachine(s, {
+      name,
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        modelTurnProbe: true,
+        antigravity: { installed: true, authenticated: true, models: [model] },
+      },
+    });
+    const token = 'registered-runner-fixture';
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: sha256Hex(token) })
+      .where(eq(machineTable.id, id))
+      .run();
+    const sent = deferred<string>();
+    const close = s.machineHub.subscribeMachine(s.team.id, id, (event) => {
+      if (event.type === 'provider.model-test') sent.resolve(event.requestId);
+    });
+    disposables.push(close);
+    const connectionId = s.machineHub.connectionId(id);
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Antigravity', runnerId: id });
+    expect(created.status).toBe(201);
+    const account = (await created.json()) as { id: string };
+    expect((await req(s.app, 'PATCH', `${path}/${account.id}`, { models: [model] })).status).toBe(
+      200,
+    );
+    const result = req(s.app, 'POST', `${path}/${account.id}/test`, { model: model.id });
+    const requestId = await sent.promise;
+    const duplicate = await req(s.app, 'POST', `${path}/${account.id}/test`, { model: model.id });
+    expect(duplicate.status).toBe(429);
+    expect(await duplicate.json()).not.toMatchObject({ status: 'ok' });
+    const machineRequest = (body: object) =>
+      s.app.request(`/api/machine/provider/model-test/${requestId}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect(
+      (await machineRequest({ phase: 'claim', connectionId: 'wrong-connection' })).status,
+    ).toBe(404);
+    const claim = await machineRequest({ phase: 'claim', connectionId });
+    expect(await claim.json()).toEqual({ mode: 'antigravity-host', model: model.id });
+    expect(
+      (await machineRequest({ phase: 'result', connectionId, result: { status: 'ok' } })).status,
+    ).toBe(200);
+    expect(await (await result).json()).toMatchObject({
+      status: 'ok',
+      failure: null,
+      detail: null,
+    });
+  });
+
+  test('deleting a host account mid-turn rejects the Runner result and fails the waiting request', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const model = { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' };
+    const machineId = insertMachine(s, {
+      name: 'revoked-host-turn-runner',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        modelTurnProbe: true,
+        antigravity: { installed: true, authenticated: true, models: [model] },
+      },
+    });
+    const token = 'revoked-host-turn-token';
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: sha256Hex(token) })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    const sent = deferred<string>();
+    const close = s.machineHub.subscribeMachine(s.team.id, machineId, (event) => {
+      if (event.type === 'provider.model-test') sent.resolve(event.requestId);
+    });
+    disposables.push(close);
+    const connectionId = s.machineHub.connectionId(machineId);
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Antigravity', runnerId: machineId });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    expect((await req(s.app, 'PATCH', `${path}/${id}`, { models: [model] })).status).toBe(200);
+    const waiting = req(s.app, 'POST', `${path}/${id}/test`, { model: model.id });
+    const requestId = await sent.promise;
+    const machineRequest = (body: object) =>
+      s.app.request(`/api/machine/provider/model-test/${requestId}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect((await machineRequest({ phase: 'claim', connectionId })).status).toBe(200);
+    expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(204);
+    expect(
+      (await machineRequest({ phase: 'result', connectionId, result: { status: 'ok' } })).status,
+    ).toBe(409);
+    expect(await (await waiting).json()).toMatchObject({ status: 'failed', failure: 'auth' });
+  });
+
   test('supports host-keyring subscriptions without token and optional token subscriptions', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());

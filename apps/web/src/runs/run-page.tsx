@@ -1,4 +1,10 @@
-import type { RunTrace, RunTraceItem } from '@cairn/shared';
+import {
+  devinSweVariant,
+  formatModelDisplayName,
+  parseModelKey,
+  type RunTrace,
+  type RunTraceItem,
+} from '@cairn/shared';
 import { ChevronLeft, Download, ScrollText, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -50,7 +56,15 @@ function metaLine(trace: RunTrace, t: TFunc): string {
   const parts = [t(STATUS_WORD[trace.status] ?? trace.status)];
   parts.push(new Date(trace.startedAt).toLocaleString());
   if (trace.finishedAt !== null) parts.push(seconds(trace.finishedAt - trace.startedAt, t));
-  if (trace.models.length > 0) parts.push(trace.models.join('、'));
+  const labels = new Set(
+    trace.models.map((model) => {
+      const { provider, modelId } = parseModelKey(model);
+      return (provider === null || provider === 'devin') && devinSweVariant(modelId) !== null
+        ? formatModelDisplayName(modelId)
+        : model;
+    }),
+  );
+  if (labels.size > 0) parts.push([...labels].join('、'));
   const tools = trace.items.filter((i) => i.kind === 'tool').length;
   if (tools > 0) parts.push(t('{n} 次工具调用', { n: tools }));
   const tokens =

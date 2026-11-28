@@ -457,8 +457,13 @@ test('the Devin subscription lists its catalog models and shows no quota section
   await row.click();
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByTestId('subscription-model')).toHaveCount(5);
-  await expect(detail.getByTestId('subscription-model').first()).toContainText('SWE-2');
-  await expect(detail.getByTestId('subscription-model').first()).toContainText('swe-2-high');
+  const models = detail.getByTestId('subscription-model');
+  await expect(models.nth(0)).toContainText('SWE-2');
+  await expect(models.nth(1)).toContainText('SWE-2 Flash');
+  await expect(models.nth(2)).toContainText('Adaptive');
+  await expect(models.nth(3)).toContainText('Claude Opus 5.5');
+  await expect(models.nth(4)).toContainText('Gemini 4 Carbon');
+  await expect(models.first()).not.toContainText('swe-2-high');
   await expect(detail.getByTestId('subscription-quota')).toContainText('Cairn 记录');
   await expect(detail.getByTestId('subscription-quota').getByRole('progressbar')).toHaveCount(0);
   await expect(detail).not.toContainText('—');

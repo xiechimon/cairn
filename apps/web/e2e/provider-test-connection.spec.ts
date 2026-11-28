@@ -74,6 +74,38 @@ test('an OAuth provider shows the same pick and test buttons', async ({ page }) 
   await expect(editor(page).getByRole('button', { name: '测试 small-model' })).toBeVisible();
 });
 
+for (const [width, colorScheme] of [[1440, 'light'], [1440, 'dark'], [390, 'light'], [390, 'dark']] as const) {
+  test(`model chip actions sit together without shrinking their targets (${width}, ${colorScheme})`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 820 });
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.addInitScript((theme) => localStorage.setItem('cairn-theme', theme), colorScheme);
+    const model = 'gemini-pro-orchestrator-for-long-context-preview-2026-11-28';
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+      if (path === '/api/teams/t1/providers') return json({
+        presets: [],
+        providers: [{ ...RECORD, models: [...RECORD.models, { id: model, name: model }] }],
+        canTestConnection: true,
+      });
+      if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+      return undefined;
+    });
+    await page.goto('/app/resources/providers');
+    await chip(page, model).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('model-chip-actions.png') });
+    const play = chip(page, model).getByRole('button', { name: `测试 ${model}` });
+    const remove = chip(page, model).getByRole('button', { name: `移除 ${model}` });
+    const playBox = await play.boundingBox();
+    const removeBox = await remove.boundingBox();
+    expect(playBox).not.toBeNull();
+    expect(removeBox).not.toBeNull();
+    if (playBox === null || removeBox === null) return;
+    expect(playBox.width).toBeGreaterThanOrEqual(24);
+    expect(removeBox.width).toBeGreaterThanOrEqual(24);
+    expect(removeBox.x - (playBox.x + playBox.width)).toBeGreaterThanOrEqual(0);
+    expect(removeBox.x - (playBox.x + playBox.width)).toBeLessThanOrEqual(4);
+  });
+}
+
 const report = (page: Page) => page.getByTestId('model-test-result');
 const MODEL_CHECK_WORDS = ['412 ms', '模型不存在', '个可用', '个失败', '上游没有这个模型', '测试未完成'];
 
@@ -135,6 +167,29 @@ test('test all pops its result up from the button, never reflows the editor, and
   await editor(page).getByRole('heading', { name: '模型', exact: true }).click();
   await expect(report(page)).toHaveCount(0);
   expect(await top()).toBe(before);
+});
+
+test('C22: dismissed model test report stays closed when the result arrives', async ({ page }) => {
+  let release: (() => void) | undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers/prov-relay/test') return held.then(() => json(OK));
+    if (path === '/api/teams/t1/providers')
+      return json({ presets: [], providers: [RECORD], canTestConnection: true });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  await editor(page).getByRole('button', { name: '测试 small-model' }).click();
+  await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'running');
+  await expect(report(page)).toHaveAttribute('data-phase', 'checking');
+  await page.keyboard.press('Escape');
+  await expect(report(page)).toHaveCount(0);
+  release?.();
+  await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'ok');
+  await expect(report(page)).toHaveCount(0);
 });
 
 test('editing the address drops results, including a test still running', async ({ page }) => {

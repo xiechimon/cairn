@@ -13,6 +13,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { createAcpBackend } from '../src/backend/acp.js';
 import { createDevinUpdateNormalizer } from '../src/backend/devin-acp.js';
 import type { ManagedRuntime } from '../src/backend/managed-runtime.js';
+import { runModelTurnProbe } from '../src/backend/model-turn-probe.js';
 import { clearCredentials, pushCredential } from '../src/credentials.js';
 import { saveDevinModels } from '../src/state.js';
 import { prepareStepEnv } from '../src/step-env.js';
@@ -286,11 +287,40 @@ describe('devin credential delivery', () => {
   });
 });
 
+describe('single-model test turn', () => {
+  test.each([
+    ['model-test-replies', 'ok'],
+    ['model-test-empty', 'failed'],
+  ] as const)('uses the selected model and requires a reply: %s', async (scenario, status) => {
+    const home = makeTestTempDir('model-test-');
+    try {
+      const result = await runModelTurnProbe(
+        { binPath: process.execPath, args: [fixture, scenario] },
+        {
+          mode: 'devin',
+          model: 'stub-model',
+          token: 'wsk-test-fixture',
+        },
+        home,
+        new AbortController().signal,
+      );
+      expect(result.status).toBe(status);
+    } finally {
+      releaseTestTempDir(home);
+    }
+  });
+});
+
 describe('devin advertised model catalog', () => {
-  const advertised = [
+  const advertised: NonNullable<NonNullable<MachineCapabilities['devin']>['models']> = [
     { id: 'stub-model', name: 'Stub Model', thinkingLevels: [] },
-    { id: 'swe-2-high', name: 'SWE-2' },
-    { id: 'swe-2-flash-medium', name: 'SWE-2 Flash' },
+    { id: 'swe-2', name: 'SWE-2', thinkingLevels: ['high'], thinkingDefault: 'high' },
+    {
+      id: 'swe-2-flash',
+      name: 'SWE-2 Flash',
+      thinkingLevels: ['medium'],
+      thinkingDefault: 'medium',
+    },
     { id: 'adaptive', name: 'adaptive' },
   ];
 
@@ -329,6 +359,27 @@ describe('devin advertised model catalog', () => {
     await collect(session.events);
     expect(onDevinModels).toHaveBeenCalledTimes(1);
     expect(onDevinModels).toHaveBeenCalledWith(advertised);
+  });
+
+  test('the Runner publishes SWE families without baking effort into their model identity', async () => {
+    const onDevinModels = vi.fn();
+    const session = await createAcpBackend({
+      harness: 'devin',
+      command: process.execPath,
+      args: [fixture, 'devin'],
+      onDevinModels,
+    }).createSession(opts);
+    await collect(session.events);
+    expect(onDevinModels).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'swe-2', name: 'SWE-2', thinkingLevels: ['high'] }),
+        expect.objectContaining({
+          id: 'swe-2-flash',
+          name: 'SWE-2 Flash',
+          thinkingLevels: ['medium'],
+        }),
+      ]),
+    );
   });
 
   test('a resumed session refreshes the catalog too', async () => {

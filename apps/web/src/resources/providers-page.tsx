@@ -37,7 +37,7 @@ import {
 } from '../api/claude-accounts.js';
 import {
   fetchClaudeUpstreamModels,
-  testClaudeSubscriptionModel,
+  testSubscriptionModel,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
   useRefreshClaudeQuota,
@@ -719,6 +719,10 @@ export function ProvidersSection() {
   };
 
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
+    const testVendor =
+      account.vendor === 'claude' || account.vendor === 'antigravity' || account.vendor === 'devin'
+        ? account.vendor
+        : null;
     const rename = renameByVendor[account.vendor] ?? renameSubscription;
     const apiIds = apiIdsByVendor[account.vendor] ?? subscriptionApiIds;
     const managedRuntime: ManagedUpdateRuntime | null =
@@ -790,10 +794,12 @@ export function ProvidersSection() {
                           updateClaudeModels.isPending,
                       }
                     : {}),
-                  ...(account.vendor === 'claude' && teamId !== undefined
+                  ...(testVendor !== null &&
+                  teamId !== undefined &&
+                  (testVendor === 'claude' || providersQ.data?.canTestConnection !== false)
                     ? {
                         onTestModel: (model: string) =>
-                          testClaudeSubscriptionModel(teamId, account.id, model),
+                          testSubscriptionModel(testVendor, teamId, account.id, model),
                       }
                     : {}),
                 }
@@ -809,7 +815,7 @@ export function ProvidersSection() {
             account.vendor === 'claude'
               ? { onPickUpstream: () => undefined, onRemoveModel: () => undefined }
               : {}),
-            ...(account.vendor === 'claude'
+            ...(testVendor !== null
               ? { onTestModel: () => Promise.resolve(SAMPLE_TEST_RESULT) }
               : {}),
           }),

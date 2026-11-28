@@ -3,6 +3,8 @@ import {
   type CoordinatorDefault,
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
+  devinSweVariant,
+  devinWireModel,
   filterAgentTools,
   isInternalAntigravityModelId,
   isSessionStepKind,
@@ -527,7 +529,7 @@ export function routeProfile(
     displayName: USE_DISPLAY_NAMES[route.use],
     description: null,
     provider: route.provider,
-    modelId: route.modelId,
+    modelId: devinWireModel(route.provider, route.modelId, route.thinkingLevel),
     thinkingLevel: route.thinkingLevel,
     machineId: (session ? override?.machineId : undefined) ?? route.machineId,
     tools: policy?.tools ?? [],
@@ -785,15 +787,25 @@ export function memoryOpsAreTeamScoped(kind: StepKind): boolean {
   return kind !== 'review' && kind !== 'verify';
 }
 
+function hydrateFallback(
+  ref: NonNullable<RoutingRuleRow['fallbackModels']>[number],
+): NonNullable<RoutingRuleRecord['fallbackModels']>[number] {
+  const fallback = ref.provider === 'devin' ? devinSweVariant(ref.modelId) : null;
+  return fallback === null
+    ? ref
+    : { ...ref, modelId: fallback.baseId, thinkingLevel: fallback.level };
+}
+
 function toRoutingRuleRecord(row: RoutingRuleRow): RoutingRuleRecord {
+  const variant = row.provider === 'devin' ? devinSweVariant(row.modelId) : null;
   return {
     id: row.id,
     teamId: row.teamId,
     use: row.use,
     provider: row.provider,
-    modelId: row.modelId,
-    thinkingLevel: row.thinkingLevel,
-    fallbackModels: row.fallbackModels,
+    modelId: variant?.baseId ?? row.modelId,
+    thinkingLevel: row.thinkingLevel ?? variant?.level ?? null,
+    fallbackModels: row.fallbackModels?.map(hydrateFallback) ?? null,
     machineId: row.machineId,
     requiredCapabilities: row.requiredCapabilities,
     seededFromAgentId: row.seededFromAgentId,
@@ -921,6 +933,20 @@ function writeRoutingRule(
     throw new HttpError(409, 'routing rule changed since it was read');
   }
   if (body.machineId != null) requireTeamMachine(db, teamId, body.machineId);
+  const remainingFallbacks = [...(existing?.fallbackModels ?? [])];
+  const fallbackModels =
+    body.fallbackModels?.map(({ provider, modelId, thinkingLevel }) => {
+      const index = remainingFallbacks.findIndex((stored) => {
+        const hydrated = hydrateFallback(stored);
+        return (
+          hydrated.provider === provider &&
+          hydrated.modelId === modelId &&
+          hydrated.thinkingLevel === thinkingLevel
+        );
+      });
+      if (index !== -1) return remainingFallbacks.splice(index, 1)[0]!;
+      return { provider, modelId: devinWireModel(provider, modelId, thinkingLevel) ?? modelId };
+    }) ?? body.fallbackModels;
   const now = nowMs();
   if (existing === undefined) {
     const fallback =
@@ -941,9 +967,10 @@ function writeRoutingRule(
         teamId,
         use,
         provider: created.provider,
-        modelId: created.modelId,
+        modelId:
+          devinWireModel(created.provider, created.modelId, body.thinkingLevel) ?? created.modelId,
         thinkingLevel: body.thinkingLevel ?? null,
-        fallbackModels: body.fallbackModels ?? null,
+        fallbackModels: fallbackModels ?? null,
         machineId: body.machineId ?? null,
         requiredCapabilities: body.requiredCapabilities ?? null,
         seededFromAgentId: null,
@@ -955,9 +982,28 @@ function writeRoutingRule(
   }
   const sets: Partial<RoutingRuleRow> = { updatedAt: now };
   if (body.provider !== undefined) sets.provider = body.provider;
-  if (body.modelId !== undefined) sets.modelId = body.modelId;
+  if (
+    body.modelId !== undefined ||
+    (existing.provider === 'devin' && body.thinkingLevel !== undefined)
+  ) {
+    const prior = toRoutingRuleRecord(existing);
+    const provider = body.provider ?? existing.provider;
+    const modelId =
+      body.modelId ?? (body.provider === undefined ? prior.modelId : existing.modelId);
+    const effort =
+      body.thinkingLevel === undefined && modelId === prior.modelId
+        ? prior.thinkingLevel
+        : body.thinkingLevel;
+    const unchangedView =
+      provider === existing.provider &&
+      modelId === prior.modelId &&
+      (body.thinkingLevel === undefined || prior.thinkingLevel === body.thinkingLevel);
+    sets.modelId = unchangedView
+      ? existing.modelId
+      : (devinWireModel(provider, modelId, effort) ?? modelId);
+  }
   if (body.thinkingLevel !== undefined) sets.thinkingLevel = body.thinkingLevel;
-  if (body.fallbackModels !== undefined) sets.fallbackModels = body.fallbackModels;
+  if (fallbackModels !== undefined) sets.fallbackModels = fallbackModels;
   if (body.machineId !== undefined) sets.machineId = body.machineId;
   if (body.requiredCapabilities !== undefined) {
     sets.requiredCapabilities = body.requiredCapabilities;

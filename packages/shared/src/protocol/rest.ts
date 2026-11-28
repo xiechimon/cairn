@@ -62,6 +62,8 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'asks the host updater to update the server when safe',
   },
   { method: 'GET', path: '/api/teams/{id}/providers', note: 'presets[] 38 项原样（r3 §2）' },
+  { method: 'POST', path: '/api/teams/{id}/devin-subscriptions/{cid}/test' },
+  { method: 'POST', path: '/api/teams/{id}/antigravity-subscriptions/{cid}/test' },
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },
   { method: 'GET', path: '/api/teams/{id}/models' },
   { method: 'GET', path: '/api/teams/{id}/model-routing' },

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type DevinSubscriptionModel,
+  devinCatalogFamilies,
   devinVariantEffort,
   THINKING_LEVELS,
   type ThinkingLevel,
@@ -404,7 +405,7 @@ export async function fetchDevinSubscriptionModels(
         ...(option.supportsImages !== undefined ? { supportsImages: option.supportsImages } : {}),
       };
     });
-    return { ok: true, models: models.slice(0, MAX_MODELS) };
+    return { ok: true, models: devinCatalogFamilies(models).slice(0, MAX_MODELS) };
   } finally {
     catalogController.abort();
     await rm(home, { recursive: true, force: true });

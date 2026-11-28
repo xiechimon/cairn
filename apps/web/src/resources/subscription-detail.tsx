@@ -118,6 +118,9 @@ const MODEL_FAILURE_SHORT: Record<ProviderFailure, string> = { ...FAILURE_SHORT,
 const modelFailureSentence = (vendor: AccountVendor): Record<ProviderFailure, string> => ({
   ...FAILURE_SENTENCE,
   auth: AUTH_RENEWAL[vendor],
+  ...(vendor === 'antigravity' || vendor === 'devin'
+    ? { network: '请确认执行机在线并已更新。请重试。' }
+    : {}),
 });
 
 const FAILED_LABEL: Record<VerifyFailure, string> = {
@@ -696,7 +699,7 @@ export function needsSubscriptionSignIn(
 
 const TEST_CONCURRENCY = 2;
 
-function tierMeta(model: SubscriptionModel, t: TFunc) {
+function tierMeta(model: SubscriptionModel, t: TFunc, labelShown: boolean) {
   const tier =
     model.costTier === undefined ? undefined : (COST_TIER_LABEL[model.costTier] ?? model.costTier);
   const context =
@@ -706,7 +709,7 @@ function tierMeta(model: SubscriptionModel, t: TFunc) {
         ? `${Number((model.contextTokens / 1_000_000).toFixed(1))}M`
         : `${Math.round(model.contextTokens / 1000)}K`;
   const parts = [
-    model.name === model.id ? null : model.name,
+    labelShown || model.name === model.id ? null : model.name,
     tier === undefined ? null : t(tier),
     context ?? null,
   ].filter((v) => v !== null);
@@ -742,7 +745,8 @@ export function SubscriptionDetail({
 }) {
   const { t } = useI18n();
   const test = actions.onTestModel;
-  const tests = useModelTests(test, TEST_CONCURRENCY);
+  const sendsRunnerTurn = account.vendor === 'devin' || account.vendor === 'antigravity';
+  const tests = useModelTests(test, sendsRunnerTurn ? 1 : TEST_CONCURRENCY);
   const { checks } = tests;
   const testAllRef = useRef<HTMLButtonElement>(null);
   const [verifyEl, setVerifyEl] = useState<HTMLButtonElement | null>(null);
@@ -914,7 +918,7 @@ export function SubscriptionDetail({
                 {t('从上游选择')}
               </Button>
             )}
-            {test !== undefined && (
+            {test !== undefined && ids.length > 0 && (
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -958,11 +962,12 @@ export function SubscriptionDetail({
               <ModelChip
                 key={model.id}
                 id={model.id}
+                {...(account.vendor === 'devin' ? { label: model.name } : {})}
                 testId="subscription-model"
                 dead={model.liveness === 'dead'}
                 check={checks[model.id]}
                 busy={actions.modelsBusy ?? false}
-                meta={tierMeta(model, t)}
+                meta={tierMeta(model, t, account.vendor === 'devin')}
                 {...(test === undefined
                   ? {}
                   : { onTest: (anchor: Element) => void tests.run([model.id], anchor) })}

@@ -401,11 +401,6 @@ export function useModelTests(
       }
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
-    if (resetEpoch.current === started) {
-      setState((prev) =>
-        prev.report?.ids === ids ? { ...prev, report: { ...prev.report, open: true } } : prev,
-      );
-    }
   };
   const drop = (id: string) => {
     setState((prev) => ({
@@ -521,6 +516,7 @@ export function ModelTestReport({
 
 export function ModelChip({
   id,
+  label = id,
   dead,
   check,
   busy,
@@ -530,6 +526,7 @@ export function ModelChip({
   onRemove,
 }: {
   id: string;
+  label?: string;
   dead: boolean;
   meta?: ReactNode;
   testId?: string;
@@ -558,41 +555,45 @@ export function ModelChip({
           dead && 'text-content-tertiary line-through',
         )}
       >
-        {id}
+        {label}
       </span>
       {meta}
       {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
-      {onTest !== undefined && (
-        <IconTooltip
-          label={t('测试 {name}', { name: id })}
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="text-content-tertiary"
-              disabled={running}
-              onClick={(event) => onTest(event.currentTarget)}
-            />
-          }
-        >
-          <Play aria-hidden />
-        </IconTooltip>
-      )}
-      {onRemove !== undefined && (
-        <IconTooltip
-          label={t('移除 {name}', { name: id })}
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="text-content-tertiary"
-              disabled={busy}
-              onClick={onRemove}
-            />
-          }
-        >
-          <X aria-hidden />
-        </IconTooltip>
+      {(onTest !== undefined || onRemove !== undefined) && (
+        <span className="inline-flex flex-none items-center">
+          {onTest !== undefined && (
+            <IconTooltip
+              label={t('测试 {name}', { name: id })}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-content-tertiary"
+                  disabled={running}
+                  onClick={(event) => onTest(event.currentTarget)}
+                />
+              }
+            >
+              <Play aria-hidden />
+            </IconTooltip>
+          )}
+          {onRemove !== undefined && (
+            <IconTooltip
+              label={t('移除 {name}', { name: id })}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-content-tertiary"
+                  disabled={busy}
+                  onClick={onRemove}
+                />
+              }
+            >
+              <X aria-hidden />
+            </IconTooltip>
+          )}
+        </span>
       )}
     </span>
   );

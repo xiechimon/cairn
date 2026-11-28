@@ -43,12 +43,15 @@ const mount = (
   record: ReturnType<typeof subscription>,
   upstream: object | null = UPSTREAM,
   patches: object[] = [],
+  probe?: (model: string) => Promise<object>,
 ) =>
   mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/antigravity-subscriptions') return json([record]);
     if (path === '/api/teams/t1/devin-subscriptions') return json([]);
     if (path === '/api/teams/t1/claude-subscriptions') return json([]);
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions/sub-a1/test' && probe)
+      return probe(route.request().postDataJSON().model).then(json);
     if (path === '/api/teams/t1/antigravity-subscriptions/sub-a1/upstream-models')
       return upstream === null
         ? json({ status: 'failed', failure: 'upstream', httpStatus: null })
@@ -72,6 +75,97 @@ test('picked models render as chips on the subscription detail', async ({ page }
   await expect(detail(page).getByTestId('subscription-models-summary')).toHaveText('2 个');
   await expect(pickedChip(page, 'gemini-4-carbon')).toBeVisible();
   await expect(pickedChip(page, 'claude-sonnet-4-6')).toBeVisible();
+});
+
+test('Antigravity models have the same test action as other providers', async ({ page }) => {
+  const models: string[] = [];
+  let finish!: (result: object) => void;
+  const outcome = new Promise<object>((resolve) => { finish = resolve; });
+  await mount(page, subscription(picked()), UPSTREAM, [], (model) => {
+    models.push(model);
+    return outcome;
+  });
+  await page.goto('/app/resources/providers');
+  const play = pickedChip(page, 'gemini-4-carbon').getByRole('button', { name: '测试 gemini-4-carbon' });
+  await expect(detail(page).getByRole('button', { name: '全部测试' })).toBeVisible();
+  await play.click();
+  const report = page.getByTestId('model-test-result');
+  await expect(report).toHaveAttribute('data-phase', 'checking');
+  await expect(play).toBeDisabled();
+  finish({ status: 'ok', failure: null, reason: null, httpStatus: null, detail: null, latencyMs: 230 });
+  await expect(report).toHaveAttribute('data-phase', 'passed');
+  expect(models).toEqual(['gemini-4-carbon']);
+  await page.keyboard.press('Escape');
+  await expect(report).toHaveCount(0);
+});
+
+test('Antigravity Test all reports partial failure and a cooldown response per model', async ({ page }) => {
+  const requests: string[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/antigravity-subscriptions') return json([subscription(picked())]);
+    if (path === '/api/teams/t1/devin-subscriptions' || path === '/api/teams/t1/claude-subscriptions') return json([]);
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions/sub-a1/test') {
+      const model = route.request().postDataJSON().model as string;
+      requests.push(model);
+      if (requests.length > 2) return route.fulfill({ status: 429, json: { error: 'Too many requests' } });
+      return json(model === 'gemini-4-carbon'
+        ? { status: 'ok', failure: null, reason: null, httpStatus: null, detail: null, latencyMs: 230 }
+        : { status: 'failed', failure: 'not-found', reason: 'failed', httpStatus: 404, detail: '<img src=x onerror=alert(1)>', latencyMs: null });
+    }
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  await detail(page).getByTestId('subscription-test-all').click();
+  const report = page.getByTestId('model-test-result');
+  const facts = page.getByTestId('model-test-detail');
+  await expect(report).toHaveAttribute('data-phase', 'failed');
+  await expect(facts.locator('dt:text-is("gemini-4-carbon") + dd')).toContainText('通过 · 230 ms');
+  await expect(facts.locator('dt:text-is("claude-sonnet-4-6") + dd')).toContainText('未通过 · 模型不存在');
+  await expect(report.locator('img')).toHaveCount(0);
+  await expect(report).not.toContainText('onerror');
+  expect(requests.slice(0, 2).sort()).toEqual(['claude-sonnet-4-6', 'gemini-4-carbon']);
+
+  await page.keyboard.press('Escape');
+  await detail(page).getByTestId('subscription-test-all').click();
+  await expect(facts.locator('dt:text-is("gemini-4-carbon") + dd')).toContainText('测试未完成');
+  await expect(facts.locator('dt:text-is("claude-sonnet-4-6") + dd')).toContainText('测试未完成');
+  expect(requests.slice(2).sort()).toEqual(['claude-sonnet-4-6', 'gemini-4-carbon']);
+});
+
+test('switching subscriptions while an Antigravity probe is in flight does not leak its result', async ({ page }) => {
+  const requests: string[] = [];
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const first = subscription(picked());
+  const second = { ...subscription(picked()), id: 'sub-b2', label: 'Antigravity second' };
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/antigravity-subscriptions') return json([first, second]);
+    if (path === '/api/teams/t1/devin-subscriptions' || path === '/api/teams/t1/claude-subscriptions') return json([]);
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions/sub-a1/test' || path === '/api/teams/t1/antigravity-subscriptions/sub-b2/test') {
+      requests.push(`${path}:${route.request().postDataJSON().model}`);
+      const result = { status: 'ok', failure: null, reason: null, httpStatus: null, detail: null, latencyMs: path.includes('sub-a1') ? 230 : 420 };
+      return path.includes('sub-a1') ? held.then(() => json(result)) : json(result);
+    }
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  await pickedChip(page, 'gemini-4-carbon').getByRole('button', { name: '测试 gemini-4-carbon' }).click();
+  await expect(page.getByTestId('model-test-result')).toHaveAttribute('data-phase', 'checking');
+  await page.locator('[data-testid="provider-instance"][data-instance-id="subscription:sub-b2"]').getByRole('button').first().click();
+  await expect(detail(page)).toHaveAttribute('data-account-id', 'sub-b2');
+  const finished = page.waitForResponse((response) => response.url().endsWith('/sub-a1/test'));
+  release();
+  await finished;
+  await expect(page.getByTestId('model-test-result')).toHaveCount(0);
+  await expect(pickedChip(page, 'gemini-4-carbon')).toHaveAttribute('data-check', 'none');
+  await pickedChip(page, 'gemini-4-carbon').getByRole('button', { name: '测试 gemini-4-carbon' }).click();
+  await expect(page.getByTestId('model-test-detail')).toContainText('通过 · 420 ms');
+  expect(requests).toEqual([
+    '/api/teams/t1/antigravity-subscriptions/sub-a1/test:gemini-4-carbon',
+    '/api/teams/t1/antigravity-subscriptions/sub-b2/test:gemini-4-carbon',
+  ]);
 });
 
 test('removing a chip persists the shortened model list', async ({ page }) => {

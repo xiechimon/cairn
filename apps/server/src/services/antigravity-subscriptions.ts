@@ -9,8 +9,10 @@ import type {
   CreateAntigravitySubscription,
   MachineAntigravityUsageProbeClaim,
   MachineCapabilities,
+  MachineModelTurnClaim,
   PatchAntigravitySubscription,
   ProviderFailure,
+  ProviderTestResult,
   SecretBox,
   UpstreamModelsResult,
 } from '@cairn/shared';
@@ -58,6 +60,7 @@ import {
   dedupeSubscriptionModels,
   refuseWhileRunning,
 } from './subscription-helpers.js';
+import { modelTurnFailure, runSubscriptionModelTurn } from './subscription-model-turn.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 export type AntigravityAccountStepsPage = {
@@ -1292,6 +1295,79 @@ function isQuotaEligibleRow(row: Row, now: number): boolean {
   if (row.enabledAt === null) return false;
   if (row.expiresAt !== null && row.expiresAt <= now) return false;
   return row.tokenCipher === null || row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX);
+}
+
+export async function testAntigravitySubscriptionModel(
+  deps: Deps & {
+    machineHub: MachineWakeHub;
+    apiKeyProbeRunnerGrant: (machineId: string) => string | null;
+  },
+  teamId: string,
+  id: string,
+  model: string,
+  signal?: AbortSignal,
+): Promise<ProviderTestResult> {
+  const row = subscriptionRow(deps.db, teamId, id);
+  if (!row) throw notFound('Antigravity subscription connection');
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return modelTurnFailure('auth');
+  const host = row.tokenCipher === null ? runnerLogin(deps.db, row) : null;
+  const models =
+    row.models.length > 0 ? row.models : host?.status === 'ok' ? host.models : defaultSeedModels();
+  if (!models.some((entry) => entry.id === model) || isInternalAntigravityModelId(model)) {
+    throw new HttpError(400, 'Unknown model for this subscription');
+  }
+  if (host?.status === 'missing_local_login') return modelTurnFailure('auth');
+  const cipher = row.tokenCipher;
+  const isKey = cipher !== null && !cipher.startsWith(OAUTH_CIPHER_PREFIX);
+  const runners = registeredRunners(deps.db, teamId).filter(
+    (r) => host === null || host.runnerId === r.id,
+  );
+  const grants = new Map(
+    runners.map((r) => [r.id, isKey ? deps.apiKeyProbeRunnerGrant(r.id) : null]),
+  );
+  return runSubscriptionModelTurn(
+    deps.db,
+    deps.machineHub,
+    id,
+    model,
+    runners.map((r) => r.id),
+    (): MachineModelTurnClaim => {
+      if (cipher === null) return { mode: 'antigravity-host', model };
+      if (isKey) return { mode: 'antigravity-key', model, token: deps.box.open(cipher) };
+      return {
+        mode: 'antigravity-oauth',
+        model,
+        credential: oauthCredentialFromRow(deps.box, row),
+      };
+    },
+    (machineId) => {
+      const fresh = subscriptionRow(deps.db, teamId, id);
+      if (
+        !fresh ||
+        fresh.tokenCipher !== cipher ||
+        fresh.runnerId !== row.runnerId ||
+        (fresh.expiresAt !== null && fresh.expiresAt <= nowMs())
+      )
+        return false;
+      if (
+        isKey &&
+        (grants.get(machineId) == null ||
+          deps.apiKeyProbeRunnerGrant(machineId) !== grants.get(machineId))
+      )
+        return false;
+      const runner = subscriptionRunner(deps.db, teamId, machineId);
+      if (
+        runner?.online !== true ||
+        runner.capabilities?.modelTurnProbe !== true ||
+        runner.capabilities.antigravity?.installed !== true
+      )
+        return false;
+      if (cipher !== null) return true;
+      const login = runnerLogin(deps.db, fresh);
+      return login.status === 'ok' && login.runnerId === machineId;
+    },
+    signal,
+  );
 }
 
 async function probeAndStoreAntigravityQuota(

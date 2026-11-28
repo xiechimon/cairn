@@ -87,12 +87,13 @@ export function fetchClaudeUpstreamModels(
   );
 }
 
-export function testClaudeSubscriptionModel(
+export function testSubscriptionModel(
+  vendor: 'claude' | 'devin' | 'antigravity',
   teamId: string,
   id: string,
   model: string,
 ): Promise<ProviderTestResult> {
-  return api.post<ProviderTestResult>(`/api/teams/${teamId}/claude-subscriptions/${id}/test`, {
+  return api.post<ProviderTestResult>(`/api/teams/${teamId}/${vendor}-subscriptions/${id}/test`, {
     model,
   });
 }

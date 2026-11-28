@@ -46,6 +46,7 @@ import {
   acpThoughtLevels,
   acpThoughtValue,
   CLAUDE_TODO_STATUS_STATES,
+  devinCatalogFamilies,
   isInternalAntigravityModelId,
 } from '@cairn/shared';
 import {
@@ -1788,7 +1789,7 @@ class AcpBackend implements AgentBackend {
               [currentValueOf(modelOption)]: response.configOptions ?? [],
               [opts.modelId]: configOptions,
             });
-            if (models.length > 0) adapter.onDevinModels?.(models);
+            if (models.length > 0) adapter.onDevinModels?.(devinCatalogFamilies(models));
           } else if (adapter?.harness === 'antigravity') {
             const models = advertisedAcpModels(
               modelOption,

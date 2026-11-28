@@ -6,12 +6,20 @@ import type {
   DevinSubscriptionVerifyResult,
   PatchDevinSubscription,
   ProviderFailure,
+  ProviderTestResult,
   SecretBox,
   UpstreamModelsResult,
 } from '@cairn/shared';
+import {
+  DEFAULT_DEVIN_MODELS,
+  devinCatalogFamilies,
+  devinSweVariant,
+  devinWireModel,
+  isRegisteredMachine,
+} from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { devinSubscription, step, stepSubscription } from '../db/schema.js';
+import { devinSubscription, machine, step, stepSubscription } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -19,6 +27,7 @@ import {
   fetchDevinSubscriptionModels,
 } from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import { timedCheck } from './subscription-check.js';
 import {
   assertLabelHidesToken,
@@ -26,6 +35,7 @@ import {
   dedupeSubscriptionModels,
   refuseWhileRunning,
 } from './subscription-helpers.js';
+import { modelTurnFailure, runSubscriptionModelTurn } from './subscription-model-turn.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 type Deps = { db: Db; box: SecretBox };
@@ -67,7 +77,7 @@ function toRecord(row: Row): DevinSubscription {
     expiresAt: row.expiresAt,
     enabled: row.enabledAt !== null,
     enabledAt: row.enabledAt,
-    models: row.models,
+    models: devinCatalogFamilies(row.models),
     createdAt: row.createdAt,
   };
 }
@@ -110,7 +120,19 @@ export function updateDevinSubscription(
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Devin subscription connection');
   assertLabelHidesToken(patch.label, deps.box.open(row.tokenCipher));
-  const models = patch.models === undefined ? undefined : dedupeSubscriptionModels(patch.models);
+  const models =
+    patch.models === undefined
+      ? undefined
+      : dedupeSubscriptionModels(
+          patch.models.flatMap((model) => {
+            const id = devinWireModel('devin', model.id, model.thinkingDefault) ?? model.id;
+            if (id === model.id) return [model];
+            const previous = row.models.filter(
+              (entry) => devinSweVariant(entry.id)?.baseId === model.id,
+            );
+            return previous.some((entry) => entry.id === id) ? previous : [{ ...model, id }];
+          }),
+        );
   deps.db
     .update(devinSubscription)
     .set({
@@ -399,6 +421,58 @@ export async function devinSubscriptionUpstreamModels(
     };
   }
   return { status: 'ok', models: harvested.models };
+}
+
+export async function testDevinSubscriptionModel(
+  deps: Deps & { machineHub: MachineWakeHub },
+  teamId: string,
+  id: string,
+  model: string,
+  signal?: AbortSignal,
+): Promise<ProviderTestResult> {
+  const row = subscriptionRow(deps.db, teamId, id);
+  if (!row) throw notFound('Devin subscription connection');
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return modelTurnFailure('auth');
+  const runners = () =>
+    deps.db
+      .select()
+      .from(machine)
+      .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt), eq(machine.online, true)))
+      .all();
+  const eligible = (runner: typeof machine.$inferSelect) =>
+    isRegisteredMachine(runner) &&
+    runner.capabilities?.modelTurnProbe === true &&
+    runner.capabilities.devin?.installed === true;
+  const current = runners();
+  const catalog = devinCatalogFamilies(
+    row.models.length > 0
+      ? row.models
+      : [
+          ...current.flatMap((runner) => runner.capabilities?.devin?.models ?? []),
+          ...DEFAULT_DEVIN_MODELS,
+        ],
+  );
+  const selected = catalog.find((entry) => entry.id === (devinSweVariant(model)?.baseId ?? model));
+  if (!selected) throw new HttpError(400, 'Unknown model for this subscription');
+  const wire = devinWireModel('devin', model, selected.thinkingDefault) ?? model;
+  return runSubscriptionModelTurn(
+    deps.db,
+    deps.machineHub,
+    id,
+    wire,
+    current.filter(eligible).map((r) => r.id),
+    () => ({ mode: 'devin', model: wire, token: deps.box.open(row.tokenCipher) }),
+    (machineId) => {
+      const fresh = subscriptionRow(deps.db, teamId, id);
+      return (
+        fresh !== undefined &&
+        fresh.tokenCipher === row.tokenCipher &&
+        (fresh.expiresAt === null || fresh.expiresAt > nowMs()) &&
+        runners().some((r) => r.id === machineId && eligible(r))
+      );
+    },
+    signal,
+  );
 }
 
 export function enabledDevinSubscriptionModels(

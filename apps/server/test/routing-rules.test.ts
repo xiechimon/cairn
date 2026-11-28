@@ -987,6 +987,116 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(coordinatorDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
   });
 
+  test('legacy Devin fallback order survives an unrelated route edit and saving the hydrated list', () => {
+    const s = bare();
+    const stored = [
+      { provider: 'devin', modelId: 'swe-2-medium' },
+      { provider: 'devin', modelId: 'swe-2-high' },
+      { provider: 'devin', modelId: 'adaptive' },
+    ];
+    const id = seedRoute(s, 'session', {
+      provider: 'devin',
+      modelId: 'swe-2-1-medium',
+      fallbackModels: stored,
+    });
+    upsertRoutingRule(s.db, s.team.id, 'session', { requiredCapabilities: { os: 'linux' } });
+    expect(
+      s.db.select().from(routingRule).where(eq(routingRule.id, id)).get()?.fallbackModels,
+    ).toEqual(stored);
+    const rule = listRoutingSettings(s.db, s.team.id).rules.find(
+      (entry) => entry.use === 'session',
+    )!;
+    expect(rule.fallbackModels).toEqual([
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'medium' },
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'high' },
+      { provider: 'devin', modelId: 'adaptive' },
+    ]);
+    upsertRoutingRule(s.db, s.team.id, 'session', { fallbackModels: rule.fallbackModels });
+    expect(
+      s.db.select().from(routingRule).where(eq(routingRule.id, id)).get()?.fallbackModels,
+    ).toEqual(stored);
+  });
+
+  test('catalogue dropping a Devin fallback variant does not merge or remove stored variants', () => {
+    const s = bare();
+    const stored = [
+      { provider: 'devin', modelId: 'swe-2-medium' },
+      { provider: 'devin', modelId: 'swe-2-high' },
+      { provider: 'devin', modelId: 'adaptive' },
+    ];
+    const id = seedRoute(s, 'session', { fallbackModels: stored });
+    s.db
+      .insert(devinSubscription)
+      .values({
+        id: newRecordId(),
+        teamId: s.team.id,
+        label: 'Devin',
+        tokenCipher: s.secretBox.seal('wsk-test-token'),
+        models: [
+          { id: 'swe-2-medium', name: 'SWE-2 Medium' },
+          { id: 'swe-2-high', name: 'SWE-2 High' },
+        ],
+        enabledAt: Date.now(),
+        createdAt: Date.now(),
+      })
+      .run();
+    s.db
+      .update(devinSubscription)
+      .set({ models: [{ id: 'swe-2-high', name: 'SWE-2 High' }] })
+      .where(eq(devinSubscription.teamId, s.team.id))
+      .run();
+    const hydrated = listRoutingSettings(s.db, s.team.id).rules.find(
+      (entry) => entry.use === 'session',
+    )!.fallbackModels;
+    expect(hydrated).toEqual([
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'medium' },
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'high' },
+      { provider: 'devin', modelId: 'adaptive' },
+    ]);
+    upsertRoutingRule(s.db, s.team.id, 'session', { fallbackModels: hydrated });
+    expect(
+      s.db.select().from(routingRule).where(eq(routingRule.id, id)).get()?.fallbackModels,
+    ).toEqual(stored);
+  });
+
+  test('hydrated fallback aliases retain each original wire spelling in submitted order', () => {
+    const s = bare();
+    const stored = [
+      { provider: 'devin', modelId: 'swe-2-off' },
+      { provider: 'devin', modelId: 'SWE-2-NONE' },
+      { provider: 'devin', modelId: 'SWE-2-HIGH' },
+    ];
+    const id = seedRoute(s, 'session', { fallbackModels: stored });
+    const hydrated = listRoutingSettings(s.db, s.team.id).rules.find(
+      (entry) => entry.use === 'session',
+    )!.fallbackModels!;
+    expect(hydrated).toEqual([
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'off' },
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'off' },
+      { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'high' },
+    ]);
+    upsertRoutingRule(s.db, s.team.id, 'session', {
+      fallbackModels: [
+        hydrated[2]!,
+        hydrated[0]!,
+        hydrated[1]!,
+        { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'low' },
+      ],
+    });
+    expect(
+      s.db.select().from(routingRule).where(eq(routingRule.id, id)).get()?.fallbackModels,
+    ).toEqual([stored[2], stored[0], stored[1], { provider: 'devin', modelId: 'swe-2-low' }]);
+  });
+
+  test('a saved Devin model variant reads as a family with its pinned effort', () => {
+    const s = bare();
+    seedRoute(s, 'session', { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: null });
+    const rule = listRoutingSettings(s.db, s.team.id).rules.find(
+      (entry) => entry.use === 'session',
+    );
+    expect(rule).toMatchObject({ provider: 'devin', modelId: 'swe-2', thinkingLevel: 'high' });
+  });
+
   test('naming a Runner on an empty Session rule creates it with the default provider and model', () => {
     const s = bare();
     const machineId = piOnlyRunner(s);

@@ -283,7 +283,9 @@ for await (const line of createInterface({ input: process.stdin })) {
                   ],
                 },
               ]
-            : [],
+            : scenario.startsWith('model-test') && params.configId === 'model'
+              ? [{ id: 'model', name: 'Model', type: 'select', category: 'model', currentValue: params.value, options: [{ value: params.value, name: 'Test model' }] }]
+              : [],
       },
     });
   } else if (method === 'session/prompt') {
@@ -292,6 +294,12 @@ for await (const line of createInterface({ input: process.stdin })) {
       throw new Error(`Expected thinking ${expectedThinking}, got ${configuredThinking}`);
     }
     const text = params.prompt.find((block) => block.type === 'text')?.text ?? '';
+    if (scenario.startsWith('model-test')) {
+      if (text !== 'Reply only with OK. Do not use tools.') throw new Error('Unexpected test prompt');
+      if (scenario === 'model-test-replies') update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'OK' } });
+      send({ id, result: { stopReason: 'end_turn' } });
+      continue;
+    }
     if (scenario === 'devin-steer' && text.includes('steer-now')) {
       send({ id: pending, result: { stopReason: 'interrupted' } });
       update({

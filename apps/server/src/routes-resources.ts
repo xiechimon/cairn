@@ -77,6 +77,7 @@ import {
   patchAntigravitySubscription,
   refreshAntigravityQuota,
   resolveAntigravitySubscription,
+  testAntigravitySubscriptionModel,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
 import { createApiKey, deleteApiKey, listApiKeys } from './services/api-keys.js';
@@ -116,6 +117,7 @@ import {
   disableDevinSubscription,
   enableDevinSubscription,
   listDevinSubscriptions,
+  testDevinSubscriptionModel,
   updateDevinSubscription,
   verifyDevinSubscriptionConnection,
 } from './services/devin-subscriptions.js';
@@ -936,6 +938,46 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       ),
     );
   });
+
+  const testSubscriptionModel = async (
+    vendor: 'devin' | 'antigravity',
+    c: Context,
+    teamId: string,
+    id: string,
+  ) => {
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const { model } = parseWith(claudeSubscriptionTestSchema, await jsonBody(c), 'body');
+    const signal = c.req.raw.signal;
+    return c.json(
+      vendor === 'devin'
+        ? await testDevinSubscriptionModel(
+            { ...keysvc, machineHub: ctx.machineHub },
+            teamId,
+            id,
+            model,
+            signal,
+          )
+        : await testAntigravitySubscriptionModel(
+            {
+              ...antigravitySvc,
+              machineHub: ctx.machineHub,
+              apiKeyProbeRunnerGrant: (machineId) =>
+                apiKeyProbeRunnerGrant(ctx.db, teamId, machineId),
+            },
+            teamId,
+            id,
+            model,
+            signal,
+          ),
+    );
+  };
+  app.post('/api/teams/:id/devin-subscriptions/:cid/test', (c) =>
+    testSubscriptionModel('devin', c, c.req.param('id'), c.req.param('cid')),
+  );
+  app.post('/api/teams/:id/antigravity-subscriptions/:cid/test', (c) =>
+    testSubscriptionModel('antigravity', c, c.req.param('id'), c.req.param('cid')),
+  );
 
   app.get('/api/teams/:id/doubao-subscriptions', (c) => {
     const teamId = c.req.param('id');

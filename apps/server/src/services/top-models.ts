@@ -1,4 +1,10 @@
-import { type TopModel, type TopModelsEnvelope, topModelsSchema } from '@cairn/shared';
+import {
+  devinSweVariant,
+  devinWireModel,
+  type TopModel,
+  type TopModelsEnvelope,
+  topModelsSchema,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import type { Db } from '../db/client.js';
@@ -13,7 +19,14 @@ function parseStored(raw: string): TopModel[] | null {
   }
 }
 
-export function readTopModels(db: Db, teamId: string, logger?: Logger): TopModelsEnvelope {
+function hydrated(model: TopModel): TopModel {
+  const legacy = model.provider === 'devin' ? devinSweVariant(model.modelId) : null;
+  return legacy === null
+    ? model
+    : { ...model, modelId: legacy.baseId, thinkingLevel: model.thinkingLevel ?? legacy.level };
+}
+
+function readStoredTopModels(db: Db, teamId: string, logger?: Logger): TopModelsEnvelope {
   const row = db
     .select({ models: teamTopModels.models })
     .from(teamTopModels)
@@ -25,8 +38,33 @@ export function readTopModels(db: Db, teamId: string, logger?: Logger): TopModel
   return { models };
 }
 
+export function readTopModels(db: Db, teamId: string, logger?: Logger): TopModelsEnvelope {
+  const { models } = readStoredTopModels(db, teamId, logger);
+  return { models: models?.map(hydrated) ?? null };
+}
+
 export function writeTopModels(db: Db, teamId: string, models: TopModel[]): TopModelsEnvelope {
-  const stored = JSON.stringify(models);
+  const previous = readStoredTopModels(db, teamId).models ?? [];
+  const stored = JSON.stringify(
+    models.map((model) => {
+      const old = previous.find((candidate) => {
+        const view = hydrated(candidate);
+        return (
+          view.provider === 'devin' &&
+          view.provider === model.provider &&
+          view.modelId === model.modelId &&
+          view.thinkingLevel === model.thinkingLevel
+        );
+      });
+      return (
+        old ?? {
+          ...model,
+          modelId:
+            devinWireModel(model.provider, model.modelId, model.thinkingLevel) ?? model.modelId,
+        }
+      );
+    }),
+  );
   const updatedAt = Date.now();
   db.insert(teamTopModels)
     .values({ teamId, models: stored, updatedAt })

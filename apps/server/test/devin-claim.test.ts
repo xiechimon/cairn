@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import { DEFAULT_DEVIN_MODELS, machineTokenResponseSchema } from '@cairn/shared';
+import {
+  DEFAULT_DEVIN_MODELS,
+  devinCatalogFamilies,
+  machineTokenResponseSchema,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -193,6 +197,37 @@ describe('claimStep and the Devin subscription', () => {
     expect(await claimAs(s, machineId)).toBeNull();
   });
 
+  test('an old Devin Runner receives the exact upstream ID for a canonical model and effort', async () => {
+    const { s, projectId } = await world({ subscription: true });
+    const machineId = insertMachine(s, { name: 'legacy-devin', capabilities: DEVIN_CAPABILITIES });
+    routeSession(s, machineId);
+    const stepId = insertBuildStep(s, projectId);
+    s.db
+      .update(todoTable)
+      .set({
+        request: {
+          segments: [
+            {
+              source: { kind: 'edit', userId: 'owner', at: 1, span: 'whole' },
+              author: 'owner',
+              sourceRef: null,
+              text: 'Explain the result',
+            },
+          ],
+          siblings: [],
+          difficulty: null,
+          titleSource: 'owner',
+          titleSourceRef: null,
+          model: { provider: 'devin', modelId: 'swe-2', thinkingLevel: 'high' },
+        },
+      })
+      .where(eq(todoTable.projectId, projectId))
+      .run();
+    const claimed = await claimAs(s, machineId);
+    expect(claimed?.step.id).toBe(stepId);
+    expect(claimed?.agent).toMatchObject({ provider: 'devin', modelId: 'swe-2-high' });
+  });
+
   test('with a subscription the devin step binds the enabled account and serves its token only while claimed', async () => {
     const { s, projectId } = await world();
     const machineId = insertMachine(s, {
@@ -327,7 +362,7 @@ describe('model sources', () => {
     });
     s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, offline)).run();
     insertMachine(s, { name: 'no-devin' });
-    const statics = [...DEFAULT_DEVIN_MODELS];
+    const statics = devinCatalogFamilies(DEFAULT_DEVIN_MODELS);
     expect(listDevinSources(s.db, s.team.id)).toEqual([
       {
         runtime: 'devin',
@@ -397,7 +432,7 @@ describe('model sources', () => {
           { id: 'swe-3', name: 'SWE-3' },
           { id: 'gpt-5.5', name: 'GPT-5.5' },
           {
-            id: 'swe-2-high',
+            id: 'swe-2',
             name: 'SWE-2',
             thinkingLevels: ['medium', 'high', 'max'],
             thinkingDefault: 'high',
@@ -419,7 +454,7 @@ describe('model sources', () => {
         installed: true,
         hostname: 'devin-empty',
         machineId,
-        models: [...DEFAULT_DEVIN_MODELS],
+        models: devinCatalogFamilies(DEFAULT_DEVIN_MODELS),
       },
     ]);
   });
@@ -461,7 +496,7 @@ describe('model sources', () => {
           { id: 'swe-3', name: 'SWE-3 picked' },
           { id: 'gpt-5.5', name: 'GPT-5.5' },
           {
-            id: 'swe-2-high',
+            id: 'swe-2',
             name: 'SWE-2',
             thinkingLevels: ['medium', 'high', 'max'],
             thinkingDefault: 'high',
@@ -505,7 +540,7 @@ describe('model sources', () => {
         machineId,
         models: [
           {
-            id: 'swe-2-high',
+            id: 'swe-2',
             name: 'SWE-2',
             thinkingLevels: ['medium', 'high', 'max'],
             thinkingDefault: 'high',

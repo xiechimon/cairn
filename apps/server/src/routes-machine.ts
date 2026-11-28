@@ -28,6 +28,7 @@ import {
   machineHeartbeatBodySchema,
   machineImEventBodySchema,
   machineLocalMergeRecheckBodySchema,
+  machineModelTurnBodySchema,
   machineOfflineBodySchema,
   machinePhoneConsentBodySchema,
   machinePresenceBodySchema,
@@ -139,6 +140,7 @@ import {
 import { phoneRowsForPresence } from './services/phone-computer.js';
 import { resumeRuntimeHeldBuilds } from './services/runtime-holds.js';
 import { readServerVersionInfo } from './services/server-version.js';
+import { modelTurnQueue } from './services/subscription-model-turn.js';
 import { acceptWorkspaceFile } from './services/workspace-file-read.js';
 
 function resolvePresenceTargetVersion(
@@ -674,6 +676,27 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       unsubscribe();
     });
   });
+
+  app.post('/api/machine/provider/model-test/:requestId', (c) =>
+    executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      (row, decoded) => {
+        const body = parseWith(machineModelTurnBodySchema, decoded, 'body');
+        const id = c.req.param('requestId');
+        const hub = ctx.machineHub;
+        if (body.phase === 'claim') {
+          const claim = modelTurnQueue.claim(hub, id, row.id, body.connectionId);
+          if (!claim) throw new HttpError(404, 'Model test not found');
+          return c.json(claim, 200, { 'Cache-Control': 'no-store' });
+        }
+        const accepted = modelTurnQueue.finish(hub, id, row.id, body.connectionId, body.result);
+        if (accepted === 'missing') throw new HttpError(404, 'Model test not found');
+        if (accepted === 'revoked') throw new HttpError(409, 'Model test authorization changed');
+        return c.json({ ok: true as const });
+      },
+    ),
+  );
 
   app.post('/api/machine/antigravity/model-probes/:requestId', async (c) => {
     const requestId = c.req.param('requestId');

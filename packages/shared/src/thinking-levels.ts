@@ -115,6 +115,69 @@ export function devinVariantEffort(modelId: string): {
   return { baseId: match[1], level };
 }
 
+const DEVIN_SWE = {
+  'swe-2': { name: 'SWE-2', defaultEffort: 'high' },
+  'swe-2-flash': { name: 'SWE-2 Flash', defaultEffort: 'medium' },
+  'swe-2-1': { name: 'SWE-2.1', defaultEffort: 'medium' },
+} as const;
+
+function sweModel(id: string) {
+  return Object.hasOwn(DEVIN_SWE, id) ? DEVIN_SWE[id as keyof typeof DEVIN_SWE] : undefined;
+}
+
+export function devinSweVariant(id: string) {
+  const variant = devinVariantEffort(id);
+  return variant !== null && sweModel(variant.baseId) !== undefined ? variant : null;
+}
+
+export function devinWireModel(
+  provider: string | null,
+  id: string | null,
+  effort?: string | null,
+): string | null {
+  const model = provider === 'devin' && id !== null ? sweModel(id) : undefined;
+  if (model === undefined || id === null) return id;
+  const level = thinkingLevelSchema.safeParse(effort);
+  const suffix = level.success ? level.data : model.defaultEffort;
+  return `${id}-${suffix === 'off' ? 'none' : suffix}`;
+}
+
+export function devinCatalogFamilies<
+  T extends {
+    id: string;
+    name: string;
+    thinkingLevels?: ThinkingLevel[];
+    thinkingDefault?: ThinkingLevel;
+  },
+>(models: readonly T[]): T[] {
+  const families = new Map<string, T>();
+  for (const model of models) {
+    const variant = devinSweVariant(model.id);
+    const id = variant?.baseId ?? model.id;
+    const family = sweModel(id);
+    const previous = families.get(id);
+    if (family === undefined) {
+      if (previous === undefined) families.set(id, model);
+      continue;
+    }
+    const levels = new Set([
+      ...(previous?.thinkingLevels ?? []),
+      ...(model.thinkingLevels ?? []),
+      ...(variant !== null ? [variant.level] : []),
+    ]);
+    const first = previous ?? model;
+    const thinkingDefault = first.thinkingDefault ?? variant?.level ?? family.defaultEffort;
+    families.set(id, {
+      ...first,
+      id,
+      name: family.name,
+      thinkingLevels: THINKING_LEVELS.filter((level) => levels.has(level)),
+      thinkingDefault,
+    });
+  }
+  return [...families.values()];
+}
+
 export function devinInferredThinking(modelId: string): {
   thinkingLevels?: ThinkingLevel[];
   thinkingDefault?: ThinkingLevel;

@@ -2,6 +2,11 @@
   "version": 1,
   "surfaces": [
     {
+      "type": "runner-device-field",
+      "key": "machine.capabilities.modelTurnProbe",
+      "userScenario": "A Runner advertises support for a one-turn diagnostic so a subscription model test runs on the right computer without creating a task."
+    },
+    {
       "type": "env",
       "key": "CAIRN_HOST_TOOLS",
       "scope": "product",

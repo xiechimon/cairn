@@ -35,6 +35,10 @@ export function isSessionStepKind(kind: StepKind): boolean {
   return SESSION_STEP_KINDS.has(kind);
 }
 
+const routingFallbackSchema = modelRefSchema.extend({
+  thinkingLevel: thinkingLevelSchema.optional(),
+});
+
 export const routingRuleRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -42,7 +46,7 @@ export const routingRuleRecordSchema = z.object({
   provider: z.string(),
   modelId: z.string(),
   thinkingLevel: z.string().nullable(),
-  fallbackModels: z.array(modelRefSchema).nullable(),
+  fallbackModels: z.array(routingFallbackSchema).nullable(),
   machineId: recordId.nullable(),
   requiredCapabilities: requiredCapabilitiesSchema.nullable(),
   seededFromAgentId: recordId.nullable(),
@@ -56,7 +60,7 @@ export const patchRoutingRuleBodySchema = z
     provider: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
     thinkingLevel: thinkingLevelSchema.nullable().optional(),
-    fallbackModels: z.array(modelRefSchema).max(FALLBACK_MODELS_MAX).nullable().optional(),
+    fallbackModels: z.array(routingFallbackSchema).max(FALLBACK_MODELS_MAX).nullable().optional(),
     machineId: recordId.nullable().optional(),
     requiredCapabilities: requiredCapabilitiesSchema.nullable().optional(),
     expectedUpdatedAt: epochMs.optional(),

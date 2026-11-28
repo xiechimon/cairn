@@ -14,6 +14,7 @@ import {
   buildTaskPromptText,
   CLAIM_PAYLOAD_VERSION,
   CORE_COORDINATOR_TOOLS,
+  devinWireModel,
   fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
@@ -352,7 +353,11 @@ export function buildChiefClaimPayload(
       displayName: agentRow.displayName,
       description: agentRow.description,
       provider: model.provider,
-      modelId: model.modelId,
+      modelId: devinWireModel(
+        model.provider,
+        model.modelId,
+        fallback?.model ? null : agentRow.thinkingLevel,
+      ),
       thinkingLevel: fallback?.model ? null : agentRow.thinkingLevel,
       memories,
     },
@@ -522,8 +527,13 @@ export function buildWorkerClaimPayload(
       displayName: agentRow.displayName,
       description: agentRow.description,
       provider: model.provider,
-      modelId: model.modelId,
-      thinkingLevel: fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
+      modelId: devinWireModel(
+        model.provider,
+        model.modelId,
+        fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
+      ),
+      thinkingLevel:
+        fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
       memories: injectWorkerStepMemories(db, stepRow.id, claimedAt, {
         agentId: memoryOwnerOf(db, teamId, stepRow.kind),
         teamId,

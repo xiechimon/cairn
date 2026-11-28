@@ -358,6 +358,36 @@ export const subscriptionQuotaWindowSchema = z.object({
   observedAt: z.number().int().nonnegative(),
 });
 
+const modelTurnTarget = { model: z.string().min(1).max(256) };
+export const machineModelTurnClaimSchema = z.discriminatedUnion('mode', [
+  z.object({ ...modelTurnTarget, mode: z.literal('devin'), token: z.string().min(1).max(4096) }),
+  z.object({
+    ...modelTurnTarget,
+    mode: z.literal('antigravity-key'),
+    token: z.string().regex(ANTIGRAVITY_TOKEN_REGEX),
+  }),
+  z.object({
+    ...modelTurnTarget,
+    mode: z.literal('antigravity-oauth'),
+    credential: antigravityOAuthStepCredentialSchema,
+  }),
+  z.object({ ...modelTurnTarget, mode: z.literal('antigravity-host') }),
+]);
+export type MachineModelTurnClaim = z.infer<typeof machineModelTurnClaimSchema>;
+export const machineModelTurnResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('ok') }),
+  z.object({ status: z.literal('failed'), failure: providerFailureSchema }),
+]);
+export type MachineModelTurnResult = z.infer<typeof machineModelTurnResultSchema>;
+export const machineModelTurnBodySchema = z.discriminatedUnion('phase', [
+  z.object({ phase: z.literal('claim'), connectionId: modelProbeConnectionId }),
+  z.object({
+    phase: z.literal('result'),
+    connectionId: modelProbeConnectionId,
+    result: machineModelTurnResultSchema,
+  }),
+]);
+
 export const machineAntigravityUsageProbeClaimSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('oauth'), credential: antigravityOAuthStepCredentialSchema }),
   z.object({ mode: z.literal('host') }),
@@ -406,6 +436,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
     taskId: backgroundTaskSchema.shape.taskId,
   }),
   z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
+  z.object({ type: z.literal('provider.model-test'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.usage'), requestId: z.string().uuid() }),
   workspaceFileReadEventSchema,
   z.object({ type: z.literal('antigravity.verify'), checkId: antigravityCheckIdSchema }),
@@ -798,6 +829,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/offline',
     reason:
       '[design] #4596 Runner goodbye on clean shutdown: ends only the caller machine connection named by connectionId (docs/design/runner-offline-grace.md)',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/provider/model-test/{requestId}',
+    reason:
+      '[design] Claim and complete a one-turn model diagnostic on its assigned Runner connection',
   },
   {
     method: 'POST',

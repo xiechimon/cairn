@@ -204,7 +204,7 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
         s.app,
         'PATCH',
         `/api/teams/${s.team.id}/routing-rules/coordinator`,
-        { thinkingLevel: 'high' },
+        { thinkingLevel: 'medium' },
       );
       expect(sameModelPatch.status).toBe(200);
       expect(

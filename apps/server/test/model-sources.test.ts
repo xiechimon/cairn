@@ -227,7 +227,7 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
 });
 
 describe('managed-runtime sources follow the subscription, not a transient install flag', () => {
-  test('devin: a machine that reports installed:false under an active subscription still lists swe-2-high', () => {
+  test('devin: a machine that reports installed:false under an active subscription still lists swe-2', () => {
     const s = bootServer();
     insertDevinSubscription(s);
     insertMachine(s, {
@@ -244,9 +244,9 @@ describe('managed-runtime sources follow the subscription, not a transient insta
     expect(devin).toBeDefined();
     expect(devin?.installed).toBe(false);
     expect(devin?.hostname).toBe('exec-devin');
-    const swe2 = devin?.models.find((m) => m.id === 'swe-2-high');
+    const swe2 = devin?.models.find((m) => m.id === 'swe-2');
     expect(swe2).toMatchObject({
-      id: 'swe-2-high',
+      id: 'swe-2',
       name: 'SWE-2',
       thinkingLevels: ['medium', 'high', 'max'],
       thinkingDefault: 'high',
@@ -535,7 +535,7 @@ describe('thinking levels per model', () => {
       },
     });
     expect(levelsOf(env, 'devin')).toEqual({
-      'swe-2-high': { task: ['medium', 'high', 'max'], taskDefault: 'high' },
+      'swe-2': { task: ['medium', 'high', 'max'], taskDefault: 'high' },
       'claude-opus-5-5-medium': { task: claude },
       'gpt-6-sol-medium': {
         task: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],

@@ -24,6 +24,8 @@ import {
   type MachineImEventBody,
   type MachineLocalMergeRecheckBody,
   type MachineLocalMergeRecheckResponse,
+  type MachineModelTurnClaim,
+  type MachineModelTurnResult,
   type MachineOfflineBody,
   type MachineOfflineResponse,
   type MachinePhoneConsentBody,
@@ -50,6 +52,7 @@ import {
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
   machineLocalMergeRecheckResponseSchema,
+  machineModelTurnClaimSchema,
   machineOfflineResponseSchema,
   machineOkResponseSchema,
   machinePhoneConsentResponseSchema,
@@ -187,6 +190,17 @@ export interface MachineApi {
     requestId: string,
     connectionId: string,
     result: MachineAntigravityModelProbeResult,
+    signal: AbortSignal,
+  ): Promise<void>;
+  claimModelTurn?(
+    id: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ): Promise<MachineModelTurnClaim>;
+  finishModelTurn?(
+    id: string,
+    connectionId: string,
+    result: MachineModelTurnResult,
     signal: AbortSignal,
   ): Promise<void>;
   claimAntigravityUsageProbe?(
@@ -430,6 +444,31 @@ export class MachineClient implements MachineApi {
         parse: (raw) => machineOkResponseSchema.parse(raw),
       },
     );
+  }
+
+  async claimModelTurn(
+    id: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ): Promise<MachineModelTurnClaim> {
+    return this.request('POST', `/api/machine/provider/model-test/${encodeURIComponent(id)}`, {
+      body: { phase: 'claim', connectionId },
+      signal,
+      parse: (raw) => machineModelTurnClaimSchema.parse(raw),
+    });
+  }
+
+  async finishModelTurn(
+    id: string,
+    connectionId: string,
+    result: MachineModelTurnResult,
+    signal: AbortSignal,
+  ): Promise<void> {
+    await this.request('POST', `/api/machine/provider/model-test/${encodeURIComponent(id)}`, {
+      body: { phase: 'result', connectionId, result },
+      signal,
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
   }
 
   async claimAntigravityUsageProbe(

@@ -16,6 +16,7 @@ export const EN: Record<string, string> = {
   '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
     'This subscription is no longer signed in. Remove it, then run `claude setup-token` in a terminal and add the new token.',
   '验证超时，请重试': 'Verification timed out. Try again.',
+  '请确认执行机在线并已更新。请重试。': 'Make sure the Runner is online and up to date. Try again.',
   '暂时无法连接 Claude 服务，请检查网络后重试。':
     'Cannot connect to the Claude service right now. Check your network and try again.',
   '服务器上找不到 codex 命令': 'The codex command was not found on the server.',
