@@ -16,6 +16,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { enqueueStep } from '../../apps/server/src/services/builds.js';
 import { setCoordinatorInServer } from '../../apps/server/src/services/coordinator-context.js';
+import { readSubscription } from '../../apps/server/src/services/step-groups/subscription.js';
 import { setTodoPhase } from '../../apps/server/src/services/todos.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
@@ -65,7 +66,12 @@ function runs(): RunLine[] {
 }
 
 function stepsOf(buildId: string) {
-  return server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
+  return server.db
+    .select()
+    .from(stepTable)
+    .where(eq(stepTable.buildId, buildId))
+    .all()
+    .map((row) => ({ ...row, ...readSubscription(server.db, row.id) }));
 }
 
 async function enable(id: string): Promise<void> {
