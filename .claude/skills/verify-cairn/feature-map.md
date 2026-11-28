@@ -435,7 +435,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `cloud-account-settings`, `cloud-account-subtitle`, `cloud-billing-portal`, `cloud-migrate-data`, `cloud-open-workspace`, `cloud-sign-in`, `cloud-sign-out`, `cloud-subscribe`, `cloud-subscribed-badge`, `cloud-switch-local`, `cloud-workspace-status`, `sidebar-account`, `sidebar-account-popover`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-feedback`, `sidebar-footer`, `sidebar-pinned`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
+- Test ids in its code: `account-host-hint`, `account-host-list`, `account-host-row`, `cloud-account-settings`, `cloud-account-subtitle`, `cloud-billing-portal`, `cloud-migrate-data`, `cloud-open-workspace`, `cloud-sign-in`, `cloud-sign-out`, `cloud-subscribe`, `cloud-subscribed-badge`, `cloud-workspace-status`, `sidebar-account`, `sidebar-account-popover`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-feedback`, `sidebar-footer`, `sidebar-pinned`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: n/a: the binding contract is docs/design/in-app-cloud-account.md and the owner-selected Direction 1 prototype
 - Frontend design: [docs/design/surfaces/sidebar.md](../../../docs/design/surfaces/sidebar.md)
 - Backend design: [docs/design/in-app-cloud-account.md](../../../docs/design/in-app-cloud-account.md)

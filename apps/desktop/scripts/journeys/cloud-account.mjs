@@ -37,7 +37,15 @@ export default async function cloudAccount({ window, mode, evidenceDir }) {
     await window.getByTestId('cloud-sign-in').waitFor({ timeout: 15_000 });
   }
   if (mode === 'remote-server') {
-    await window.getByTestId('cloud-switch-local').waitFor({ timeout: 15_000 });
+    await window.getByTestId('account-host-list').waitFor({ timeout: 15_000 });
+    await window.getByTestId('account-host-hint').waitFor({ timeout: 15_000 });
+    const localHost = window.locator('[data-testid="account-host-row"][data-host-id="local"]');
+    await localHost.waitFor({ timeout: 15_000 });
+    assert.equal(
+      await localHost.isDisabled(),
+      false,
+      'the local host is not offered from a remote workspace',
+    );
   }
 
   await window.screenshot({ path: join(evidenceDir, `${mode}-cloud-account.png`) });

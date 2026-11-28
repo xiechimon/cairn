@@ -6,6 +6,7 @@ import {
   Laptop,
   LogIn,
   LogOut,
+  Monitor,
   Settings,
   Upload,
 } from 'lucide-react';
@@ -68,6 +69,14 @@ function accountSubtitle(
   return t('Cairn 云端 · 未订阅');
 }
 
+export interface AccountHostRow {
+  id: string;
+  label: string;
+  active: boolean;
+  local: boolean;
+  switchable: boolean;
+}
+
 export interface SidebarAccountPanelProps {
   displayName: string;
   avatarSrc: string | null | undefined;
@@ -78,6 +87,7 @@ export interface SidebarAccountPanelProps {
   workspaceUrl: string | null;
   onRemoteHost: boolean;
   desktopHostAvailable: boolean;
+  hosts?: readonly AccountHostRow[];
   connectPending: boolean;
   checkoutPending: boolean;
   portalPending: boolean;
@@ -88,7 +98,7 @@ export interface SidebarAccountPanelProps {
   onSubscribe: () => void;
   onBillingPortal: () => void;
   onOpenWorkspace: () => void;
-  onSwitchLocal: () => void;
+  onSwitchHost?: (id: string) => void;
   onSignOut: () => void;
 }
 
@@ -104,6 +114,7 @@ export function SidebarAccountPanel(props: SidebarAccountPanelProps) {
     workspaceUrl,
     onRemoteHost,
     desktopHostAvailable,
+    hosts,
     connectPending,
     checkoutPending,
     portalPending,
@@ -114,7 +125,7 @@ export function SidebarAccountPanel(props: SidebarAccountPanelProps) {
     onSubscribe,
     onBillingPortal,
     onOpenWorkspace,
-    onSwitchLocal,
+    onSwitchHost,
     onSignOut,
   } = props;
   return (
@@ -144,6 +155,45 @@ export function SidebarAccountPanel(props: SidebarAccountPanelProps) {
         </div>
       </div>
       <Separator className="my-1.5" />
+      {desktopHostAvailable && hosts !== undefined && hosts.length > 1 && (
+        <>
+          <div className="flex flex-col gap-1" data-testid="account-host-list">
+            <div className="px-2 text-meta text-muted-foreground">{t('主机')}</div>
+            {hosts.map((host) => (
+              <Button
+                key={host.id}
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 font-normal"
+                data-testid="account-host-row"
+                data-host-id={host.id}
+                data-host-active={host.active ? 'true' : 'false'}
+                aria-current={host.active ? 'true' : undefined}
+                disabled={!host.switchable || switchingHost}
+                onClick={() => onSwitchHost?.(host.id)}
+              >
+                {host.local ? (
+                  <Laptop className={MENU_ICON_CLS} />
+                ) : (
+                  <Monitor className={MENU_ICON_CLS} />
+                )}
+                <span className="truncate">{host.label}</span>
+                {host.active && (
+                  <Badge variant="outline" className="ml-auto flex-none font-normal">
+                    {t('当前')}
+                  </Badge>
+                )}
+              </Button>
+            ))}
+            {onRemoteHost && (
+              <p className="px-2 text-meta text-muted-foreground" data-testid="account-host-hint">
+                {t('远程工作区只能切回本机')}
+              </p>
+            )}
+          </div>
+          <Separator className="my-1.5" />
+        </>
+      )}
       <div className="flex flex-col gap-1">
         {!linked ? (
           <>
@@ -242,19 +292,6 @@ export function SidebarAccountPanel(props: SidebarAccountPanelProps) {
             </Button>
           </>
         )}
-        {onRemoteHost && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 font-normal"
-            data-testid="cloud-switch-local"
-            disabled={switchingHost}
-            onClick={onSwitchLocal}
-          >
-            <Laptop className={MENU_ICON_CLS} />
-            {t('切回本机工作区')}
-          </Button>
-        )}
       </div>
     </>
   );
@@ -287,6 +324,17 @@ export function SidebarAccount() {
   const localConnection = hostStatus?.connections.find((conn) => conn.kind === 'local') ?? null;
   const onRemoteHost =
     hostStatus !== null && localConnection !== null && hostStatus.activeId !== localConnection.id;
+  const hosts: AccountHostRow[] =
+    hostStatus === null
+      ? []
+      : hostStatus.connections.map((conn) => ({
+          id: conn.id,
+          label: conn.kind === 'local' ? t('本机') : conn.name,
+          active: conn.id === hostStatus.activeId,
+          local: conn.kind === 'local',
+          switchable:
+            conn.id !== hostStatus.activeId && (onRemoteHost ? conn.kind === 'local' : true),
+        }));
 
   useEffect(() => {
     if (!activePoll) return;
@@ -425,15 +473,15 @@ export function SidebarAccount() {
     }
   };
 
-  const handleSwitchLocalHost = async () => {
-    if (hostBridge === null || localConnection === null) return;
+  const handleSwitchHost = async (id: string) => {
+    if (hostBridge === null) return;
     setSwitchingHost(true);
     try {
-      const next = await hostBridge.switch(localConnection.id);
+      const next = await hostBridge.switch(id);
       if (next !== null) setHostStatus(next);
       setOpen(false);
     } catch (error) {
-      toastError(t('切换本机工作区失败。'), error);
+      toastError(t('切换主机失败，请重试。'), error);
     } finally {
       setSwitchingHost(false);
     }
@@ -494,6 +542,7 @@ export function SidebarAccount() {
           workspaceUrl={workspaceUrl}
           onRemoteHost={onRemoteHost}
           desktopHostAvailable={hostBridge !== null}
+          hosts={hosts}
           connectPending={mutations.startConnect.isPending}
           checkoutPending={mutations.startCheckout.isPending}
           portalPending={mutations.openBillingPortal.isPending}
@@ -504,7 +553,7 @@ export function SidebarAccount() {
           onSubscribe={() => void handleSubscribe()}
           onBillingPortal={() => void handleBillingPortal()}
           onOpenWorkspace={() => void handleOpenCloudWorkspace()}
-          onSwitchLocal={() => void handleSwitchLocalHost()}
+          onSwitchHost={(id) => void handleSwitchHost(id)}
           onSignOut={() => void handleSignOut()}
         />
       </PopoverContent>

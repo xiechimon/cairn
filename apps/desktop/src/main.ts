@@ -89,6 +89,7 @@ import { installContextMenu } from './context-menu.js';
 import { createDesktopNotificationController } from './desktop-notifications.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
 import { canInvokeHostIpc, canSwitchHost, probeRemoteReachable } from './host-lifecycle.js';
+import { createHostRestarter, type ReplacementTarget } from './host-restart.js';
 import {
   desktopStateToHostStatus,
   initialHandledHostRequestId,
@@ -134,6 +135,7 @@ import {
   parseRelaunchWindow,
   RELAUNCH_WINDOW_FILE_NAME,
   type RelaunchWindow,
+  relaunchWindowAtRoot,
   relaunchWindowOf,
   restoredUrl,
 } from './relaunch-window.js';
@@ -714,19 +716,19 @@ function relaunchWindowPath(): string {
   return join(app.getPath('userData'), RELAUNCH_WINDOW_FILE_NAME);
 }
 
-function rememberWindowForRelaunch(): void {
+function rememberWindowForRelaunch(rootPage = false): void {
   const window = mainWindow;
   if (window === null || window.isDestroyed() || appOrigin === null) return;
-  const saved = relaunchWindowOf(
-    {
-      isVisible: () => mainWindowShown,
-      isMinimized: () => window.isMinimized(),
-      isMaximized: () => window.isMaximized(),
-      isFullScreen: () => window.isFullScreen(),
-      url: window.webContents.getURL(),
-    },
-    appOrigin,
-  );
+  const windowLike = {
+    isVisible: () => mainWindowShown,
+    isMinimized: () => window.isMinimized(),
+    isMaximized: () => window.isMaximized(),
+    isFullScreen: () => window.isFullScreen(),
+    url: window.webContents.getURL(),
+  };
+  const saved = rootPage
+    ? relaunchWindowAtRoot(windowLike, appOrigin)
+    : relaunchWindowOf(windowLike, appOrigin);
   try {
     writeFileSync(relaunchWindowPath(), `${JSON.stringify(saved)}\n`);
   } catch (error) {
@@ -754,18 +756,40 @@ function showRestored(window: BrowserWindow, restore: RelaunchWindow | null): vo
   if (!restore.visible && BACKGROUND_LAUNCH) return;
   if (restore.maximized) window.maximize();
   if (BACKGROUND_LAUNCH) window.showInactive();
-  else window.show();
+  else {
+    window.show();
+    app.focus({ steal: true });
+  }
   if (restore.minimized) window.minimize();
   if (!restore.fullScreen) return;
   if (window.isFocused()) window.setFullScreen(true);
   else window.once('focus', () => window.setFullScreen(true));
 }
 
+const restartHosts = createHostRestarter();
+
+function restartForSwitch(): void {
+  setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
+  const args = relaunchArgs(false);
+  if (process.platform !== 'darwin') {
+    app.relaunch({ args });
+    app.quit();
+    return;
+  }
+  const target: ReplacementTarget = { pid: process.pid, executablePath: process.execPath, args };
+  restartHosts(
+    {
+      rememberWindow: () => rememberWindowForRelaunch(true),
+      quit: () => app.quit(),
+      fallback: () => app.relaunch({ args }),
+    },
+    target,
+  );
+}
+
 function switchDesktopHost(userData: string, id: string): void {
   setActiveConnection(userData, id);
-  app.relaunch({ args: relaunchArgs(false) });
-  setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
-  app.quit();
+  restartForSwitch();
 }
 
 function hostMenuEntries(userData: string) {
@@ -2572,12 +2596,7 @@ async function boot(): Promise<void> {
     });
     let residentTransitionInFlight = false;
     const relaunchForHostTransition = (): void => {
-      rememberWindowForRelaunch();
-      setTimeout(() => {
-        app.relaunch({ args: relaunchArgs(false) });
-        setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
-        app.quit();
-      }, 50).unref();
+      setTimeout(() => restartForSwitch(), 50).unref();
     };
     ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {
       if (!fromHostMainPage(event) || !canInvokeHostIpc(activeConn.kind, 'set-resident'))

@@ -36,6 +36,10 @@ export function relaunchWindowOf(window: WindowLike, origin: string): RelaunchWi
   };
 }
 
+export function relaunchWindowAtRoot(window: WindowLike, origin: string): RelaunchWindow {
+  return { ...relaunchWindowOf(window, origin), path: '/' };
+}
+
 export function parseRelaunchWindow(raw: string | null): RelaunchWindow | null {
   if (raw === null) return null;
   let value: unknown;

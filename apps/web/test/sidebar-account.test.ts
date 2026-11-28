@@ -6,7 +6,11 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { fetchCloudStatus } from '../src/api/hooks.js';
 import { LiveDataContext } from '../src/api/provider.js';
-import { SidebarAccount, SidebarAccountPanel } from '../src/board/sidebar-account.js';
+import {
+  type AccountHostRow,
+  SidebarAccount,
+  SidebarAccountPanel,
+} from '../src/board/sidebar-account.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
 afterEach(() => {
@@ -60,6 +64,7 @@ function renderPanel(options: {
   offerCloudSignIn?: boolean;
   desktopHostAvailable?: boolean;
   onRemoteHost?: boolean;
+  hosts?: readonly AccountHostRow[];
 }) {
   const cloud = options.cloud;
   const subscribed = cloud?.subscribed ?? false;
@@ -76,6 +81,7 @@ function renderPanel(options: {
         workspaceUrl: cloud?.workspace?.url ?? null,
         onRemoteHost: options.onRemoteHost ?? false,
         desktopHostAvailable: options.desktopHostAvailable ?? false,
+        hosts: options.hosts,
         connectPending: false,
         checkoutPending: false,
         portalPending: false,
@@ -86,11 +92,19 @@ function renderPanel(options: {
         onSubscribe: noop,
         onBillingPortal: noop,
         onOpenWorkspace: noop,
-        onSwitchLocal: noop,
+        onSwitchHost: noop,
         onSignOut: noop,
       }),
     }),
   );
+}
+
+function hostRowTag(html: string, id: string): string {
+  return html.match(new RegExp(`<button[^>]*data-host-id="${id}"[^>]*>`))?.[0] ?? '';
+}
+
+function hostRowIsDisabled(html: string, id: string): boolean {
+  return / disabled(=|>|\s)/.test(hostRowTag(html, id).replace(/ class="[^"]*"/, ''));
 }
 
 describe('SidebarAccount', () => {
@@ -136,14 +150,58 @@ describe('SidebarAccount', () => {
     expect(html).not.toContain('开通 Cairn 云端');
   });
 
-  test('renders switch-back-to-local action when connected to a remote host even while unlinked', () => {
+  test('lists every desktop host in the account popover and marks the active one', () => {
+    const html = renderPanel({
+      displayName: 'Local Ian',
+      linked: false,
+      desktopHostAvailable: true,
+      hosts: [
+        { id: 'local', label: '本机', active: true, local: true, switchable: false },
+        { id: 'remote-1', label: 'Mac mini', active: false, local: false, switchable: true },
+      ],
+    });
+    expect(html).toContain('data-testid="account-host-list"');
+    expect(html).toContain('Mac mini');
+    expect(hostRowIsDisabled(html, 'remote-1')).toBe(false);
+    expect(hostRowIsDisabled(html, 'local')).toBe(true);
+    expect(hostRowTag(html, 'local')).toContain('data-host-active="true"');
+    expect(html).toContain('当前');
+  });
+
+  test('offers only this computer while the workspace runs on a remote host', () => {
     const html = renderPanel({
       displayName: 'Remote Ian',
       linked: false,
+      desktopHostAvailable: true,
       onRemoteHost: true,
+      hosts: [
+        { id: 'local', label: '本机', active: false, local: true, switchable: true },
+        { id: 'remote-1', label: 'Mac mini', active: true, local: false, switchable: false },
+      ],
     });
-    expect(html).toContain('切回本机工作区');
+    expect(hostRowIsDisabled(html, 'local')).toBe(false);
+    expect(hostRowIsDisabled(html, 'remote-1')).toBe(true);
+    expect(hostRowTag(html, 'remote-1')).toContain('data-host-active="true"');
+    expect(html).toContain('data-testid="account-host-hint"');
     expect(html).toContain('账号设置');
+  });
+
+  test('shows no host list when this computer is the only host or in a browser tab', () => {
+    const singleHost = renderPanel({
+      displayName: 'Local Ian',
+      linked: false,
+      desktopHostAvailable: true,
+    });
+    expect(singleHost).not.toContain('data-testid="account-host-list"');
+    const browser = renderPanel({
+      displayName: 'Local Ian',
+      linked: false,
+      hosts: [
+        { id: 'local', label: '本机', active: true, local: true, switchable: false },
+        { id: 'remote-1', label: 'Mac mini', active: false, local: false, switchable: true },
+      ],
+    });
+    expect(browser).not.toContain('data-testid="account-host-list"');
   });
 
   test('switches trigger and panel to Clerk avatar and display name and shows subscribe button when unsubscribed', () => {
