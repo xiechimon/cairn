@@ -52,6 +52,7 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/coordinator/runtime/tool-args-repair.ts:JSON_ESCAPE': 'constant lookup table',
   'apps/server/src/coordinator/steer-withdrawals.ts:steerWithdrawals':
     'in-server coordinator runtime registry keyed on unique stepIds; the coordinator is a process-level singleton',
+  'apps/server/src/db/agent-layer-upgrade.ts:REVIEWER_PERSONAS': 'constant lookup table',
   'apps/server/src/lib/forwarded-origin.ts:FORWARDED_PROTOCOLS': 'constant lookup table',
   'apps/server/src/lib/github-oauth-base.ts:LOOPBACK_HOSTS': 'constant lookup table',
   'apps/server/src/lib/github-token.ts:appFetches':

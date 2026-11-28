@@ -55,7 +55,7 @@ describe('retired agent-layer boot path', () => {
     close();
   });
 
-  test('a pre-0119 database with live agent rows fails loudly instead of dropping them', () => {
+  test('a pre-0119 database with live agent rows upgrades through the bridge instead of overflowing', () => {
     const { dir, path } = dbPath('data-migration-ancient-');
     const sqlite = new Database(path);
     try {
@@ -68,7 +68,16 @@ describe('retired agent-layer boot path', () => {
     } finally {
       sqlite.close();
     }
-    expect(() => openDbWithHandle(path)).toThrow();
+    const { db, close } = openDbWithHandle(path);
+    expect(
+      db.all<{ name: string }>(
+        sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agent'`,
+      ),
+    ).toEqual([]);
+    expect(
+      db.all<{ id: string }>(sql`SELECT id FROM data_migration WHERE id = 'drop-agents'`),
+    ).toHaveLength(1);
+    close();
   });
 
   test('a pre-0119 database with an empty agent table drops it and opens', () => {
